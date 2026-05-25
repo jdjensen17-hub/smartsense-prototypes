@@ -13,7 +13,6 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@joltup/colors": "^1.3.0",
-    "@joltup/lists-web-components": "^5.5.23",
     "react": "^19.2.4",
     "react-complex-tree": "^2.6.1",
     "react-dom": "^19.2.4",
