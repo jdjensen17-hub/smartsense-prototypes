@@ -10,19 +10,18 @@ import {
   mdiDotsVertical,
 } from '@/icons/mdi';
 import { MobileStatusBar, MobileAppHeader, MobileHomeIndicator } from '@/components/mobile-shell';
+import { SHELL_HEX } from '@/theme/shellHex';
 
-// Shell-only hex values per design-system docs (not in @joltup/colors)
-const SHELL_HEX = {
+// Page-local hex values — PDF-viewer chrome and phone-frame bezel
+// used only by this prototype. Cross-file shell values come from
+// @/theme/shellHex via the SHELL_HEX import above.
+const PAGE_HEX = {
   viewerHeaderBg: '#3D4144',
   findBarBg: '#2a2a2a',
   pdfPageBg: '#E8E8E8',
   darkBezel: '#1C1C1C',
   highlight: '#FFEB3B',
   highlightCurrent: '#FF9800',
-  whiteHover: 'rgba(255,255,255,0.12)',
-  // Production universal repo: blue500 = #0078C8
-  // Not in @joltup/colors — documented shell exception
-  listHeaderBlue: '#0078C8',
 } as const;
 
 // ── Document content (reconstructed from prior research thread) ──────────────
@@ -85,8 +84,8 @@ const PhoneFrame = styled.div({
   width: `${PHONE_W}px`,
   height: `${PHONE_H}px`,
   borderRadius: '55px',
-  border: `8px solid ${SHELL_HEX.darkBezel}`,
-  backgroundColor: SHELL_HEX.darkBezel,
+  border: `8px solid ${PAGE_HEX.darkBezel}`,
+  backgroundColor: PAGE_HEX.darkBezel,
   boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
   overflow: 'hidden',
   fontFamily: '"Open Sans", sans-serif',
@@ -131,7 +130,7 @@ const ListHeaderIconBtn = styled.button({
   alignItems: 'center',
   justifyContent: 'center',
   flexShrink: 0,
-  '&:hover': { backgroundColor: SHELL_HEX.whiteHover },
+  '&:hover': { backgroundColor: SHELL_HEX.translucentWhiteHover },
 });
 const ListHeaderTitle = styled.span({
   label: 'list-header-title',
@@ -416,7 +415,7 @@ const Overlay = styled.div<{ open: boolean }>(({ open }) => ({
 const ViewerHeaderBar = styled.div({
   label: 'viewer-header',
   height: '52px',
-  backgroundColor: SHELL_HEX.viewerHeaderBg,
+  backgroundColor: PAGE_HEX.viewerHeaderBg,
   color: colors.white.white,
   display: 'flex',
   alignItems: 'center',
@@ -437,7 +436,7 @@ const ViewerIconBtn = styled.button({
   alignItems: 'center',
   justifyContent: 'center',
   flexShrink: 0,
-  '&:hover': { backgroundColor: SHELL_HEX.whiteHover },
+  '&:hover': { backgroundColor: SHELL_HEX.translucentWhiteHover },
 });
 const ViewerTitle = styled.span({
   label: 'viewer-title',
@@ -454,7 +453,7 @@ const SearchInput = styled.input({
   height: '34px',
   border: 'none',
   outline: 'none',
-  background: SHELL_HEX.whiteHover,
+  background: SHELL_HEX.translucentWhiteHover,
   color: colors.white.white,
   borderRadius: '8px',
   padding: '0 12px',
@@ -467,7 +466,7 @@ const PdfContent = styled.div({
   label: 'pdf-content',
   flex: 1,
   overflowY: 'auto',
-  backgroundColor: SHELL_HEX.pdfPageBg,
+  backgroundColor: PAGE_HEX.pdfPageBg,
   padding: '16px',
 });
 const PdfPage = styled.div({
@@ -505,7 +504,7 @@ const Paragraph = styled.p({
 });
 const Highlight = styled.span<{ isCurrent: boolean }>(({ isCurrent }) => ({
   label: 'pdf-highlight',
-  backgroundColor: isCurrent ? SHELL_HEX.highlightCurrent : SHELL_HEX.highlight,
+  backgroundColor: isCurrent ? PAGE_HEX.highlightCurrent : PAGE_HEX.highlight,
   color: isCurrent ? colors.white.white : '#181D1F',
   borderRadius: '2px',
   padding: '0 1px',
@@ -519,7 +518,7 @@ const FindBar = styled.div({
   bottom: '50px',
   left: '50%',
   transform: 'translateX(-50%)',
-  backgroundColor: SHELL_HEX.findBarBg,
+  backgroundColor: PAGE_HEX.findBarBg,
   color: colors.white.white,
   borderRadius: '12px',
   padding: '8px 16px',
@@ -558,7 +557,7 @@ const FindBarIconBtn = styled.button({
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  '&:hover': { backgroundColor: SHELL_HEX.whiteHover },
+  '&:hover': { backgroundColor: SHELL_HEX.translucentWhiteHover },
 });
 
 function PdfViewerOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {

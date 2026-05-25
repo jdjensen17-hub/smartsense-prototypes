@@ -2,6 +2,7 @@ import styled from '@emotion/styled';
 import colors from '@joltup/colors';
 import { Icon } from '@/components/shared/Icon';
 import { mdiMenuChunky, mdiChevronDown } from '@/icons/mdi';
+import { SHELL_HEX } from '@/theme/shellHex';
 
 // ── Status bar SVGs ──────────────────────────────────────────────────────────
 function SignalIcon() {
@@ -169,8 +170,8 @@ const LogoutText = styled.span({
   fontWeight: 600,
   letterSpacing: '0.1px',
   lineHeight: '20px',
-  // Production universal repo: blue500 = #0078C8 (documented shell exception)
-  color: '#0078C8',
+  // UA blue500 — see src/theme/shellHex.ts
+  color: SHELL_HEX.listHeaderBlue,
 });
 const TimerText = styled.span({
   label: 'timer-text',

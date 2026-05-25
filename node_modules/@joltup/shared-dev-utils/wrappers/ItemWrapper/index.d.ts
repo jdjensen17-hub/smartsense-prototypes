@@ -1,1 +1,0 @@
-export { ItemWrapper } from './ItemWrapper';
