@@ -72,6 +72,19 @@ Mobile prototype routes (/mobile/*) render with a minimal shell
 header. Full shell header on all other routes. This is already 
 implemented in App.tsx — do not change it.
 
+**Deploying updates:**
+After CC completes any change, push to GitHub to trigger 
+an automatic Vercel deployment:
+
+  git add .
+  git commit -m "describe what changed"
+  git push
+
+Public URL: https://smartsense-prototypes.vercel.app
+This URL is permanent — it updates automatically on 
+every push. Share it with collaborators who need to 
+view prototypes without running locally.
+
 ---
 
 ## STYLING
@@ -166,14 +179,24 @@ Follow-up needed:  [anything flagged but not addressed]
 
 ## HARD STOPS — REQUIRE EXPLICIT IN-SESSION CONFIRMATION
 
-Stop and ask before any of the following. "You mentioned this earlier" is never confirmation. I must say yes in the current message.
+Stop and ask before any of the following:
 
-- Deleting any file, overwriting existing code, dropping database records, removing dependencies
-- Deploying or pushing to any environment
+- Deleting any source file or directory
+- Dropping database records
 - Running migrations or schema changes
-- Any command with irreversible side effects
-- Sending, posting, publishing, sharing, or scheduling anything on my behalf (emails, calendar invites, document shares)
 - Any external API call with side effects
+- Sending, posting, publishing, or scheduling anything 
+  on my behalf (emails, calendar invites, document shares)
+
+The following do NOT require confirmation and should be 
+executed automatically when part of a task:
+- npm install, npm uninstall (except @joltup/* packages 
+  — confirm those)
+- git add, git commit, git push, git push --force when 
+  explicitly requested in the prompt
+- npm run dev, npm run build
+- Creating new files and directories
+- Editing existing source files within stated scope
 
 ---
 
