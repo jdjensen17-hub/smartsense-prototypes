@@ -22,7 +22,7 @@ Refer to `goals.md`, `company.md`, and `product.md` for audience and objectives.
 
 **Stack:** React, TypeScript, Vite, Node, React Native.
 
-**Universal App (UA) repo:** ~/Projects/universal
+**Universal App (UA) repo:** ~/projects/repos/universal
 When building mobile prototype components, search this repo 
 first for real component implementations and ground-truth 
 values before estimating from screenshots. The UA is the 

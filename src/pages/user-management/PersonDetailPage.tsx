@@ -5,6 +5,9 @@ import ScopePickerScreen, { type OrgNode, nodes } from '@/components/people/Scop
 import RolePickerScreen from '@/components/shared/RolePickerScreen';
 import { ROLE_DEFS } from '@/data/roles';
 
+// Prototype stub — wire to real permissions later.
+const CURRENT_USER_CAN_VIEW_EMPLOYEE_DETAILS = true;
+
 type Status = 'active' | 'invited' | 'deactivated';
 type Assignment = { id: string; roleId: string; scopeId: string; };
 type Person = { id: string; name: string; email: string; phone?: string; roles: string[]; status: string; lastLogin: string | null; assignments: Assignment[]; };
@@ -108,12 +111,14 @@ function EditableIdentitySection({ person }: { person: Person }) {
   const [firstName, setFirstName] = useState(nameParts[0] ?? '');
   const [lastName, setLastName] = useState(nameParts.slice(1).join(' ') ?? '');
   const [phone, setPhone] = useState(person.phone ?? '');
+  const [carrier, setCarrier] = useState('Verizon');
 
   function handleSave() { setEditing(false); }
   function handleCancel() {
     setFirstName(nameParts[0] ?? '');
     setLastName(nameParts.slice(1).join(' ') ?? '');
     setPhone(person.phone ?? '');
+    setCarrier('Verizon');
     setEditing(false);
   }
 
@@ -183,6 +188,14 @@ function EditableIdentitySection({ person }: { person: Person }) {
           )}
         </div>
         <div>
+          <p className="mb-0.5 text-xs font-medium" style={{ color: '#9BA0B0' }}>Carrier</p>
+          {editing ? (
+            <input type="text" value={carrier} onChange={(e) => setCarrier(e.target.value)} className={inputClass} style={{ border: '1px solid #CCCDD0', color: '#35353B' }} onFocus={e => e.currentTarget.style.borderColor = '#9BA0B0'} onBlur={e => e.currentTarget.style.borderColor = '#CCCDD0'} />
+          ) : (
+            <p className="text-sm font-medium" style={{ color: '#35353B' }}>{carrier || '—'}</p>
+          )}
+        </div>
+        <div>
           <p className="mb-0.5 text-xs font-medium" style={{ color: '#9BA0B0' }}>Email</p>
           <p className="text-sm font-medium" style={{ color: '#35353B' }}>{person.email}</p>
         </div>
@@ -213,6 +226,24 @@ function PlaceholderSection({ title, description }: { title: string; description
     <div className="rounded p-4" style={{ border: '1px dashed #CCCDD0', backgroundColor: '#F7F7FA' }}>
       <SectionHeader title={title} />
       <p className="text-sm" style={{ color: '#9BA0B0' }}>{description}</p>
+    </div>
+  );
+}
+
+function NotificationsSection({ personId }: { personId: string }) {
+  const navigate = useNavigate();
+  return (
+    <div className="rounded p-4" style={{ border: '1px dashed #CCCDD0', backgroundColor: '#F7F7FA' }}>
+      <SectionHeader title="Notifications" />
+      <button
+        onClick={() => navigate(`/admin/people/${personId}/notifications`)}
+        className="text-sm transition-colors"
+        style={{ color: '#1678C2', textDecoration: 'none' }}
+        onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+        onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+      >
+        Manage notification preferences →
+      </button>
     </div>
   );
 }
@@ -428,9 +459,11 @@ export default function PersonDetailPage() {
           onAdd={(a) => setAssignments((prev) => [...prev, a])}
           onRemove={(id) => setAssignments((prev) => prev.filter((a) => a.id !== id))}
         />
+        <NotificationsSection personId={person.id} />
+        {CURRENT_USER_CAN_VIEW_EMPLOYEE_DETAILS && (
+          <PlaceholderSection title="Employee Details" description="Hourly rate and employee ID." />
+        )}
         <MetaSection person={person} />
-        <PlaceholderSection title="Scheduling" description="Hourly rate and employee ID — owned by the Scheduling module." />
-        <PlaceholderSection title="Notifications" description="Per-channel alert preferences — owned by each module." />
       </div>
     </div>
   );
