@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 // ── Types + seed data (minimal copy — do not import from PersonDetailPage) ──────
 
@@ -89,8 +89,15 @@ type Channel = 'email' | 'sms' | 'push';
 export default function NotificationPreferencesPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const person = ROSTER.find((p) => p.id === id) ?? FALLBACK_ENTRY;
   const prefsSource = PREFS_BY_ID[person.id] ?? FALLBACK_PREFS;
+
+  // Back target: where we came from (avatar menu passes it in nav state),
+  // otherwise default to this person's detail page.
+  const navState = location.state as { from?: string; fromLabel?: string } | null;
+  const backTo = navState?.from ?? `/admin/people/${person.id}`;
+  const backLabel = navState?.fromLabel || (navState?.from ? 'Back' : person.name);
 
   const [prefs, setPrefs] = useState<Pref[]>(() => prefsSource.map((p) => ({ ...p })));
 
@@ -106,13 +113,13 @@ export default function NotificationPreferencesPage() {
   return (
     <div className="mx-auto max-w-2xl pb-16">
       <button
-        onClick={() => navigate(`/admin/people/${person.id}`)}
+        onClick={() => navigate(backTo)}
         className="mb-6 flex items-center gap-1.5 text-sm transition-colors"
         style={{ color: '#9BA0B0' }}
         onMouseEnter={e => e.currentTarget.style.color = '#35353B'}
         onMouseLeave={e => e.currentTarget.style.color = '#9BA0B0'}
       >
-        <ChevronLeftIcon /> {person.name}
+        <ChevronLeftIcon /> {backLabel}
       </button>
 
       <h1 className="mb-6 text-xl font-semibold" style={{ color: '#35353B' }}>Notification Preferences</h1>

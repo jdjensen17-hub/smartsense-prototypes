@@ -302,7 +302,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
           My Profile
         </button>
-        <button onClick={() => { setAvatarOpen(false); navigate(`/admin/people/${CURRENT_USER_ID}/notifications`); }}
+        <button onClick={() => { setAvatarOpen(false); navigate(`/admin/people/${CURRENT_USER_ID}/notifications`, { state: { from: location.pathname, fromLabel: pageTitle } }); }}
           className="block w-full px-4 py-2.5 text-left text-sm transition-colors"
           style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 400 }}
           onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
