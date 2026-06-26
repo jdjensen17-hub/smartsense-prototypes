@@ -6,6 +6,7 @@ import RolesListPage from '@/pages/user-management/RolesListPage';
 import PeopleListPage from '@/pages/user-management/PeopleListPage';
 import OrgScopePage from '@/pages/user-management/OrgScopePage';
 import PersonDetailPage from '@/pages/user-management/PersonDetailPage';
+import NotificationPreferencesPage from '@/pages/user-management/NotificationPreferencesPage';
 import LocationAttributesPage from '@/pages/user-management/LocationAttributesPage';
 import LocationTagManagementPage from '@/pages/user-management/LocationTagManagementPage';
 import DistributionPage from '@/pages/user-management/DistributionPage';
@@ -279,6 +280,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/admin/people" replace />} />
           <Route path="/admin/people"        element={<PeopleListPage />} />
           <Route path="/admin/people/:id"    element={<PersonDetailPage />} />
+          <Route path="/admin/people/:id/notifications" element={<NotificationPreferencesPage />} />
           <Route path="/admin/roles"         element={<RolesListPage />} />
           <Route path="/admin/org"           element={<OrgScopePage />} />
           <Route path="/admin/attributes"    element={<LocationAttributesPage />} />
