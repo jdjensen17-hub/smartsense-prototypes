@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 
 // ── Types + seed data (minimal copy — do not import from PersonDetailPage) ──────
 
-type Pref = { product: string; notification: string; email: boolean; sms: boolean; push: boolean };
+type Pref = { source: string; notification: string; email: boolean; sms: boolean; push: boolean };
 type RosterEntry = { id: string; name: string; email: string };
 
 // Prototype stubs — shared across all people until wired to real data.
@@ -38,21 +38,21 @@ const ROSTER: RosterEntry[] = [
 // Explicit notification tables. Anyone not listed borrows Ben's table (FALLBACK_PREFS).
 const PREFS_BY_ID: Record<string, Pref[]> = {
   p16: [
-    { product: 'Lists', notification: 'Item overdue',      email: true, sms: false, push: true },
-    { product: 'Lists', notification: 'Item out of range', email: true, sms: false, push: false },
+    { source: 'Lists', notification: 'Item overdue',      email: true, sms: false, push: true },
+    { source: 'Lists', notification: 'Item out of range', email: true, sms: false, push: false },
   ],
   p1: [
-    { product: 'Lists',   notification: 'Item overdue',   email: true,  sms: false, push: true },
-    { product: 'Lists',   notification: 'List completed',  email: false, sms: false, push: true },
-    { product: 'Sensors', notification: 'Critical alarm',  email: true,  sms: true,  push: false },
+    { source: 'Lists',   notification: 'Item overdue',   email: true,  sms: false, push: true },
+    { source: 'Lists',   notification: 'List completed',  email: false, sms: false, push: true },
+    { source: 'Sensors', notification: 'Critical alarm',  email: true,  sms: true,  push: false },
   ],
   p11: [
-    { product: 'Lists',       notification: 'Item overdue',        email: true, sms: false, push: true },
-    { product: 'Lists',       notification: 'Item out of range',   email: true, sms: false, push: false },
-    { product: 'Sensors',     notification: 'Critical alarm',      email: true, sms: true,  push: false },
-    { product: 'Sensors',     notification: 'Warning alarm',       email: true, sms: false, push: false },
-    { product: 'Work Orders', notification: 'Work order assigned', email: true, sms: false, push: true },
-    { product: 'Work Orders', notification: 'Work order past due', email: true, sms: true,  push: true },
+    { source: 'Lists',       notification: 'Item overdue',        email: true, sms: false, push: true },
+    { source: 'Lists',       notification: 'Item out of range',   email: true, sms: false, push: false },
+    { source: 'Sensors',     notification: 'Critical alarm',      email: true, sms: true,  push: false },
+    { source: 'Sensors',     notification: 'Warning alarm',       email: true, sms: false, push: false },
+    { source: 'Work Orders', notification: 'Work order assigned', email: true, sms: false, push: true },
+    { source: 'Work Orders', notification: 'Work order past due', email: true, sms: true,  push: true },
   ],
 };
 
@@ -119,21 +119,13 @@ export default function NotificationPreferencesPage() {
 
       <div className="space-y-4">
         {/* Section 1 — Contact Information */}
-        <div className="rounded p-4" style={{ border: '1px dashed #CCCDD0', backgroundColor: '#F7F7FA' }}>
+        <div className="rounded bg-white p-4" style={{ border: '1px solid #CCCDD0' }}>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide" style={{ color: '#9BA0B0' }}>Contact Information</p>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: '#9BA0B0' }}>Email</span>
-              <span className="text-sm" style={{ color: '#35353B' }}>{person.email}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: '#9BA0B0' }}>Mobile</span>
-              <span className="text-sm" style={{ color: '#35353B' }}>{MOBILE}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: '#9BA0B0' }}>Carrier</span>
-              <span className="text-sm" style={{ color: '#35353B' }}>{CARRIER}</span>
-            </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium" style={{ color: '#35353B' }}>{person.name}</span>
+            <span className="text-sm" style={{ color: '#757677' }}>{person.email}</span>
+            <span className="text-sm" style={{ color: '#757677' }}>{MOBILE}</span>
+            <span className="text-sm" style={{ color: '#757677' }}>{CARRIER}</span>
           </div>
           <button
             onClick={() => navigate(`/admin/people/${person.id}`)}
@@ -150,17 +142,17 @@ export default function NotificationPreferencesPage() {
         <div className="rounded bg-white" style={{ border: '1px solid #CCCDD0' }}>
           {/* Header row */}
           <div className="flex items-center px-4 py-3" style={{ borderBottom: '1px solid #CCCDD0' }}>
-            <span className="w-32 flex-shrink-0 text-xs font-semibold" style={{ color: '#9BA0B0' }}>Product</span>
+            <span className="w-32 flex-shrink-0 text-xs font-semibold" style={{ color: '#9BA0B0' }}>Source</span>
             <span className="flex-1 text-xs font-semibold" style={{ color: '#9BA0B0' }}>Notification</span>
             <span className="w-16 flex-shrink-0 text-center text-xs font-semibold" style={{ color: '#9BA0B0' }}>Email</span>
             <span className="w-16 flex-shrink-0 text-center text-xs font-semibold" style={{ color: '#9BA0B0' }}>SMS</span>
             <span className="w-16 flex-shrink-0 text-center text-xs font-semibold" style={{ color: '#9BA0B0' }}>Push</span>
           </div>
 
-          {/* Data rows — newspaper-column product grouping */}
+          {/* Data rows — newspaper-column source grouping */}
           {prefs.map((row, i) => {
-            const isFirstOfGroup = i === 0 || prefs[i - 1].product !== row.product;
-            const isLastOfGroup = i === prefs.length - 1 || prefs[i + 1].product !== row.product;
+            const isFirstOfGroup = i === 0 || prefs[i - 1].source !== row.source;
+            const isLastOfGroup = i === prefs.length - 1 || prefs[i + 1].source !== row.source;
             const showDivider = isLastOfGroup && i !== prefs.length - 1;
             return (
               <div
@@ -169,7 +161,7 @@ export default function NotificationPreferencesPage() {
                 style={showDivider ? { borderBottom: '1px solid #CCCDD0' } : undefined}
               >
                 <span className="w-32 flex-shrink-0 whitespace-nowrap text-sm font-medium" style={{ color: '#35353B' }}>
-                  {isFirstOfGroup ? row.product : ''}
+                  {isFirstOfGroup ? row.source : ''}
                 </span>
                 <span className="flex-1 text-sm" style={{ color: '#35353B' }}>{row.notification}</span>
                 <span className="flex w-16 flex-shrink-0 justify-center">

@@ -221,9 +221,9 @@ function MetaSection({ person }: { person: Person }) {
   );
 }
 
-function PlaceholderSection({ title, description }: { title: string; description: string }) {
+function InfoSection({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded p-4" style={{ border: '1px dashed #CCCDD0', backgroundColor: '#F7F7FA' }}>
+    <div className="rounded bg-white p-4" style={{ border: '1px solid #CCCDD0' }}>
       <SectionHeader title={title} />
       <p className="text-sm" style={{ color: '#9BA0B0' }}>{description}</p>
     </div>
@@ -233,7 +233,7 @@ function PlaceholderSection({ title, description }: { title: string; description
 function NotificationsSection({ personId }: { personId: string }) {
   const navigate = useNavigate();
   return (
-    <div className="rounded p-4" style={{ border: '1px dashed #CCCDD0', backgroundColor: '#F7F7FA' }}>
+    <div className="rounded bg-white p-4" style={{ border: '1px solid #CCCDD0' }}>
       <SectionHeader title="Notifications" />
       <button
         onClick={() => navigate(`/admin/people/${personId}/notifications`)}
@@ -461,7 +461,7 @@ export default function PersonDetailPage() {
         />
         <NotificationsSection personId={person.id} />
         {CURRENT_USER_CAN_VIEW_EMPLOYEE_DETAILS && (
-          <PlaceholderSection title="Employee Details" description="Hourly rate and employee ID." />
+          <InfoSection title="Employee Details" description="Hourly rate and employee ID." />
         )}
         <MetaSection person={person} />
       </div>
