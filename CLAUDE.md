@@ -179,6 +179,11 @@ Follow-up needed:  [anything flagged but not addressed]
 
 ## HARD STOPS — REQUIRE EXPLICIT IN-SESSION CONFIRMATION
 
+This is conversational judgment, not the permission system. The
+`.claude/settings.local.json` permission mode controls the tool
+popups; this list controls when *you* should pause and check with
+me in plain conversation, regardless of what the harness allows.
+
 Stop and ask before any of the following:
 
 - Deleting any source file or directory
@@ -188,15 +193,10 @@ Stop and ask before any of the following:
 - Sending, posting, publishing, or scheduling anything 
   on my behalf (emails, calendar invites, document shares)
 
-The following do NOT require confirmation and should be 
-executed automatically when part of a task:
-- npm install, npm uninstall (except @joltup/* packages 
-  — confirm those)
-- git add, git commit, git push, git push --force when 
-  explicitly requested in the prompt
-- npm run dev, npm run build
-- Creating new files and directories
-- Editing existing source files within stated scope
+These hard stops matter most on production code for my employer
+(e.g. the Universal App repo). This prototypes repo runs in
+bypassPermissions mode, so routine prototype work — npm, git,
+file edits, builds — proceeds without interruption.
 
 ---
 
