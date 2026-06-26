@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { HashRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { HashRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '@/components/shared/Icon';
-import { mdiMenu, mdiChevronDown } from '@/icons/mdi';
+import { mdiMenu, mdiChevronDown, mdiAccount } from '@/icons/mdi';
 import RolesListPage from '@/pages/user-management/RolesListPage';
 import PeopleListPage from '@/pages/user-management/PeopleListPage';
 import OrgScopePage from '@/pages/user-management/OrgScopePage';
@@ -13,6 +13,10 @@ import DistributionPage from '@/pages/user-management/DistributionPage';
 import OrgHierarchyImportPage from '@/pages/user-management/OrgHierarchyImportPage';
 import LicenseAssignmentPage from '@/pages/user-management/LicenseAssignmentPage';
 import PdfSearchPage from '@/pages/mobile/operate/PdfSearchPage';
+
+// ── Logged-in user (prototype stub) ─────────────────────────────────────────────
+const CURRENT_USER_ID = 'p16';
+const CURRENT_USER_NAME = 'Ben Caldwell';
 
 // ── Page title map ────────────────────────────────────────────────────────────
 const PAGE_TITLES: Record<string, string> = {
@@ -82,22 +86,31 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [guardOpen, setGuardOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [dashboardsOpen, setDashboardsOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const avatarRef = useRef<HTMLDivElement>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const pageTitle = usePageTitle();
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobilePage = location.pathname.startsWith('/mobile/');
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (drawerOpen && drawerRef.current && !drawerRef.current.contains(e.target as Node) &&
-          hamburgerRef.current && !hamburgerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (drawerOpen && drawerRef.current && !drawerRef.current.contains(target) &&
+          hamburgerRef.current && !hamburgerRef.current.contains(target)) {
         setDrawerOpen(false);
+      }
+      if (avatarOpen && avatarRef.current && !avatarRef.current.contains(target) &&
+          avatarButtonRef.current && !avatarButtonRef.current.contains(target)) {
+        setAvatarOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [drawerOpen]);
+  }, [drawerOpen, avatarOpen]);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') setDrawerOpen(false); }
@@ -159,6 +172,20 @@ function Shell({ children }: { children: React.ReactNode }) {
               </span>
             </>
           )}
+
+          {/* Avatar button */}
+          <div className="ml-auto">
+            <button ref={avatarButtonRef}
+              onClick={() => { setAvatarOpen(v => !v); setDrawerOpen(false); }}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors"
+              style={{ backgroundColor: '#CCCDD0', border: 'none', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#B8BCC8')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#CCCDD0')}
+              title={CURRENT_USER_NAME}
+              aria-label={`Account menu — ${CURRENT_USER_NAME}`} aria-expanded={avatarOpen}>
+              <Icon path={mdiAccount} size={18} color="#ffffff" />
+            </button>
+          </div>
         </header>
       )}
 
@@ -255,6 +282,41 @@ function Shell({ children }: { children: React.ReactNode }) {
             <ChevronIcon open={dashboardsOpen} />
           </button>
         </nav>
+      </div>
+
+      {/* ── Avatar dropdown menu ── */}
+      <div ref={avatarRef} style={{
+        position: 'fixed', top: '53px', right: '12px', width: '180px',
+        backgroundColor: '#ffffff', border: '1px solid #CCCDD0', borderRadius: '4px',
+        boxShadow: ['0 9px 28px 8px rgba(0,0,0,0.05)', '0 6px 16px 0px rgba(0,0,0,0.08)', '0 3px 6px -4px rgba(0,0,0,0.12)'].join(', '),
+        zIndex: 40, overflow: 'hidden',
+        opacity: avatarOpen ? 1 : 0,
+        transform: avatarOpen ? 'translateY(0) scale(1)' : 'translateY(-6px) scale(0.98)',
+        pointerEvents: avatarOpen ? 'auto' : 'none',
+        transition: 'opacity 0.15s ease, transform 0.15s ease',
+      }}>
+        <button onClick={() => { setAvatarOpen(false); navigate(`/admin/people/${CURRENT_USER_ID}`); }}
+          className="block w-full px-4 py-2.5 text-left text-sm transition-colors"
+          style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 400 }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+          My Profile
+        </button>
+        <button onClick={() => { setAvatarOpen(false); navigate(`/admin/people/${CURRENT_USER_ID}/notifications`); }}
+          className="block w-full px-4 py-2.5 text-left text-sm transition-colors"
+          style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 400 }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+          Notifications
+        </button>
+        <div style={{ borderTop: '1px solid #CCCDD0' }} />
+        <button onClick={() => setAvatarOpen(false)}
+          className="block w-full px-4 py-2.5 text-left text-sm transition-colors"
+          style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 400 }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+          Log out
+        </button>
       </div>
 
       {/* ── Page content ── */}
