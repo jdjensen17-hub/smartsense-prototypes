@@ -81,7 +81,7 @@ function DrawerNavItem({ to, label, end, onNavigate }: { to: string; label: stri
 // ── Shell ─────────────────────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [operateOpen, setOperateOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -115,12 +115,18 @@ function Shell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('keydown', handleKey);
   }, []);
 
+  // Opening the drawer always starts with both accordions collapsed.
+  function toggleDrawer() {
+    if (!drawerOpen) { setAdminOpen(false); setOperateOpen(false); }
+    setDrawerOpen(v => !v);
+  }
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7FA', color: '#35353B' }}>
 
       {/* ── Top bar / floating hamburger ── */}
       {isMobilePage ? (
-        <button ref={hamburgerRef} onClick={() => setDrawerOpen(v => !v)}
+        <button ref={hamburgerRef} onClick={toggleDrawer}
           className="flex items-center justify-center rounded-lg transition-colors"
           style={{
             position: 'fixed',
@@ -143,7 +149,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           style={{ borderBottom: '1px solid #CCCDD0', height: 52 }}>
 
           {/* Hamburger */}
-          <button ref={hamburgerRef} onClick={() => setDrawerOpen(v => !v)}
+          <button ref={hamburgerRef} onClick={toggleDrawer}
             className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-colors"
             style={{ color: drawerOpen ? '#5CA6D9' : '#9BA0B0', backgroundColor: drawerOpen ? '#E9F6FF' : 'transparent', border: 'none', cursor: 'pointer' }}
             onMouseEnter={e => { if (!drawerOpen) e.currentTarget.style.backgroundColor = '#F7F7FA'; }}
