@@ -518,8 +518,8 @@ const ItemResponse = styled.div({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ListCompletionPage() {
-  const [selectedListId, setSelectedListId] = useState<string | null>('3');
-  const [sheetMode, setSheetMode] = useState<'complete' | 'create' | null>('complete');
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [sheetMode, setSheetMode] = useState<'complete' | 'create' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [itemStates, setItemStates] = useState<Record<string, Partial<ListItem>>>({});
