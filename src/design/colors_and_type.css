@@ -1,0 +1,356 @@
+/* ============================================================
+   SmartSense Design System — Color & Type Foundations
+   Source: SmartSense (MCP) Web Design System — Figma
+   ============================================================ */
+
+/* ----- 1. Web Fonts (Proxima Nova) — local TTFs in ./fonts/ ----- */
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-thin.ttf") format("truetype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-thin-italic.ttf") format("truetype");
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-light-italic.ttf") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-regular-italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-semibold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-semibold-italic.ttf") format("truetype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-bold-italic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-extrabold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-extrabold-italic.ttf") format("truetype");
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proxima Nova";
+  src: url("./fonts/proxima-nova-black-italic.ttf") format("truetype");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ============================================================
+   2. Tokens
+   ============================================================ */
+:root {
+  /* ----- Brand palette ----- */
+  --ss-dark-blue: #004676; /* Primary brand — headers, accents, links */
+  --ss-sky-blue: #5ca6d9; /* Primary action color — buttons, links */
+  --ss-light-blue: #abcde5; /* Section / callout background */
+  --ss-pale-blue: #eef5fc; /* Even softer panel background */
+  --ss-medium-blue: #2c82bd; /* Pressed / accent blue */
+  --ss-sky-blue-25: rgba(92, 166, 217, 0.25); /* Focus halo */
+
+  /* ----- Semantic colors ----- */
+  --ss-success: #82c55d;
+  --ss-success-dark: #367a36;
+  --ss-success-bg: #e8fce8;
+  --ss-success-30: rgba(130, 197, 93, 0.3);
+
+  --ss-warning: #f29200; /* Orange */
+  --ss-warning-30: rgba(242, 146, 0, 0.3);
+  --ss-warning-alt: #f1ae00; /* Yellow (lower priority warning) */
+  --ss-warning-bg: #fff7cf;
+  --ss-warning-dark: #9a5a00; /* Warning text on tinted/30 background (per components.md) */
+
+  --ss-danger: #e30425; /* Red */
+  --ss-danger-dark: #842029;
+  --ss-danger-pink: #e08484;
+  --ss-danger-bg: #ffebeb;
+
+  --ss-info: #5ca6d9; /* Same as sky-blue */
+  --ss-info-bg: #e9f6ff;
+
+  --ss-purple: #9450c8; /* Used for diagnostic / dashed annotation */
+  --ss-purple-dashed: #9747ff;
+
+  /* ----- Neutrals ----- */
+  --ss-black: #35353b; /* Body text */
+  --ss-true-black: #000000;
+  --ss-black-30: rgba(53, 53, 59, 0.3);
+  --ss-black-10: rgba(
+    53,
+    53,
+    59,
+    0.1
+  ); /* Offline badge / neutral tint (per components.md) */
+  --ss-grey-800: #525253; /* Dense body text variant */
+  --ss-grey-700: #757677; /* Caption / tertiary text */
+  --ss-grey-600: #9ba0b0; /* Icon default, placeholder glyph */
+  --ss-grey-500: #cccdd0; /* Borders, dividers */
+  --ss-grey-400: #d6d7d9; /* Hairline divider, disabled fill */
+  --ss-grey-300: #e0e1e3; /* Soft separators */
+  --ss-grey-200: #f7f7fa; /* App background / light surface */
+  --ss-white: #ffffff;
+
+  /* ----- Surface roles ----- */
+  --ss-bg-app: var(--ss-grey-200);
+  --ss-bg-surface: var(--ss-white);
+  --ss-bg-subtle: var(--ss-grey-300);
+  --ss-bg-callout: var(--ss-light-blue);
+  --ss-bg-navbar: var(--ss-black);
+
+  --ss-fg-primary: var(--ss-black);
+  --ss-fg-secondary: var(--ss-grey-700);
+  --ss-fg-tertiary: var(--ss-grey-600);
+  --ss-fg-on-dark: var(--ss-white);
+  --ss-fg-link: var(--ss-sky-blue);
+  --ss-fg-heading: var(--ss-dark-blue);
+
+  --ss-border-default: var(--ss-grey-500);
+  --ss-border-strong: var(--ss-grey-600);
+  --ss-border-brand: var(--ss-dark-blue);
+  --ss-border-focus: var(--ss-sky-blue);
+
+  /* ----- Spacing scale (Indention) ----- */
+  --ss-space-1: 4px;
+  --ss-space-2: 8px;
+  --ss-space-3: 12px;
+  --ss-space-4: 16px;
+  --ss-space-6: 24px;
+  --ss-space-8: 32px;
+  --ss-space-10: 40px;
+  --ss-space-12: 48px;
+  --ss-space-14: 56px;
+  --ss-space-16: 64px;
+
+  /* ----- Radius — Scale/* tokens ----- */
+  --ss-rd-none: 0;
+  --ss-rd-2: 2px;
+  --ss-rd-4: 4px; /* default — buttons, inputs, cards */
+  --ss-rd-8: 8px; /* panels, callouts */
+  --ss-rd-16: 16px; /* large containers */
+  --ss-rd-24: 24px; /* hero / extra-large */
+  --ss-rd-36: 36px; /* maximum scale value */
+  --ss-rd-pill: 9999px; /* pills / status dots */
+
+  /* Legacy aliases (kept for backward-compat with existing previews) */
+  --ss-radius-xs: var(--ss-rd-2);
+  --ss-radius-sm: var(--ss-rd-4);
+  --ss-radius-md: var(--ss-rd-8);
+  --ss-radius-lg: var(--ss-rd-16);
+  --ss-radius-pill: var(--ss-rd-pill);
+
+  /* ----- Shadows ----- */
+  --ss-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --ss-shadow-2: 0 2px 4px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --ss-shadow-3: 2px 4px 9px rgba(0, 0, 0, 0.25); /* Card / popover (from Figma) */
+  --ss-shadow-fab: 0 3px 8px rgba(0, 0, 0, 0.18); /* FAB elevation (DS v1.0.0) — lighter than shadow-3 */
+  --ss-shadow-focus: 0 0 0 3px var(--ss-sky-blue-25);
+  --ss-shadow-inset-input: inset 0 0 0 1px var(--ss-border-default);
+  --ss-overlay-scrim: rgba(
+    0,
+    0,
+    0,
+    0.4
+  ); /* Modal overlay — solid scrim, no blur (per components.md) */
+
+  /* ----- Layout ----- */
+  --ss-grid-columns: 12;
+  --ss-grid-gutter: 24px;
+  --ss-grid-margin: 60px;
+  --ss-navbar-height: 62px;
+
+  /* ----- Typography (raw) ----- */
+  --ss-font-sans:
+    "Proxima Nova", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+  --ss-font-mono: "SF Mono", "Courier New", monospace;
+
+  /* Type ramp — per Figma "Typography" frame */
+  --ss-size-h1: 24px; /* Headline 1 — Bold */
+  --ss-size-h2: 20px; /* Headline 2 — Bold or Light */
+  --ss-size-h3: 18px; /* Headline 3 — Bold */
+  --ss-size-h4: 16px; /* Headline 4 — Regular */
+  --ss-size-body-lg: 16px; /* Body-Large — Regular or Bold */
+  --ss-size-body: 14px; /* Body-Medium — Regular or Semibold */
+  --ss-size-body-sm: 12px; /* Body-Small — Regular or Semibold */
+  --ss-size-button: 14px; /* Button / Link — Bold */
+  --ss-size-special: 10px; /* Special — Regular */
+
+  --ss-lh-tight: 1;
+  --ss-lh-snug: 1.2;
+  --ss-lh-normal: 1.4;
+  --ss-lh-relaxed: 1.6;
+
+  --ss-tracking-banner: 0.1px;
+
+  /* ----- Motion ----- */
+  --ss-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ss-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ss-duration-fast: 120ms;
+  --ss-duration-base: 180ms;
+  --ss-duration-slow: 280ms;
+}
+
+/* ============================================================
+   3. Base elements (apply to any document linking this file)
+   ============================================================ */
+html,
+body {
+  font-family: var(--ss-font-sans);
+  color: var(--ss-fg-primary);
+  background: var(--ss-bg-surface);
+  font-size: var(--ss-size-body);
+  line-height: var(--ss-lh-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+.ss-h1 {
+  font-family: var(--ss-font-sans);
+  font-weight: 700;
+  font-size: var(--ss-size-h1);
+  line-height: 1.15;
+  color: var(--ss-fg-primary);
+  margin: 0;
+}
+h2,
+.ss-h2 {
+  font-weight: 700; /* or 300 Light */
+  font-size: var(--ss-size-h2);
+  line-height: 1.2;
+  color: var(--ss-fg-primary);
+  margin: 0;
+}
+h3,
+.ss-h3 {
+  font-weight: 700;
+  font-size: var(--ss-size-h3);
+  line-height: 1.2;
+  color: var(--ss-fg-primary);
+  margin: 0;
+}
+h4,
+.ss-h4 {
+  font-weight: 400; /* Headline 4 is Regular */
+  font-size: var(--ss-size-h4);
+  line-height: 1.3;
+  color: var(--ss-fg-primary);
+  margin: 0;
+}
+
+p,
+.ss-body {
+  font-size: var(--ss-size-body);
+  line-height: var(--ss-lh-normal);
+  color: var(--ss-fg-primary);
+  margin: 0;
+}
+.ss-body-lg {
+  font-size: var(--ss-size-body-lg);
+}
+.ss-body-sm {
+  font-size: var(--ss-size-body-sm);
+}
+.ss-special {
+  font-size: var(--ss-size-special);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ss-muted {
+  color: var(--ss-fg-secondary);
+}
+.ss-quiet {
+  color: var(--ss-fg-tertiary);
+}
+.ss-required {
+  color: var(--ss-danger);
+}
+
+a,
+.ss-link {
+  color: var(--ss-fg-link);
+  text-decoration: none;
+  font-weight: 700;
+}
+a:hover,
+.ss-link:hover {
+  text-decoration: underline;
+}
+
+code,
+kbd,
+.ss-mono {
+  font-family: var(--ss-font-mono);
+  font-size: 0.92em;
+}
+
+button {
+  font-family: inherit;
+}

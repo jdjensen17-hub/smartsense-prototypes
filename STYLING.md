@@ -1,6 +1,6 @@
 # STYLING.md
 
-**Emotion Styling Reference for lists-web-components**
+**Emotion Styling Reference — Jolt Design System**
 
 ---
 

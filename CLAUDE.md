@@ -65,6 +65,7 @@ change.
 **Page organization:**
   src/pages/mobile/[module]/     ← mobile prototypes (Operate, 
                                     Assure, Guard, Service)
+  src/pages/operate/             ← SmartSense ONE web pages
   src/pages/dashboards/          ← dashboard prototypes
   src/pages/user-management/     ← existing admin pages
 
@@ -89,25 +90,13 @@ view prototypes without running locally.
 
 ## STYLING
 
-All components use Emotion. No Tailwind, no inline styles, no hardcoded hex values, no `css` template literals.
+Two design systems are in active use. Read the target before styling anything.
 
-**Always import colors from @joltup/colors directly:**
-  import colors from '@joltup/colors';
+Jolt DS (legacy pages, @joltup/colors + Emotion):
+  → STYLING.md
 
-**Pattern 2 caveat:** LIST_COMPONENT_COLORS from 
-@joltup/lists-web-components requires that package's full 
-transitive dep tree to be installed. If Pattern 2 imports fail, 
-fall back to Pattern 1 with direct colors.* tokens — visual 
-output is identical. Document the fallback in Follow-up needed.
-
-**Pattern 1** (static/structural components): use `@joltup/colors` directly.
-**Pattern 2** (hover/active/disabled/theme-aware): use `LIST_COMPONENT_COLORS` from `THEME_LIGHT`/`THEME_DARK` in `constants.js`.
-
-Always include a `label` on every styled component.
-
-⚠️ `TRASNPARENT_HOVER` and `TRASNPARENT_ACTIVE` are typos in the source constants — use them as-is to match the codebase.
-
-→ See `STYLING.md` for full token reference, pattern examples, and file naming conventions.
+SmartSense ONE DS (new platform pages, --ss-* tokens + colors_and_type.css):
+  → STYLING-S1.md
 
 ---
 

@@ -13,6 +13,7 @@ import DistributionPage from '@/pages/user-management/DistributionPage';
 import OrgHierarchyImportPage from '@/pages/user-management/OrgHierarchyImportPage';
 import LicenseAssignmentPage from '@/pages/user-management/LicenseAssignmentPage';
 import PdfSearchPage from '@/pages/mobile/operate/PdfSearchPage';
+import ListCompletionPage from '@/pages/operate/ListCompletionPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -27,6 +28,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/licenses':            'License Assignment',
   '/admin/distribution':        'Distribution',
   '/admin/org-import':          'Org Hierarchy Import',
+  '/operate/lists':             'List Completion',
   '/mobile/operate/pdf-search': 'PDF Search — Operate',
 };
 
@@ -80,12 +82,7 @@ function DrawerNavItem({ to, label, end, onNavigate }: { to: string; label: stri
 function Shell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(true);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [operateOpen, setOperateOpen] = useState(false);
-  const [assureOpen, setAssureOpen] = useState(false);
-  const [guardOpen, setGuardOpen] = useState(false);
-  const [serviceOpen, setServiceOpen] = useState(false);
-  const [dashboardsOpen, setDashboardsOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
@@ -220,67 +217,20 @@ function Shell({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          <button onClick={() => setMobileOpen(v => !v)}
+          <button onClick={() => setOperateOpen(v => !v)}
             className="mt-1 flex w-full items-center justify-between rounded px-3 py-2 text-sm font-semibold transition-colors"
             style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-            <span>Mobile Prototypes</span>
-            <ChevronIcon open={mobileOpen} />
+            <span>Operate</span>
+            <ChevronIcon open={operateOpen} />
           </button>
-          {mobileOpen && (
+          {operateOpen && (
             <div className="mt-1 ml-3 flex flex-col gap-0.5" style={{ borderLeft: '1px solid #CCCDD0', paddingLeft: '10px' }}>
-              <button onClick={() => setOperateOpen(v => !v)}
-                className="flex w-full items-center justify-between rounded px-3 py-2 text-sm transition-colors"
-                style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 500 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-                <span>Operate</span>
-                <ChevronIcon open={operateOpen} />
-              </button>
-              {operateOpen && (
-                <div className="ml-3 flex flex-col gap-0.5" style={{ borderLeft: '1px solid #CCCDD0', paddingLeft: '10px' }}>
-                  <DrawerNavItem to="/mobile/operate/pdf-search" label="PDF Search" end onNavigate={() => setDrawerOpen(false)} />
-                </div>
-              )}
-
-              <button onClick={() => setAssureOpen(v => !v)}
-                className="flex w-full items-center justify-between rounded px-3 py-2 text-sm transition-colors"
-                style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 500 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-                <span>Assure</span>
-                <ChevronIcon open={assureOpen} />
-              </button>
-
-              <button onClick={() => setGuardOpen(v => !v)}
-                className="flex w-full items-center justify-between rounded px-3 py-2 text-sm transition-colors"
-                style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 500 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-                <span>Guard</span>
-                <ChevronIcon open={guardOpen} />
-              </button>
-
-              <button onClick={() => setServiceOpen(v => !v)}
-                className="flex w-full items-center justify-between rounded px-3 py-2 text-sm transition-colors"
-                style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 500 }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-                <span>Service</span>
-                <ChevronIcon open={serviceOpen} />
-              </button>
+              <DrawerNavItem to="/operate/lists" label="List Completion" end onNavigate={() => setDrawerOpen(false)} />
+              <DrawerNavItem to="/mobile/operate/pdf-search" label="PDF Search" end onNavigate={() => setDrawerOpen(false)} />
             </div>
           )}
-
-          <button onClick={() => setDashboardsOpen(v => !v)}
-            className="mt-1 flex w-full items-center justify-between rounded px-3 py-2 text-sm font-semibold transition-colors"
-            style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F7F7FA')}
-            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-            <span>Dashboards</span>
-            <ChevronIcon open={dashboardsOpen} />
-          </button>
         </nav>
       </div>
 
@@ -350,6 +300,7 @@ export default function App() {
           <Route path="/admin/licenses"      element={<LicenseAssignmentPage />} />
           <Route path="/admin/distribution" element={<DistributionPage />} />
           <Route path="/admin/org-import"   element={<OrgHierarchyImportPage />} />
+          <Route path="/operate/lists" element={<ListCompletionPage />} />
           <Route path="/mobile/operate/pdf-search" element={<PdfSearchPage />} />
         </Routes>
       </Shell>

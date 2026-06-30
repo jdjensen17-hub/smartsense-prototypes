@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FY26 Roadmap</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f4f0; padding: 24px; }
+.page { max-width: 1400px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.page-title { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 2px; }
+.page-title span { color: #e05a2b; font-size: 13px; font-weight: 400; margin-left: 10px; }
+.page-sub { font-size: 11px; color: #999; margin-bottom: 14px; }
+.leg { display: flex; gap: 20px; padding: 0 0 10px; font-size: 11px; color: #666; align-items: center; flex-wrap: wrap; }
+.ls { width: 26px; height: 11px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: middle; }
+.rw { width: 100%; overflow-x: auto; }
+table.rm { width: 100%; font-size: 11px; border-collapse: collapse; table-layout: fixed; border: 2px solid #fff; }
+table.rm th, table.rm td { border: 2px solid #fff; }
+.hdr th { background: #2c2c2c; color: #fff; font-weight: 500; font-size: 11px; padding: 7px 8px; text-align: center; }
+.hdr th:first-child, .hdr th:nth-child(2) { text-align: left; }
+.pb-cell { font-weight: 700; font-size: 10px; padding: 6px 8px; vertical-align: middle; text-align: left; line-height: 1.4; background: #f5d5c0; color: #5a3a28; }
+.ao-cell { font-size: 10px; padding: 5px 7px; vertical-align: middle; font-weight: 500; position: relative; overflow: hidden; background: #b8d4f0; }
+.ao-fill { position: absolute; top: 0; left: 0; height: 100%; pointer-events: none; opacity: 0.4; }
+.ao-lbl { position: relative; z-index: 1; }
+.gc { padding: 2px 3px; vertical-align: top; background: #f9f9f7; }
+.bar { height: 17px; border-radius: 3px; display: flex; align-items: center; padding: 0 6px; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; margin: 1px 0; }
+.b-done { background: #4a9e5c; color: #fff; }
+.b-prog { background: #d6ead7; color: #1a1a1a; }
+.b-none { background: #e0e0e0; color: #777; }
+.b-fill { position: absolute; top: 0; left: 0; height: 100%; background: #66bb6a; border-radius: 3px; z-index: 0; }
+.b-txt { position: relative; z-index: 1; }
+.footer { margin-top: 14px; font-size: 10px; color: #bbb; text-align: right; }
+.health { margin-top: 16px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 6px; padding: 12px 16px; font-size: 11px; }
+.health h3 { font-size: 12px; color: #856404; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-title">FY26 Roadmap <span>Subject to change</span></div>
+  <div class="page-sub">SmartSense by Digi International &middot; Confidential &middot; Lists (LW) team &middot; Data from Jira</div>
+  <div class="leg">
+    <span><span class="ls" style="background:#4a9e5c;"></span>Complete (100%)</span>
+    <span><span class="ls" style="background:#d6ead7;border:0.5px solid #66bb6a;"></span>In progress</span>
+    <span><span class="ls" style="background:#e0e0e0;"></span>Not started / no Jira data</span>
+    <span style="color:#bbb;font-size:10px;">Annual objective cell fills as initiatives complete</span>
+  </div>
+  <div class="rw">
+    <table class="rm">
+      <colgroup><col style="width:90px"><col style="width:135px"><col><col><col><col></colgroup>
+      <thead><tr class="hdr">
+        <th style="text-align:left;">PLAYBOOK</th>
+        <th style="text-align:left;">Annual Objective</th>
+        <th>FQ1<div style="font-weight:400;font-size:9px;opacity:0.6;margin-top:1px;">Oct–Dec 2025</div></th>
+        <th>FQ2<div style="font-weight:400;font-size:9px;opacity:0.6;margin-top:1px;">Jan–Mar 2026</div></th>
+        <th>FQ3<div style="font-weight:400;font-size:9px;opacity:0.6;margin-top:1px;">Apr–Jun 2026</div></th>
+        <th>FQ4<div style="font-weight:400;font-size:9px;opacity:0.6;margin-top:1px;">Jul–Sep 2026</div></th>
+      </tr></thead>
+      <tbody><tr><td class="pb-cell" rowspan="9">Achieve ARR & Revenue Growth</td><td class="ao-cell" rowspan="5">
+            <div class="ao-fill" style="width:15%;background:#66bb6a;"></div>
+            <span class="ao-lbl" style="color:#1a5c2a;">Support Sales & Retention</span>
+        </td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Predictive Analytics Research and Prototype</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Prescriptive Analytics Research and Prototype</span></div></td></tr><tr><td class="gc" colspan="2"><div class="bar b-done"><span class="b-txt">Logile Integration (Schnucks)</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Install App Enhancements</span></div></td></tr><tr><td class="gc" colspan="2"><div class="bar b-prog"><div class="b-fill" style="width:79%;"></div><span class="b-txt">Jolt Audits · 79%</span></div></td><td class="gc"><div class="bar b-none"><span class="b-txt">Cluster Alarms</span></div></td><td class="gc"><div class="bar b-none"><span class="b-txt">Single Asset Summary</span></div></td></tr><tr><td class="gc"><div class="bar b-none"><span class="b-txt">Fexa Integration - Phase 1</span></div></td><td class="gc"><div class="bar b-none"><span class="b-txt">Historical NIST Certificates</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Label Subscriptions</span></div></td></tr><tr><td class="gc"><div class="bar b-none"><span class="b-txt">MM on Mobile</span></div></td><td class="gc"><div class="bar b-none"><span class="b-txt">USB Module - JPS Usage Stats</span></div></td><td class="gc"></td><td class="gc"></td></tr><tr><td class="ao-cell" rowspan="4">
+            <div class="ao-fill" style="width:43%;background:#66bb6a;"></div>
+            <span class="ao-lbl" style="color:#1a5c2a;">Integrate SmartSense & Jolt</span>
+        </td><td class="gc" colspan="4"><div class="bar b-none"><span class="b-txt">OAuth</span></div></td></tr><tr><td class="gc"><div class="bar b-done"><span class="b-txt">SmartSense Probe Integration with Jolt</span></div></td><td class="gc"></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">CS Tools for Jolt</span></div></td></tr><tr><td class="gc"><div class="bar b-none"><span class="b-txt">Add Pendo to Jolt Apps</span></div></td><td class="gc"></td><td class="gc" colspan="2"><div class="bar b-done"><span class="b-txt">Merge Hierarchies</span></div></td></tr><tr><td class="gc"></td><td class="gc"></td><td class="gc" colspan="2"><div class="bar b-prog"><div class="b-fill" style="width:57%;"></div><span class="b-txt">Close Gaps to Migrate Top Accounts · 57%</span></div></td></tr><tr><td class="pb-cell" rowspan="11">Enhance Experience & Talent</td><td class="ao-cell" rowspan="10">
+            <div class="ao-fill" style="width:4%;background:#66bb6a;"></div>
+            <span class="ao-lbl" style="color:#1a5c2a;">Strengthen customer health & retention</span>
+        </td><td class="gc" colspan="4"><div class="bar b-prog"><div class="b-fill" style="width:53%;"></div><span class="b-txt">Tech debt reduction across Jolt and SmartSense · 53%</span></div></td></tr><tr><td class="gc" colspan="3"><div class="bar b-none"><span class="b-txt">Gateway Firmware Improvements (Backfill, Stability, SHUB)</span></div></td><td class="gc"></td></tr><tr><td class="gc" colspan="4"><div class="bar b-none"><span class="b-txt">Stabilize JPS Units</span></div></td></tr><tr><td class="gc"><div class="bar b-none"><span class="b-txt">New Z Screen</span></div></td><td class="gc"><div class="bar b-none"><span class="b-txt">Jolt Account Health in Totango</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Working with HDL on Global Gateway component refresh</span></div></td></tr><tr><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Labels Stabilization</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Z Sensor Store & Forward for New Sensors</span></div></td></tr><tr><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">SHUB - Static IP Support</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">OTA Improvements</span></div></td></tr><tr><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">B3 Stability</span></div></td><td class="gc"></td><td class="gc"></td></tr><tr><td class="gc"><div class="bar b-none"><span class="b-txt">Printhead Usage / Device Tracking</span></div></td><td class="gc"><div class="bar b-none"><span class="b-txt">Install App Enhancements for CVS</span></div></td><td class="gc"></td><td class="gc"></td></tr><tr><td class="gc"></td><td class="gc"><div class="bar b-none"><span class="b-txt">Historical NIST Certificates</span></div></td><td class="gc"></td><td class="gc"></td></tr><tr><td class="gc"></td><td class="gc" colspan="3"><div class="bar b-none"><span class="b-txt">Temp/Hum Replacement Sensor</span></div></td></tr><tr><td class="ao-cell" rowspan="1">
+            <div class="ao-fill" style="width:0%;background:#4a90d9;"></div>
+            <span class="ao-lbl" style="color:#1a3a5c;">Reduce SEV 3 backlog by 70%</span>
+        </td><td class="gc" colspan="4"><div class="bar b-none"><span class="b-txt">Ongoing Maintenance Sprints</span></div></td></tr><tr><td class="pb-cell" rowspan="8">Innovation</td><td class="ao-cell" rowspan="3">
+            <div class="ao-fill" style="width:0%;background:#4a90d9;"></div>
+            <span class="ao-lbl" style="color:#1a3a5c;">Enhance Voyage</span>
+        </td><td class="gc"><div class="bar b-none"><span class="b-txt">Events Report</span></div></td><td class="gc" colspan="3"><div class="bar b-none"><span class="b-txt">Voyage Light v1 - Visibility & Exposure Monitoring</span></div></td></tr><tr><td class="gc"><div class="bar b-none"><span class="b-txt">Geofencing</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Trip Management</span></div></td><td class="gc"><div class="bar b-none"><span class="b-txt">Temp Incidents Display Location</span></div></td></tr><tr><td class="gc"><div class="bar b-none"><span class="b-txt">Display Address or POI</span></div></td><td class="gc" colspan="3"><div class="bar b-none"><span class="b-txt">T1R - Position Accuracy, Light Sensor and Flight Mode</span></div></td></tr><tr><td class="ao-cell" rowspan="1">
+            <div class="ao-fill" style="width:0%;background:#4a90d9;"></div>
+            <span class="ao-lbl" style="color:#1a3a5c;">SmartSense ONE Reporting</span>
+        </td><td class="gc" colspan="4"><div class="bar b-none"><span class="b-txt">Aggregate one reporting system for Jolt and SmartSense</span></div></td></tr><tr><td class="ao-cell" rowspan="1">
+            <div class="ao-fill" style="width:0%;background:#4a90d9;"></div>
+            <span class="ao-lbl" style="color:#1a3a5c;">Prototype new Gateway ONE</span>
+        </td><td class="gc" colspan="4"><div class="bar b-none"><span class="b-txt">Prototype new gateway-sensor based on Digi Hive and Xbee platform</span></div></td></tr><tr><td class="ao-cell" rowspan="1">
+            <div class="ao-fill" style="width:0%;background:#4a90d9;"></div>
+            <span class="ao-lbl" style="color:#1a3a5c;">Launch GenAI Companion (Kai)</span>
+        </td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">AI Companion on Reports</span></div></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">AI Companion on Platform (MCP)</span></div></td></tr><tr><td class="ao-cell" rowspan="2">
+            <div class="ao-fill" style="width:0%;background:#4a90d9;"></div>
+            <span class="ao-lbl" style="color:#1a3a5c;">JPS → SPS</span>
+        </td><td class="gc"></td><td class="gc"></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">Standardize JPS Offering</span></div></td></tr><tr><td class="gc"></td><td class="gc"></td><td class="gc" colspan="2"><div class="bar b-none"><span class="b-txt">SmartSense Print Station</span></div></td></tr></tbody>
+    </table>
+  </div>
+  <div class="health">
+    <h3>⚠️ Health Report — 1 unlabeled epic</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <tr style="color:#666;border-bottom:1px solid #ffe58f;">
+        <th style="text-align:left;padding:2px 8px 4px 0;">Epic Key</th>
+        <th style="text-align:left;padding:2px 8px 4px 0;">Summary</th>
+        <th style="text-align:left;padding:2px 8px 4px 0;">Cycle</th>
+        <th style="text-align:left;padding:2px 0 4px 0;">Issue</th>
+      </tr>
+      <tr>
+        <td style="padding:3px 8px 0 0;">LW-16905</td>
+        <td style="padding:3px 8px 0 0;">Jim's Tasks</td>
+        <td style="padding:3px 8px 0 0;">PM-9</td>
+        <td style="padding:3px 0 0 0;">No initiative label</td>
+      </tr>
+    </table>
+  </div>
+  <div class="footer">Generated from Jira &middot; May 28, 2026 at 05:38 PM &middot; 101 epics &middot; 1,404 tickets</div>
+</div>
+</body>
+</html>
