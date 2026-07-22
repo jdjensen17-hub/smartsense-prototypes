@@ -17,7 +17,7 @@
 
 When you load this file, your first reply must include:
 
-> Context loaded. Read STYLING-S1.md + AGENTS.md. Ready for task.
+> Context loaded. Read STYLING-S1.md. Ready for task.
 
 This confirms you are not working from assumptions.
 
@@ -61,7 +61,7 @@ const Card = styled.div({
 ```
 
 The only allowed hex literals are two on-white contrast overrides
-documented in `colors.md`: `#6b1717` (red on white) and `#6b3600` (amber on white).
+documented here: `#6b1717` (red on white) and `#6b3600` (amber on white).
 Every other value must use a `var(--ss-*)` token. If a needed token does not
 exist in `colors_and_type.css`, **stop and flag it** — do not inline a literal.
 
@@ -192,8 +192,10 @@ const NavItem = styled.button({
 
 ## Token quick reference
 
-The full values live in `colors_and_type.css`. These are the tokens you
-will reach for most often. Verify exact names against the CSS before using.
+The token quick reference below covers the tokens you will reach for most often.
+These names are exact — use them as written. `src/design/colors_and_type.css`
+is in the repo and contains all token values; you may read it to verify a value,
+but do not read any other design system `.md` files — they are not in this repo.
 
 ### Brand / interactive
 
@@ -299,7 +301,10 @@ Never use `100`, `200`, `500`, `800`, or `900`.
 
 ## Component reference — common patterns
 
-Full specs in `components.md`. These are the most frequently needed.
+The patterns below are self-contained. Do not attempt to read `components.md`
+— that file is part of the design system package, not this repo. If you need
+a component pattern not listed here, derive it from the token quick reference
+above and flag it for review.
 
 ### Primary button
 

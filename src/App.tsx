@@ -14,6 +14,8 @@ import OrgHierarchyImportPage from '@/pages/user-management/OrgHierarchyImportPa
 import LicenseAssignmentPage from '@/pages/user-management/LicenseAssignmentPage';
 import PdfSearchPage from '@/pages/mobile/operate/PdfSearchPage';
 import ListCompletionPage from '@/pages/operate/ListCompletionPage';
+import JoltListEditorPage from '@/pages/operate/JoltListEditorPage';
+import JoltListPreviewPage from '@/pages/operate/JoltListPreviewPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -30,6 +32,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/org-import':          'Org Hierarchy Import',
   '/operate/lists':             'List Completion',
   '/mobile/operate/pdf-search': 'PDF Search — Operate',
+  '/operate/jolt-editor':       'Jolt List Editor',
+  '/operate/jolt-preview':      'List Preview',
 };
 
 function usePageTitle() {
@@ -92,6 +96,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobilePage = location.pathname.startsWith('/mobile/');
+  const isFullBleedPage = isMobilePage || location.pathname.startsWith('/operate/jolt-editor') || location.pathname.startsWith('/operate/jolt-preview');
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -125,7 +130,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7FA', color: '#35353B' }}>
 
       {/* ── Top bar / floating hamburger ── */}
-      {isMobilePage ? (
+      {isFullBleedPage && !isMobilePage ? null : isMobilePage ? (
         <button ref={hamburgerRef} onClick={toggleDrawer}
           className="flex items-center justify-center rounded-lg transition-colors"
           style={{
@@ -234,6 +239,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           {operateOpen && (
             <div className="mt-1 ml-3 flex flex-col gap-0.5" style={{ borderLeft: '1px solid #CCCDD0', paddingLeft: '10px' }}>
               <DrawerNavItem to="/operate/lists" label="List Completion" end onNavigate={() => setDrawerOpen(false)} />
+              <DrawerNavItem to="/operate/jolt-editor" label="List Template Editor" end onNavigate={() => setDrawerOpen(false)} />
+              <DrawerNavItem to="/operate/jolt-preview" label="List Preview" end onNavigate={() => setDrawerOpen(false)} />
               <DrawerNavItem to="/mobile/operate/pdf-search" label="PDF Search" end onNavigate={() => setDrawerOpen(false)} />
             </div>
           )}
@@ -282,6 +289,8 @@ function Shell({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
+      ) : isFullBleedPage ? (
+        <main className="p-0">{children}</main>
       ) : (
         <main className="px-8 py-6">{children}</main>
       )}
@@ -307,6 +316,8 @@ export default function App() {
           <Route path="/admin/distribution" element={<DistributionPage />} />
           <Route path="/admin/org-import"   element={<OrgHierarchyImportPage />} />
           <Route path="/operate/lists" element={<ListCompletionPage />} />
+          <Route path="/operate/jolt-editor" element={<JoltListEditorPage />} />
+          <Route path="/operate/jolt-preview" element={<JoltListPreviewPage />} />
           <Route path="/mobile/operate/pdf-search" element={<PdfSearchPage />} />
         </Routes>
       </Shell>
