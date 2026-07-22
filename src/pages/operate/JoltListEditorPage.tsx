@@ -427,7 +427,7 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
 }
 
 // ── Side sheet ────────────────────────────────────────────────────────────
-function SideSheet({ item, onClose, onUpdate }: { item: ListItem; onClose: () => void; onUpdate: (id: string, updates: Partial<ListItem>) => void }) {
+function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void }) {
   const upd = (updates: Partial<ListItem>) => onUpdate(item.id, updates);
   const meta = TYPE_META[item.type];
   const [bgColor, setBgColor] = useState(item.bgColor ?? '');
@@ -441,10 +441,23 @@ function SideSheet({ item, onClose, onUpdate }: { item: ListItem; onClose: () =>
   return (
     <div style={{ width: 420, flexShrink: 0, background: T.surface1, borderLeft: `0.5px solid ${T.border}`, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: T.surface2, borderBottom: `0.5px solid ${T.border}`, flexShrink: 0 }}>
-        <i className={`ti ${meta.icon}`} style={{ fontSize: 18, color: T.textMuted }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: T.surface2, borderBottom: `0.5px solid ${T.border}`, flexShrink: 0 }}>
+        <i className={`ti ${meta.icon}`} style={{ fontSize: 16, color: T.textMuted, flexShrink: 0 }} />
         <span style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, flex: 1 }}>{meta.label}</span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 18, display: 'flex', alignItems: 'center', padding: 4 }}><i className="ti ti-x" /></button>
+        {/* Up / Down navigation */}
+        {(() => {
+          const idx = items.findIndex(i => i.id === item.id);
+          const prev = items[idx - 1];
+          const next = items[idx + 1];
+          const navBtn = (icon: string, target: ListItem | undefined) => (
+            <button onClick={() => target && onNavigate(target.id)} disabled={!target} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, background: T.surface2, cursor: target ? 'pointer' : 'default', color: target ? T.textSecondary : T.textMuted, opacity: target ? 1 : 0.35, fontSize: 14 }}>
+              <i className={`ti ${icon}`} />
+            </button>
+          );
+          return <div style={{ display: 'flex', gap: 4 }}>{navBtn('ti-chevron-up', prev)}{navBtn('ti-chevron-down', next)}</div>;
+        })()}
+        <div style={{ width: 0.5, height: 18, background: T.borderStrong, marginLeft: 2 }} />
+        <button onClick={onClose} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 16, borderRadius: 5 }}><i className="ti ti-x" /></button>
       </div>
       {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -472,9 +485,24 @@ function SideSheet({ item, onClose, onUpdate }: { item: ListItem; onClose: () =>
         </SsSection>
         {/* General options */}
         <SsSection label="General Options" defaultOpen>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontSize: 13, color: T.textPrimary }}>Allow N/A</span>
-            <Toggle on={item.allowNA} onChange={v => upd({ allowNA: v })} />
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['N/A', 'OOO'] as const).map(val => {
+                const active = markAs === val;
+                return (
+                  <button key={val} onClick={() => onMarkAsChange(active ? null : val)} style={{
+                    fontFamily: T.font, fontSize: 12, fontWeight: 600, padding: '4px 14px',
+                    borderRadius: 5, border: `0.5px solid ${active ? T.borderAccent : T.borderStrong}`,
+                    background: active ? T.bgAccent : T.surface2,
+                    color: active ? T.textAccent : T.textSecondary,
+                    cursor: 'pointer',
+                  }}>
+                    {val}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {item.type === 'yn' && (
             <div>
@@ -980,6 +1008,8 @@ interface RowProps {
   dcColors: Record<string, string>;
   kebabOpenId: string | null;
   shownCols: Set<string>;
+  colValues: Record<string, Record<string, string>>;
+  onColChange: (itemId: string, colKey: string, value: string | null) => void;
   onCheckbox: (id: string) => void;
   onRowClick: (id: string) => void;
   onKebab: (id: string) => void;
@@ -988,7 +1018,7 @@ interface RowProps {
   onDCClick: (id: string) => void;
 }
 
-function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick }: RowProps) {
+function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, colValues, onColChange, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
@@ -1067,11 +1097,35 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         </div>
       </td>
       {/* Optional columns */}
-      {activeCols.map(col => (
-        <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>
-          —
-        </td>
-      ))}
+      {activeCols.map(col => {
+        if (col.key === 'all-mark-as') {
+          const CYCLE: (string | null)[] = [null, 'N/A', 'OOO'];
+          const CHIP: Record<string, { bg: string; color: string }> = {
+            'N/A': { bg: T.surface0,  color: T.textSecondary },
+            'OOO': { bg: T.bgWarning, color: T.textWarning },
+          };
+          const cur = (colValues[item.id] ?? {})['all-mark-as'] ?? null;
+          const next = CYCLE[(CYCLE.indexOf(cur) + 1) % CYCLE.length];
+          const chip = cur ? CHIP[cur] : null;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}
+              onClick={e => { e.stopPropagation(); onColChange(item.id, 'all-mark-as', next); }}>
+              {chip ? (
+                <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: chip.bg, color: chip.color, cursor: 'pointer', userSelect: 'none' }}>
+                  {cur}
+                </span>
+              ) : (
+                <span style={{ color: T.textMuted, fontSize: 12, cursor: 'pointer' }}>—</span>
+              )}
+            </td>
+          );
+        }
+        return (
+          <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>
+            —
+          </td>
+        );
+      })}
       {/* Kebab */}
       <td style={{ width: 32, padding: '0 4px', position: 'relative', borderLeft: hovered || isActive ? `0.5px solid ${T.border}` : '0.5px solid transparent' }}>
         <button onClick={(e) => { e.stopPropagation(); onKebab(item.id); }} style={{ width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: T.textSecondary, border: 'none', background: 'none', cursor: 'pointer', opacity: hovered || isActive || kebabOpenId === item.id ? 1 : 0, margin: 'auto' }}>
@@ -1113,6 +1167,14 @@ export default function JoltListEditorPage() {
   const [dcMode, setDcMode] = useState(false);
   const [dcLinkingId, setDcLinkingId] = useState<string | null>(null);
   const [dcConditionState, setDcConditionState] = useState<{ childId: string; parentId: string } | null>(null);
+  const [colValues, setColValues] = useState<Record<string, Record<string, string>>>({});
+  const setColValue = (itemId: string, colKey: string, value: string | null) => {
+    setColValues(prev => {
+      const row = { ...prev[itemId] };
+      if (value === null) delete row[colKey]; else row[colKey] = value;
+      return { ...prev, [itemId]: row };
+    });
+  };
   const [shownCols, setShownCols] = useState<Set<string>>(new Set([
     'all-mark-as', 'all-color', 'all-info-library', 'all-points', 'all-print-label',
   ]));
@@ -1340,7 +1402,7 @@ export default function JoltListEditorPage() {
               {dcConditionState && conditionParentItem && conditionChildItem ? (
                 <div style={{ display: 'flex', height: '100%' }}>
                   <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols}
+                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue}
                       onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                       onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                       onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
@@ -1354,7 +1416,7 @@ export default function JoltListEditorPage() {
                   <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onCancel={() => setDcConditionState(null)} />
                 </div>
               ) : (
-                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols}
+                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue}
                   onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                   onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                   onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
@@ -1371,7 +1433,7 @@ export default function JoltListEditorPage() {
           {/* Side sheet */}
           {activeItemId && !dcMode && (() => {
             const item = findItem(items, activeItemId);
-            return item ? <SideSheet item={item} onClose={() => setActiveItemId(null)} onUpdate={updateItem} /> : null;
+            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => setActiveItemId(null)} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} /> : null;
           })()}
         </div>
       )}
@@ -1394,6 +1456,8 @@ interface ItemsTableProps {
   editingPrompt: string;
   editInputRef: React.RefObject<HTMLInputElement>;
   shownCols: Set<string>;
+  colValues: Record<string, Record<string, string>>;
+  onColChange: (itemId: string, colKey: string, value: string | null) => void;
   onCheckbox: (id: string) => void;
   onRowClick: (id: string) => void;
   onKebab: (id: string) => void;
@@ -1404,7 +1468,7 @@ interface ItemsTableProps {
   onEditCommit: () => void;
 }
 
-function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit }: ItemsTableProps) {
+function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
   // Cumulative left offsets for sticky columns: drag=0, checkbox=28, stripe=58, prompt=62
@@ -1475,7 +1539,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} colValues={colValues} onColChange={onColChange} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} />
           )
         ))}
       </tbody>
