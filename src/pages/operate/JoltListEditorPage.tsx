@@ -19,7 +19,7 @@ type DCConditionMeas = { type: 'measurement'; op: '>' | '>=' | '=' | '<=' | '<';
 type DCCondition = DCConditionYN | DCConditionMeas;
 
 interface MCChoice { id: string; label: string; color: string; icon: string | null; }
-interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: string; }
+interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; }
 
 interface ListItem {
   id: string;
@@ -47,6 +47,10 @@ interface ListItem {
   points?: number;
   promptHtml?: string;
   labelIds?: string[];
+  caForNAList?: string;
+  caForNAAdHoc?: boolean;
+  caForNANextStep?: 'repeat-item' | 'repeat-list' | 'no-repeat';
+  caForNAOptional?: boolean;
   autoComplete?: { flagId: string; op: '<' | '>' | '=' | '>=' | '<='; count: number; answer: 'Yes' | 'No' };
 }
 
@@ -98,6 +102,14 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
 ];
 
 const FLAG_COLORS = ['#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
+const CA_LISTS = [
+  { id: 'cal1', title: 'Corrective Action List' },
+  { id: 'cal2', title: 'Food Safety Corrective Actions' },
+  { id: 'cal3', title: 'Equipment Failure Protocol' },
+  { id: 'cal4', title: 'Temperature Violation Checklist' },
+  { id: 'cal5', title: 'Health & Safety Incident Log' },
+];
+
 const FLAGS = [
   { id: 'f1', name: 'Health & Safety', color: '#EF5350', emoji: '⚠️' },
   { id: 'f2', name: 'Equipment',        color: '#FF7043', emoji: '🔧' },
@@ -134,11 +146,11 @@ function mkid() { return Math.random().toString(36).slice(2, 9); }
 // ── Initial sample data ───────────────────────────────────────────────────
 const INITIAL_ITEMS: ListItem[] = [
   { id: 'section-opening', prompt: 'Opening Tasks', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', inds: ['ti-flag','ti-alert-circle'], allowNA: false, flagEnabled: true, caForYNRules: [{ id: 'r1', condition: 'No', caList: 'Corrective Action List', adHoc: false, nextStep: '' }], scoreYes: 1, scoreNo: 0 },
+  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', inds: [], allowNA: false, flagEnabled: true, caForYNRules: [], scoreYes: 1, scoreNo: 0 },
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', inds: ['ti-filter'], allowNA: true, dcParentId: 'cooler-ok', dcCondition: { type: 'yn', value: 'No' } },
   { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', inds: [], allowNA: false },
   { id: 'section-food-safety', prompt: 'Food Safety', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'prep-temp', prompt: 'Record prep cooler temp °F', type: 'measurement', stripe: '#C1E1C5', inds: ['ti-alert-triangle'], allowNA: true, caForRangeRules: [{ id: 'r2', condition: 'Inside', caList: 'Temp Range Actions', adHoc: false, nextStep: '' }] },
+  { id: 'prep-temp', prompt: 'Record prep cooler temp °F', type: 'measurement', stripe: '#C1E1C5', inds: [], allowNA: true },
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', inds: ['ti-filter'], allowNA: false, dcParentId: 'prep-temp', dcCondition: { type: 'measurement', op: '>=', value: 41 } },
   { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', inds: [], allowNA: false },
   { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', inds: [], allowNA: false, scoreYes: 1, scoreNo: 0 },
@@ -160,7 +172,8 @@ function findItem(items: ListItem[], id: string): ListItem | undefined {
 
 function indColor(ind: string) {
   if (ind === 'ti-flag') return T.fillAccent;
-  if (ind === 'ti-alert-circle' || ind === 'ti-alert-triangle') return T.textWarning;
+  if (ind === 'ti-info-circle') return T.fillAccent;
+  if (ind === 'ti-alert-triangle') return T.textWarning;
   if (ind === 'ti-filter') return T.fillAccent;
   return T.textMuted;
 }
@@ -351,6 +364,76 @@ function FlagSection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: P
   );
 }
 
+function CAListPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setTimeout(() => inputRef.current?.focus(), 0);
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const filtered = CA_LISTS.filter(l => l.title.toLowerCase().includes(q.toLowerCase()));
+  const selected = CA_LISTS.find(l => l.id === value);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ fontFamily: T.font, fontSize: 13, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '6px 10px', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, cursor: 'pointer', color: selected ? T.textPrimary : T.textMuted }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected ? selected.title : 'Select a list…'}</span>
+        <i className="ti ti-chevron-down" style={{ fontSize: 12, flexShrink: 0, color: T.textMuted }} />
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden' }}>
+          {/* Create List */}
+          <div
+            onClick={() => { window.open(window.location.href.split('#')[0] + '#/operate/create-list', '_blank'); setOpen(false); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer', borderBottom: `0.5px solid ${T.border}` }}
+            onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            <i className="ti ti-plus" style={{ fontSize: 13, color: T.textAccent }} />
+            <span style={{ fontSize: 13, color: T.textAccent, fontWeight: 500 }}>Create List</span>
+          </div>
+          {/* Search */}
+          <div style={{ padding: '8px 10px', borderBottom: `0.5px solid ${T.border}` }}>
+            <input
+              ref={inputRef}
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search lists…"
+              style={{ fontFamily: T.font, fontSize: 13, width: '100%', border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', outline: 'none', background: T.surface1 }}
+            />
+          </div>
+          {/* Options */}
+          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+            {filtered.length === 0 && <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted }}>No lists found</div>}
+            {filtered.map(l => (
+              <div
+                key={l.id}
+                onClick={() => { onChange(l.id); setOpen(false); setQ(''); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', background: value === l.id ? T.bgAccent : 'transparent' }}
+                onMouseEnter={e => { if (value !== l.id) e.currentTarget.style.background = T.surface1; }}
+                onMouseLeave={e => { if (value !== l.id) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {value === l.id && <i className="ti ti-check" style={{ fontSize: 13, color: T.textAccent, flexShrink: 0 }} />}
+                <span style={{ fontSize: 13, color: value === l.id ? T.textAccent : T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
   const forNA = item.caForNA ?? false;
   const ynRules = item.caForYNRules ?? [];
@@ -361,7 +444,7 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
   const setForNA = (v: boolean) => onUpdate({ caForNA: v });
   const setForRanges = (v: boolean) => onUpdate({ caForRanges: v });
   const updateYNRule = (id: string, updates: Partial<CARule>) => onUpdate({ caForYNRules: ynRules.map(r => r.id === id ? { ...r, ...updates } : r) });
-  const addYNRule = () => onUpdate({ caForYNRules: [...ynRules, { id: mkid(), condition: 'No', caList: '', adHoc: false, nextStep: '' }] });
+  const addYNRule = () => { const taken = ynRules[0]?.condition ?? 'No'; onUpdate({ caForYNRules: [...ynRules, { id: mkid(), condition: taken === 'No' ? 'Yes' : 'No', caList: '', adHoc: false, nextStep: 'repeat-item' }] }); };
   const removeYNRule = (id: string) => onUpdate({ caForYNRules: ynRules.filter(r => r.id !== id) });
 
   return (
@@ -373,44 +456,75 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
           <Toggle on={forNA} onChange={setForNA} />
         </div>
         {forNA && (
-          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 10, marginTop: 8 }}>
-            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
-            <Select value="default" onChange={() => {}} options={[{ value: 'default', label: 'Corrective Action List' }]} style={{ width: '100%', marginBottom: 8 }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ paddingTop: 10, marginTop: 8 }}>
+            {!item.caForNAAdHoc && (
+              <>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
+                <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
+              </>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
-              <Toggle on={false} onChange={() => {}} />
+              <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
             </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 10, marginTop: 3 }}>Corrective action list is created on the app.</div>
             <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
-            <input placeholder="Optional" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%' }} />
+            <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+              <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
+            </div>
           </div>
         )}
       </div>
       {/* For Yes/No or ranges */}
-      <div>
+      <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: forNA ? 12 : 0 }} />
+      <div style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (isMeas ? forRanges : ynRules.length > 0) ? 10 : 0 }}>
           <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>{isMeas ? 'For ranges' : 'For Yes/No'}</span>
           <Toggle on={isMeas ? forRanges : ynRules.length > 0} onChange={v => { if (isMeas) { setForRanges(v); } else { if (v && ynRules.length === 0) addYNRule(); else if (!v) onUpdate({ caForYNRules: [] }); } }} />
         </div>
         {!isMeas && ynRules.map((rule, idx) => (
-          <div key={rule.id} style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 10, marginTop: 8 }}>
+          <div key={rule.id} style={{ paddingTop: 10, marginTop: 8 }}>
+            {idx > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: '0.05em' }}>OR</span>
+                <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase' }}>Rule {idx + 1}</span>
               <button onClick={() => removeYNRule(rule.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13, display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-x" />Remove</button>
             </div>
             <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Condition</div>
-            <Select value={rule.condition ?? 'No'} onChange={v => updateYNRule(rule.id, { condition: v })} options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }]} style={{ width: '100%', marginBottom: 8 }} />
-            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>CA list</div>
-            <Select value={rule.caList || 'default'} onChange={v => updateYNRule(rule.id, { caList: v })} options={[{ value: 'default', label: 'Corrective Action List' }]} style={{ width: '100%', marginBottom: 8 }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <Select value={rule.condition ?? 'No'} onChange={v => updateYNRule(rule.id, { condition: v })} options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }].filter(o => idx === 0 || o.value !== (ynRules[0]?.condition ?? 'No'))} style={{ width: '100%', marginBottom: 8 }} />
+            {!rule.adHoc && (
+              <>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>CA list</div>
+                <div style={{ marginBottom: 8 }}><CAListPicker value={rule.caList ?? ''} onChange={v => updateYNRule(rule.id, { caList: v })} /></div>
+              </>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
-              <Toggle on={rule.adHoc} onChange={v => updateYNRule(rule.id, { adHoc: v })} />
+              <Toggle on={rule.adHoc} onChange={v => updateYNRule(rule.id, { adHoc: v, ...(v ? { caList: '' } : {}) })} />
+            </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 10, marginBottom: 6 }}>Next step</div>
+            <Select value={rule.nextStep ?? 'repeat-item'} onChange={v => updateYNRule(rule.id, { nextStep: v as CARule['nextStep'] })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+              <Toggle on={!!rule.optional} onChange={v => updateYNRule(rule.id, { optional: v })} />
             </div>
           </div>
         ))}
         {!isMeas && ynRules.length < 2 && ynRules.length > 0 && (
-          <button onClick={addYNRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
-            <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add condition (OR)
-          </button>
+          <>
+            <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: 12 }} />
+            <button onClick={addYNRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+              <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Condition
+            </button>
+          </>
         )}
         {isMeas && forRanges && (
           <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 10, marginTop: 8 }}>
@@ -422,7 +536,7 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
                 <Select value="default" onChange={() => {}} options={[{ value: 'default', label: 'Temp Range Actions' }]} style={{ width: '100%' }} />
               </div>
             ))}
-            <button onClick={() => onUpdate({ caForRangeRules: [...rangeRules, { id: mkid(), condition: 'Inside', caList: '', adHoc: false, nextStep: '' }] })} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={() => onUpdate({ caForRangeRules: [...rangeRules, { id: mkid(), condition: 'Inside', caList: '', adHoc: false, nextStep: 'repeat-item' }] })} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
               <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add range rule
             </button>
           </div>
@@ -1118,13 +1232,13 @@ const COLUMN_GROUPS: { group: string; cols: { key: string; label: string }[] }[]
     { key: 'mc-show-inline',        label: 'Show inline' },
   ]},
   { group: 'CA — Corrective Action', cols: [
-    { key: 'ca-turn-on',            label: 'Turn on' },
-    { key: 'ca-list',               label: 'List' },
+    { key: 'ca-turn-on',            label: 'Turn on for Y/N' },
+    { key: 'ca-list',               label: 'CA List' },
     { key: 'ca-turn-on-na',         label: 'Turn on for N/A' },
     { key: 'ca-list-na',            label: 'List for NA' },
-    { key: 'ca-trigger-yn',         label: 'Trigger Y/N' },
+    { key: 'ca-trigger-yn',         label: 'Condition' },
     { key: 'ca-trigger-ranges',     label: 'Trigger Ranges' },
-    { key: 'ca-planned',            label: 'Planned' },
+    { key: 'ca-planned',            label: 'Ad Hoc' },
     { key: 'ca-optional',           label: 'Optional' },
     { key: 'ca-repeat',             label: 'Repeat' },
   ]},
@@ -1330,9 +1444,18 @@ interface RowProps {
   onKebabClose: () => void;
   onKebabAction: (action: string, id: string) => void;
   onDCClick: (id: string) => void;
+  caToastId: string | null;
+  onCaToast: (key: string | null) => void;
 }
 
-function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick }: RowProps) {
+const isYNCaUnconfigured = (item: ListItem) =>
+  (item.caForYNRules?.length ?? 0) > 0 &&
+  item.caForYNRules!.every(r => !r.caList && !r.adHoc);
+
+const isNACaUnconfigured = (item: ListItem) =>
+  !!item.caForNA && !item.caForNAList && !item.caForNAAdHoc;
+
+function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, caToastId, onCaToast }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
@@ -1344,8 +1467,12 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
   const isLinkingChild = dcMode && dcLinkingId === item.id;
   const isTypeDimmed = dcMode && dcLinkingId && !isEligibleParent && !isLinkingChild;
 
-  const indsForDC = item.inds.filter(i => i === 'ti-filter');
-  const indsNonDC = item.inds.filter(i => i !== 'ti-filter');
+  const derivedInds: { icon: string; title: string }[] = [
+    ...(item.flagEnabled ? [{ icon: 'ti-flag', title: 'Flags configured' }] : []),
+    ...((item.infoInline || (item as any).infoFile) ? [{ icon: 'ti-info-circle', title: 'Info Library configured' }] : []),
+    ...((item.caForYNRules?.length ?? 0) > 0 || item.caForNA ? [{ icon: 'ti-alert-triangle', title: 'Corrective Action configured' }] : []),
+    ...(!!item.dcParentId || items.some(x => x.dcParentId === item.id) ? [{ icon: 'ti-filter', title: 'Display Criteria configured' }] : []),
+  ];
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const stickyBg = isActive || isLinkingChild ? T.bgAccent : T.surface2;
   const sticky = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
@@ -1408,7 +1535,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       {/* Config indicators */}
       <td style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, height: 44 }}>
-          {item.inds.map(ind => <i key={ind} className={`ti ${ind}`} style={{ fontSize: 13, color: indColor(ind) }} />)}
+          {derivedInds.map(ind => <i key={ind.icon} className={`ti ${ind.icon}`} style={{ fontSize: 13, color: indColor(ind.icon) }} title={ind.title} />)}
         </div>
       </td>
       {/* Optional columns */}
@@ -1449,6 +1576,140 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         }
         if (col.key === 'all-points') {
           return <PointsCell key={col.key} value={item.points} onCommit={v => onUpdate(item.id, { points: v })} />;
+        }
+        if (col.key === 'ca-turn-on-na') {
+          if (item.type !== 'yn' && item.type !== 'measurement') return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const on = !!item.caForNA;
+          const unconfigured = isNACaUnconfigured(item);
+          const toastKey = `${item.id}:ca-turn-on-na`;
+          const showToast = caToastId === toastKey;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer', position: 'relative', outline: unconfigured ? `1.5px solid #EF5350` : 'none', outlineOffset: -1 }}
+              onClick={e => {
+                e.stopPropagation();
+                if (!on) {
+                  onUpdate(item.id, { caForNA: true });
+                  onCaToast(toastKey);
+                  setTimeout(() => onCaToast(null), 3000);
+                } else {
+                  onUpdate(item.id, { caForNA: false });
+                  onCaToast(null);
+                }
+              }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: unconfigured ? '#EF5350' : on ? T.textAccent : T.textMuted }} />
+              {showToast && (
+                <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: '#323232', color: '#fff', borderRadius: 6, padding: '7px 10px', fontSize: 12, whiteSpace: 'nowrap', zIndex: 500, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', pointerEvents: 'none' }}>
+                  Configure corrective action in item settings
+                  <div style={{ position: 'absolute', bottom: -4, right: 12, width: 8, height: 8, background: '#323232', clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }} />
+                </div>
+              )}
+            </td>
+          );
+        }
+        if (col.key === 'ca-turn-on') {
+          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const on = (item.caForYNRules?.length ?? 0) > 0;
+          const unconfigured = isYNCaUnconfigured(item);
+          const toastKey = `${item.id}:ca-turn-on`;
+          const showToast = caToastId === toastKey;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer', position: 'relative', outline: unconfigured ? `1.5px solid #EF5350` : 'none', outlineOffset: -1 }}
+              onClick={e => {
+                e.stopPropagation();
+                if (!on) {
+                  onUpdate(item.id, { caForYNRules: [{ id: mkid(), condition: 'No', caList: '', adHoc: false, nextStep: 'repeat-item' }] });
+                  onCaToast(toastKey);
+                  setTimeout(() => onCaToast(null), 3000);
+                } else {
+                  onUpdate(item.id, { caForYNRules: [] });
+                  onCaToast(null);
+                }
+              }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: unconfigured ? '#EF5350' : on ? T.textAccent : T.textMuted }} />
+              {showToast && (
+                <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: '#323232', color: '#fff', borderRadius: 6, padding: '7px 10px', fontSize: 12, whiteSpace: 'nowrap', zIndex: 500, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', pointerEvents: 'none' }}>
+                  Configure corrective action in item settings
+                  <div style={{ position: 'absolute', bottom: -4, right: 12, width: 8, height: 8, background: '#323232', clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }} />
+                </div>
+              )}
+            </td>
+          );
+        }
+        if (col.key === 'ca-repeat') {
+          const ynStep = item.caForYNRules?.[0]?.nextStep ?? 'repeat-item';
+          const naStep = item.caForNA ? (item.caForNANextStep ?? 'repeat-item') : null;
+          const ynOn = (item.caForYNRules?.length ?? 0) > 0;
+          const pillStyle = (bg: string, color: string) => ({ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: bg, color } as React.CSSProperties);
+          const stepLabel = (s: string) => s === 'repeat-item' ? 'Item' : s === 'repeat-list' ? 'List' : null;
+          const ynLabel = ynOn ? stepLabel(ynStep) : null;
+          const naLabel = naStep ? stepLabel(naStep) : null;
+          if (!ynLabel && !naLabel) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                {ynLabel && <span style={pillStyle(T.bgAccent, T.textAccent)}>{ynLabel}</span>}
+                {naLabel && <span style={pillStyle(T.surface1, T.textSecondary)}>{naLabel}</span>}
+              </div>
+            </td>
+          );
+        }
+        if (col.key === 'ca-optional') {
+          const ynOptional = item.caForYNRules?.some(r => r.optional) ?? false;
+          const naOptional = !!item.caForNAOptional;
+          if (!ynOptional && !naOptional) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                {ynOptional && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>Y/N</span>}
+                {naOptional && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface1, color: T.textSecondary }}>N/A</span>}
+              </div>
+            </td>
+          );
+        }
+        if (col.key === 'ca-planned') {
+          const ynAdHoc = item.caForYNRules?.some(r => r.adHoc) ?? false;
+          const naAdHoc = !!item.caForNAAdHoc;
+          if (!ynAdHoc && !naAdHoc) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                {ynAdHoc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>Y/N</span>}
+                {naAdHoc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface1, color: T.textSecondary }}>N/A</span>}
+              </div>
+            </td>
+          );
+        }
+        if (col.key === 'ca-trigger-yn') {
+          const rules = item.caForYNRules ?? [];
+          if (rules.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                {rules.map(r => (
+                  <span key={r.id} style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: r.condition === 'Yes' ? '#E8F5E9' : '#FFEBEE', color: r.condition === 'Yes' ? '#388E3C' : '#C62828' }}>
+                    {r.condition ?? 'No'}
+                  </span>
+                ))}
+              </div>
+            </td>
+          );
+        }
+        if (col.key === 'ca-list' || col.key === 'ca-list-na') {
+          const listId = col.key === 'ca-list'
+            ? (item.caForYNRules?.find(r => r.caList)?.caList ?? '')
+            : (item.caForNAList ?? '');
+          const listName = CA_LISTS.find(l => l.id === listId)?.title ?? '';
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {listName ? (
+                <span title={listName} style={{ display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, verticalAlign: 'middle' }}>
+                  {listName}
+                </span>
+              ) : (
+                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+              )}
+            </td>
+          );
         }
         if (col.key === 'yn-score-y') {
           if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
@@ -1523,6 +1784,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
 export default function JoltListEditorPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
   const [scoringOn, setScoringOn] = useState(true);
+  const [caToastId, setCaToastId] = useState<string | null>(null);
   const [items, setItems] = useState<ListItem[]>(INITIAL_ITEMS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
@@ -1579,10 +1841,25 @@ export default function JoltListEditorPage() {
 
   function updateItem(id: string, updates: Partial<ListItem>) {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
+    const current = items.find(it => it.id === id);
+    if (current) {
+      const m = { ...current, ...updates };
+      const rules: CARule[] = m.caForYNRules ?? [];
+      const toAdd: string[] = [];
+      if (rules.length > 0)                                     toAdd.push('ca-turn-on');
+      if (m.caForNA)                                            toAdd.push('ca-turn-on-na');
+      if (rules.some(r => r.caList))                           toAdd.push('ca-list');
+      if (m.caForNAList)                                        toAdd.push('ca-list-na');
+      if (rules.some(r => r.condition))                        toAdd.push('ca-trigger-yn');
+      if (rules.some(r => r.adHoc) || m.caForNAAdHoc)         toAdd.push('ca-planned');
+      if (rules.some(r => r.optional) || m.caForNAOptional)   toAdd.push('ca-optional');
+      if (rules.length > 0 || m.caForNA)                       toAdd.push('ca-repeat');
+      if (toAdd.length) setShownCols(prev => new Set([...prev, ...toAdd]));
+    }
   }
 
   function deleteItem(id: string) {
-    setItems(prev => prev.filter(it => it.id !== id).map(it => it.dcParentId === id ? { ...it, dcParentId: undefined, dcCondition: undefined, inds: it.inds.filter(x => x !== 'ti-filter') } : it));
+    setItems(prev => prev.filter(it => it.id !== id).map(it => it.dcParentId === id ? { ...it, dcParentId: undefined, dcCondition: undefined } : it));
     if (activeItemId === id) setActiveItemId(null);
   }
 
@@ -1651,12 +1928,12 @@ export default function JoltListEditorPage() {
   function saveDCCondition(cond: DCCondition) {
     if (!dcConditionState) return;
     const { childId, parentId } = dcConditionState;
-    updateItem(childId, { dcParentId: parentId, dcCondition: cond, inds: [...(findItem(items, childId)?.inds.filter(x => x !== 'ti-filter') ?? []), 'ti-filter'] });
+    updateItem(childId, { dcParentId: parentId, dcCondition: cond });
     setDcConditionState(null);
   }
 
   function removeDCLink(id: string) {
-    updateItem(id, { dcParentId: undefined, dcCondition: undefined, inds: findItem(items, id)?.inds.filter(x => x !== 'ti-filter') ?? [] });
+    updateItem(id, { dcParentId: undefined, dcCondition: undefined });
   }
 
   function handleKebabAction(action: string, id: string) {
@@ -1790,6 +2067,7 @@ export default function JoltListEditorPage() {
                       onDCClick={handleDCClick}
                       onEditChange={setEditingPrompt}
                       onEditCommit={commitEdit}
+                      caToastId={caToastId} onCaToast={setCaToastId}
                     />
                   </div>
                   <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onCancel={() => setDcConditionState(null)} />
@@ -1804,6 +2082,7 @@ export default function JoltListEditorPage() {
                   onDCClick={handleDCClick}
                   onEditChange={setEditingPrompt}
                   onEditCommit={commitEdit}
+                  caToastId={caToastId} onCaToast={setCaToastId}
                 />
               )}
             </div>
@@ -1846,9 +2125,11 @@ interface ItemsTableProps {
   onDCClick: (id: string) => void;
   onEditChange: (v: string) => void;
   onEditCommit: () => void;
+  caToastId: string | null;
+  onCaToast: (key: string | null) => void;
 }
 
-function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit }: ItemsTableProps) {
+function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, caToastId, onCaToast }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
   // Cumulative left offsets for sticky columns: drag=0, checkbox=28, stripe=58, prompt=62
@@ -1891,6 +2172,46 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
       </colgroup>
       {activeCols.length > 0 && (
         <thead style={{ position: 'sticky', top: 0, zIndex: 11 }}>
+          {/* Group header row */}
+          {(() => {
+            const CA_KEYS = new Set(['ca-turn-on','ca-turn-on-na','ca-list','ca-list-na','ca-trigger-yn','ca-planned','ca-optional','ca-repeat']);
+            // Build segments: runs of CA vs non-CA cols
+            const segments: { ca: boolean; count: number }[] = [];
+            for (const col of activeCols) {
+              const ca = CA_KEYS.has(col.key);
+              if (segments.length && segments[segments.length - 1].ca === ca) segments[segments.length - 1].count++;
+              else segments.push({ ca, count: 1 });
+            }
+            const hasCaGroup = activeCols.some(c => CA_KEYS.has(c.key));
+            if (!hasCaGroup) return null;
+            return (
+              <tr style={{ background: T.surface1, height: 20 }}>
+                {/* Sticky frozen cols */}
+                <th style={{ ...stickyHead(S.drag, { width: 28, padding: 0 }) }} />
+                <th style={{ ...stickyHead(S.checkbox, { width: 30, padding: 0 }) }} />
+                <th style={{ ...stickyHead(S.stripe, { width: 4, padding: 0 }) }} />
+                <th style={{ ...stickyHead(S.prompt, { padding: 0 }) }}>
+                  <div style={{ position: 'absolute', top: 0, right: 0, width: 1, height: '100%', background: T.borderStrong, zIndex: 1 }} />
+                </th>
+                <th style={{ width: 32, padding: 0 }} />
+                <th style={{ width: 100, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
+                {segments.map((seg, i) => (
+                  <th key={i} colSpan={seg.count} style={{
+                    padding: '0 8px', textAlign: 'center', fontSize: 9, fontWeight: 700,
+                    letterSpacing: '0.07em', textTransform: 'uppercase',
+                    background: seg.ca ? '#E3EEF7' : T.surface1,
+                    color: seg.ca ? T.textAccent : 'transparent',
+                    borderLeft: seg.ca ? `0.5px solid ${T.borderAccent}` : 'none',
+                    borderRight: seg.ca ? `0.5px solid ${T.borderAccent}` : 'none',
+                    borderBottom: seg.ca ? `0.5px solid ${T.borderAccent}` : `0.5px solid ${T.borderStrong}`,
+                  }}>
+                    {seg.ca ? 'Corrective Action' : ''}
+                  </th>
+                ))}
+                <th style={{ width: 32, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
+              </tr>
+            );
+          })()}
           <tr style={{ background: T.surface1, borderBottom: `0.5px solid ${T.borderStrong}`, height: 32 }}>
             <th style={stickyHead(S.drag, { width: 28 })} />
             <th style={stickyHead(S.checkbox, { width: 30 })} />
@@ -1908,7 +2229,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }} />
             </th>
             <th style={{ width: 32 }} />
-            <th style={{ width: 100 }} />
+            <th style={{ width: 100, padding: '5px 8px', borderLeft: `0.5px solid ${T.border}`, borderTop: `0.5px solid ${T.border}`, fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', verticalAlign: 'middle' }}>Config</th>
             {activeCols.map(col => (
               <th key={col.key} style={{
                 width: 100, padding: '5px 8px',
@@ -1948,7 +2269,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} caToastId={caToastId} onCaToast={onCaToast} />
           )
         ))}
       </tbody>
