@@ -16,6 +16,7 @@ import PdfSearchPage from '@/pages/mobile/operate/PdfSearchPage';
 import ListCompletionPage from '@/pages/operate/ListCompletionPage';
 import JoltListEditorPage from '@/pages/operate/JoltListEditorPage';
 import JoltListPreviewPage from '@/pages/operate/JoltListPreviewPage';
+import LabelTemplatesPage from '@/pages/operate/LabelTemplatesPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -318,6 +319,7 @@ export default function App() {
           <Route path="/operate/lists" element={<ListCompletionPage />} />
           <Route path="/operate/jolt-editor" element={<JoltListEditorPage />} />
           <Route path="/operate/jolt-preview" element={<JoltListPreviewPage />} />
+          <Route path="/operate/label-templates" element={<LabelTemplatesPage />} />
           <Route path="/mobile/operate/pdf-search" element={<PdfSearchPage />} />
         </Routes>
       </Shell>

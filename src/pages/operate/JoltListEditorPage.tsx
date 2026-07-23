@@ -46,11 +46,13 @@ interface ListItem {
   infoInline?: boolean;
   points?: number;
   promptHtml?: string;
+  labelIds?: string[];
+  autoComplete?: { flagId: string; op: '<' | '>' | '=' | '>=' | '<='; count: number; answer: 'Yes' | 'No' };
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const TYPE_META: Record<ItemType, { label: string; icon: string }> = {
-  yn:          { label: 'Yes/No',         icon: 'ti-circle-check' },
+  yn:          { label: 'Yes/No',         icon: 'ti-toggle-right' },
   checkmark:   { label: 'Checkmark',      icon: 'ti-check' },
   rating:      { label: 'Rating',         icon: 'ti-star-half' },
   signature:   { label: 'Signature',      icon: 'ti-writing' },
@@ -96,6 +98,23 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
 ];
 
 const FLAG_COLORS = ['#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
+const FLAGS = [
+  { id: 'f1', name: 'Health & Safety', color: '#EF5350', emoji: '⚠️' },
+  { id: 'f2', name: 'Equipment',        color: '#FF7043', emoji: '🔧' },
+  { id: 'f3', name: 'Food Safety',      color: '#42A5F5', emoji: '🍽️' },
+];
+
+const LABEL_TEMPLATES = [
+  { id: 'l1', name: 'Bacon (GRILL STATION)',        group: 'Jolt Product Discovery' },
+  { id: 'l2', name: 'Bacon Bits (GRILL STATION)',   group: 'Jolt Product Discovery' },
+  { id: 'l3', name: 'Cheese (GRILL STATION)',        group: 'Jolt Product Discovery' },
+  { id: 'l4', name: 'Lettuce (PREP)',                group: 'Jolt Product Discovery' },
+  { id: 'l5', name: 'Tomato (PREP)',                 group: 'Jolt Product Discovery' },
+  { id: 'l6', name: 'Cooler Temp Log',               group: 'Food Safety' },
+  { id: 'l7', name: 'Hot Hold Temperature',          group: 'Food Safety' },
+  { id: 'l8', name: 'Date Label — 3 Day',            group: 'Date Labels' },
+  { id: 'l9', name: 'Date Label — 7 Day',            group: 'Date Labels' },
+];
 
 const STRIPE_COLORS = [
   { label: 'None', value: '' },
@@ -115,14 +134,15 @@ function mkid() { return Math.random().toString(36).slice(2, 9); }
 // ── Initial sample data ───────────────────────────────────────────────────
 const INITIAL_ITEMS: ListItem[] = [
   { id: 'section-opening', prompt: 'Opening Tasks', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', inds: ['ti-flag','ti-alert-circle'], allowNA: false, flagEnabled: true, caForYNRules: [{ id: 'r1', condition: 'No', caList: 'Corrective Action List', adHoc: false, nextStep: '' }] },
+  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', inds: ['ti-flag','ti-alert-circle'], allowNA: false, flagEnabled: true, caForYNRules: [{ id: 'r1', condition: 'No', caList: 'Corrective Action List', adHoc: false, nextStep: '' }], scoreYes: 1, scoreNo: 0 },
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', inds: ['ti-filter'], allowNA: true, dcParentId: 'cooler-ok', dcCondition: { type: 'yn', value: 'No' } },
   { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', inds: [], allowNA: false },
   { id: 'section-food-safety', prompt: 'Food Safety', type: 'subtitle', stripe: '', inds: [], allowNA: false },
   { id: 'prep-temp', prompt: 'Record prep cooler temp °F', type: 'measurement', stripe: '#C1E1C5', inds: ['ti-alert-triangle'], allowNA: true, caForRangeRules: [{ id: 'r2', condition: 'Inside', caList: 'Temp Range Actions', adHoc: false, nextStep: '' }] },
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', inds: ['ti-filter'], allowNA: false, dcParentId: 'prep-temp', dcCondition: { type: 'measurement', op: '>=', value: 41 } },
   { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', inds: [], allowNA: false },
-  { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', inds: [], allowNA: false },
+  { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', inds: [], allowNA: false, scoreYes: 1, scoreNo: 0 },
+  { id: 'gloves-worn', prompt: 'All food handlers wearing gloves?', type: 'yn', stripe: '#FFF176', inds: [], allowNA: false, points: 5, infoInline: true, labelIds: ['l6'], scoreYes: 1, scoreNo: 0 },
   { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', inds: [], allowNA: false, choices: [
     { id: 'c1', label: 'Sysco', color: '#4CAF50', icon: null },
     { id: 'c2', label: 'US Foods', color: '#2196F3', icon: null },
@@ -219,16 +239,93 @@ function SsSection({ label, children, defaultOpen = false }: { label: string; ch
   );
 }
 
+const COMPLETION_OPS = [
+  { value: '<',  label: '<'  },
+  { value: '<=', label: '≤'  },
+  { value: '=',  label: '='  },
+  { value: '>=', label: '≥'  },
+  { value: '>',  label: '>'  },
+];
+
+function CompletionModeSection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
+  const isAuto = !!item.autoComplete;
+  const rule = item.autoComplete ?? { flagId: '', op: '>' as const, count: 0, answer: 'No' as const };
+
+  const setAuto = (v: boolean) => {
+    if (v) onUpdate({ autoComplete: { flagId: '', op: '>', count: 0, answer: 'No' } });
+    else onUpdate({ autoComplete: undefined });
+  };
+  const updRule = (patch: Partial<typeof rule>) => onUpdate({ autoComplete: { ...rule, ...patch } });
+
+  const radioStyle: React.CSSProperties = { accentColor: T.fillAccent, width: 14, height: 14, cursor: 'pointer' };
+  const labelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: T.textPrimary };
+
+  return (
+    <SsSection label="Completion Mode" defaultOpen={isAuto}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label style={labelStyle}>
+          <input type="radio" checked={!isAuto} onChange={() => setAuto(false)} style={radioStyle} />
+          Manually complete
+        </label>
+        <label style={labelStyle}>
+          <input type="radio" checked={isAuto} onChange={() => setAuto(true)} style={radioStyle} />
+          Auto complete <span style={{ fontSize: 12, color: T.textMuted }}>(cannot be manually completed)</span>
+        </label>
+      </div>
+      {isAuto && (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.5 }}>
+            <strong style={{ color: T.textPrimary, fontWeight: 600 }}>IF</strong> the flag count on this list for:
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select
+              value={rule.flagId}
+              onChange={e => updRule({ flagId: e.target.value })}
+              style={{ fontFamily: T.font, fontSize: 13, color: rule.flagId ? T.textPrimary : T.textMuted, background: T.surface2, border: `0.5px solid ${rule.flagId ? T.borderStrong : '#EF5350'}`, borderRadius: 6, padding: '6px 8px', flex: 1 }}
+            >
+              <option value="">Select a flag…</option>
+              {FLAGS.map(f => <option key={f.id} value={f.id}>{f.emoji} {f.name}</option>)}
+            </select>
+            <select
+              value={rule.op}
+              onChange={e => updRule({ op: e.target.value as typeof rule.op })}
+              style={{ fontFamily: T.font, fontSize: 13, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 8px', width: 56 }}
+            >
+              {COMPLETION_OPS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <input
+              type="number"
+              min={0}
+              value={rule.count}
+              onChange={e => { const n = parseInt(e.target.value, 10); if (!isNaN(n) && n >= 0) updRule({ count: n }); }}
+              onKeyDown={e => { if (e.key === 'e' || e.key === 'E' || e.key === '.' || e.key === ',' || e.key === '-') e.preventDefault(); }}
+              style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 8px', width: 56, textAlign: 'center' }}
+            />
+          </div>
+          {!rule.flagId && <div style={{ fontSize: 11, color: '#EF5350' }}>A flag is required</div>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: T.textPrimary }}><strong style={{ fontWeight: 600 }}>THEN</strong> the answer will autocomplete to:</span>
+            <select
+              value={rule.answer}
+              onChange={e => updRule({ answer: e.target.value as 'Yes' | 'No' })}
+              style={{ fontFamily: T.font, fontSize: 13, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 8px', width: 72 }}
+            >
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+      )}
+    </SsSection>
+  );
+}
+
 function FlagSection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
   const [creating, setCreating] = useState(false);
   const [newFlagName, setNewFlagName] = useState('');
   const [newFlagColor, setNewFlagColor] = useState(FLAG_COLORS[0]);
   const [newFlagEmoji, setNewFlagEmoji] = useState('🔴');
-  const flags = [
-    { id: 'f1', name: 'Health & Safety', color: '#EF5350', emoji: '⚠️' },
-    { id: 'f2', name: 'Equipment', color: '#FF7043', emoji: '🔧' },
-    { id: 'f3', name: 'Food Safety', color: '#42A5F5', emoji: '🍽️' },
-  ];
+  const flags = FLAGS;
   const [selectedFlag, setSelectedFlag] = useState(item.flagEnabled ? 'f1' : '');
   return (
     <SsSection label="Flags" defaultOpen={!!item.flagEnabled}>
@@ -430,6 +527,68 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
   );
 }
 
+function LabelSelector({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = item.labelIds ?? [];
+  const toggle = (id: string) => {
+    const next = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
+    onUpdate({ labelIds: next });
+  };
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const groups = Array.from(new Set(LABEL_TEMPLATES.map(t => t.group)));
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div onClick={() => setOpen(o => !o)} style={{ minHeight: 36, border: `0.5px solid ${open ? T.borderAccent : T.borderStrong}`, borderRadius: 6, padding: '5px 8px', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', cursor: 'text', background: T.surface2 }}>
+        {selected.map(id => {
+          const tpl = LABEL_TEMPLATES.find(t => t.id === id);
+          if (!tpl) return null;
+          return (
+            <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: T.bgAccent, color: T.textAccent, fontSize: 12, fontWeight: 500, padding: '3px 8px', borderRadius: 12, maxWidth: 160 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tpl.name}</span>
+              <button onClick={e => { e.stopPropagation(); toggle(id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textAccent, fontSize: 13, padding: 0, lineHeight: 1, display: 'flex', flexShrink: 0 }}>⊗</button>
+            </span>
+          );
+        })}
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 12, color: T.textMuted, marginLeft: 'auto' }} />
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden', maxHeight: 260, overflowY: 'auto' }}>
+          <div onClick={() => { window.open(window.location.href.split('#')[0] + '#/operate/label-templates', '_blank'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: `0.5px solid ${T.border}` }}
+            onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <i className="ti ti-settings" style={{ fontSize: 15, color: T.textSecondary }} />
+            <span style={{ fontSize: 13, color: T.textPrimary }}>Manage Labels</span>
+          </div>
+          {groups.map(group => (
+            <div key={group}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '8px 14px 4px' }}>{group}</div>
+              {LABEL_TEMPLATES.filter(t => t.group === group).map(tpl => {
+                const checked = selected.includes(tpl.id);
+                return (
+                  <div key={tpl.id} onClick={() => toggle(tpl.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <i className={`ti ${checked ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: checked ? T.textAccent : T.textMuted, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: checked ? T.textAccent : T.textPrimary }}>{tpl.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PromptEditor({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
   const editorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -513,16 +672,13 @@ function InfoLibrarySection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
 }
 
 // ── Side sheet ────────────────────────────────────────────────────────────
-function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void }) {
+function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange, scoringOn }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void; scoringOn: boolean }) {
   const upd = (updates: Partial<ListItem>) => onUpdate(item.id, updates);
   const meta = TYPE_META[item.type];
-  const [bgColor, setBgColor] = useState(item.bgColor ?? '');
+  const [bgColor, setBgColor] = useState(item.stripe ?? '');
   const [scoreEnabled, setScoreEnabled] = useState(item.scoreEnabled ?? false);
-  const [scoreYes, setScoreYes] = useState(item.scoreYes ?? 1);
-  const [scoreNo, setScoreNo] = useState(item.scoreNo ?? 0);
-  const [tagsInput, setTagsInput] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [completionMode, setCompletionMode] = useState('any');
+  const [scoreYes, setScoreYes] = useState(() => { const v = item.scoreYes ?? 1; if (item.type === 'yn' && item.scoreYes === undefined) onUpdate(item.id, { scoreYes: v }); return v; });
+  const [scoreNo, setScoreNo] = useState(() => { const v = item.scoreNo ?? 0; if (item.type === 'yn' && item.scoreNo === undefined) onUpdate(item.id, { scoreNo: v }); return v; });
 
   return (
     <div style={{ width: 420, flexShrink: 0, background: T.surface1, borderLeft: `0.5px solid ${T.border}`, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -552,7 +708,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           <PromptEditor item={item} onUpdate={upd} />
         </SsSection>
         {/* General options */}
-        <SsSection label="General Options" defaultOpen={!!(markAs || item.points)}>
+        <SsSection label="General Options" defaultOpen={!!(markAs || item.points || (item.labelIds?.length ?? 0) > 0)}>
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -572,23 +728,21 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
               })}
             </div>
           </div>
-          {item.type === 'yn' && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Completion mode</div>
-              <Select value={completionMode} onChange={setCompletionMode} options={[{ value: 'any', label: 'Any answer completes' }, { value: 'yes', label: 'Only Yes completes' }, { value: 'no', label: 'Only No completes' }]} style={{ width: '100%' }} />
-            </div>
-          )}
-          <div>
+          <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Points</div>
             <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
             <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Employees get points by completing items or half points if late.</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Labels</div>
+            <LabelSelector item={item} onUpdate={upd} />
           </div>
         </SsSection>
         {/* Background color */}
         <SsSection label="Background Color" defaultOpen={!!item.stripe}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {STRIPE_COLORS.map(sc => (
-              <div key={sc.value} onClick={() => { setBgColor(sc.value); upd({ stripe: sc.value }); }} title={sc.label} style={{ width: 24, height: 24, borderRadius: 4, background: sc.value || T.surface1, border: `1.5px solid ${bgColor === sc.value ? T.textPrimary : T.borderStrong}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div key={sc.value} onClick={() => { setBgColor(sc.value); upd({ stripe: sc.value }); }} title={sc.label} style={{ width: 24, height: 24, borderRadius: 4, background: sc.value || T.surface1, border: `0.5px solid ${T.borderStrong}`, outline: bgColor === sc.value ? `1.5px solid ${T.textSecondary}` : 'none', outlineOffset: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {!sc.value && <i className="ti ti-x" style={{ fontSize: 11, color: T.textMuted }} />}
               </div>
             ))}
@@ -598,37 +752,31 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         <SsSection label="Info Library" defaultOpen={!!(item.infoFile || item.infoInline)}>
           <InfoLibrarySection item={item} onUpdate={upd} />
         </SsSection>
-        {/* Labels (tags) */}
-        <SsSection label="Labels" defaultOpen={false}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-            {tags.map(tag => (
-              <div key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: T.bgAccent, color: T.textAccent, fontSize: 12, padding: '3px 8px', borderRadius: 4 }}>
-                {tag}
-                <button onClick={() => setTags(tags.filter(t => t !== tag))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textAccent, fontSize: 12, padding: 0, lineHeight: 1 }}>×</button>
-              </div>
-            ))}
-          </div>
-          <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && tagsInput.trim()) { setTags([...tags, tagsInput.trim()]); setTagsInput(''); e.preventDefault(); } }} placeholder="Type and press Enter…" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%' }} />
-        </SsSection>
         {/* Score */}
-        {(item.type === 'yn' || item.type === 'measurement' || item.type === 'checkmark') && (
-          <SsSection label="Score" defaultOpen={!!(item.scoreEnabled)}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: scoreEnabled ? 12 : 0 }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Enable scoring</span>
-              <Toggle on={scoreEnabled} onChange={v => { setScoreEnabled(v); upd({ scoreEnabled: v }); }} />
-            </div>
-            {scoreEnabled && item.type === 'yn' && (
+        {scoringOn && (item.type === 'yn' || item.type === 'measurement' || item.type === 'checkmark') && (
+          <SsSection label="Score" defaultOpen>
+            {item.type === 'yn' && (
               <div>
-                {[{ label: 'Yes', val: scoreYes, set: setScoreYes }, { label: 'No', val: scoreNo, set: setScoreNo }].map(row => (
+                {[{ label: 'Score for Yes', val: scoreYes, set: setScoreYes, upd: (v: number) => upd({ scoreYes: v }) }, { label: 'Score for No', val: scoreNo, set: setScoreNo, upd: (v: number) => upd({ scoreNo: v }) }].map(row => (
                   <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontSize: 13, color: T.textPrimary }}>{row.label}</span>
-                    <input type="number" value={row.val} onChange={e => row.set(Number(e.target.value))} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', width: 70, textAlign: 'center' }} />
+                    <input
+                      type="number"
+                      value={row.val}
+                      onChange={e => {
+                        const n = parseInt(e.target.value, 10);
+                        if (!isNaN(n)) { row.set(n); row.upd(n); }
+                      }}
+                      onKeyDown={e => { if (e.key === 'e' || e.key === 'E' || e.key === '.' || e.key === ',') e.preventDefault(); }}
+                      style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', width: 70, textAlign: 'center' }}
+                    />
                   </div>
                 ))}
               </div>
             )}
           </SsSection>
         )}
+        {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} />}
         {/* Type-specific sections */}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} />}
@@ -800,9 +948,8 @@ function NotificationSection() {
 }
 
 // ── Settings tab ──────────────────────────────────────────────────────────
-function SettingsTab() {
+function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScoringOn: (v: boolean) => void }) {
   const [submission, setSubmission] = useState('anyone-anytime');
-  const [scoringOn, setScoringOn] = useState(false);
   const [listScoreVisible, setListScoreVisible] = useState(true);
   const [itemScoreVisible, setItemScoreVisible] = useState(false);
   const [rbacAnyone, setRbacAnyone] = useState(true);
@@ -985,7 +1132,7 @@ const COLUMN_GROUPS: { group: string; cols: { key: string; label: string }[] }[]
 
 const ALL_COLS = COLUMN_GROUPS.flatMap(g => g.cols);
 
-function ColumnPicker({ shownCols, onChange }: { shownCols: Set<string>; onChange: (next: Set<string>) => void }) {
+function ColumnPicker({ shownCols, onChange, scoringOn }: { shownCols: Set<string>; onChange: (next: Set<string>) => void; scoringOn: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -1042,13 +1189,16 @@ function ColumnPicker({ shownCols, onChange }: { shownCols: Set<string>; onChang
           >
             <input
               type="checkbox"
-              checked={shownCols.size === ALL_COLS.length}
-              onChange={() => onChange(shownCols.size === ALL_COLS.length ? new Set() : new Set(ALL_COLS.map(c => c.key)))}
+              checked={shownCols.size === ALL_COLS.filter(c => scoringOn || (c.key !== 'yn-score-y' && c.key !== 'yn-score-n')).length}
+              onChange={() => { const available = ALL_COLS.filter(c => scoringOn || (c.key !== 'yn-score-y' && c.key !== 'yn-score-n')); onChange(shownCols.size === available.length ? new Set() : new Set(available.map(c => c.key))); }}
               style={{ accentColor: T.fillAccent, width: 13, height: 13, flexShrink: 0 }}
             />
             Select all
           </label>
-          {COLUMN_GROUPS.map(group => (
+          {COLUMN_GROUPS.map(group => {
+            const visibleCols = group.cols.filter(c => scoringOn || (c.key !== 'yn-score-y' && c.key !== 'yn-score-n'));
+            if (visibleCols.length === 0) return null;
+            return (
             <div key={group.group}>
               <div style={{
                 fontSize: 10, fontWeight: 700, color: T.textMuted,
@@ -1057,7 +1207,7 @@ function ColumnPicker({ shownCols, onChange }: { shownCols: Set<string>; onChang
               }}>
                 {group.group}
               </div>
-              {group.cols.map(col => (
+              {visibleCols.map(col => (
                 <label key={col.key} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '5px 14px', cursor: 'pointer', fontSize: 13,
@@ -1076,10 +1226,52 @@ function ColumnPicker({ shownCols, onChange }: { shownCols: Set<string>; onChang
                 </label>
               ))}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
+  );
+}
+
+// ── Points cell ───────────────────────────────────────────────────────────
+function PointsCell({ value, onCommit, allowNegative = false }: { value?: number; onCommit: (v: number | undefined) => void; allowNegative?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(value != null ? String(value) : '');
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+  const commit = () => {
+    const n = parseInt(draft, 10);
+    onCommit(isNaN(n) ? undefined : n);
+    setEditing(false);
+  };
+
+  return (
+    <td style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}
+      onClick={startEdit}>
+      {editing ? (
+        <input
+          ref={inputRef}
+          type="number"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); if (!allowNegative && e.key === '-') e.preventDefault(); if (e.key === 'e' || e.key === 'E' || e.key === '.' || e.key === ',') e.preventDefault(); }}
+          onClick={e => e.stopPropagation()}
+          style={{ fontFamily: T.font, fontSize: 12, width: 60, textAlign: 'center', border: `1px solid ${T.borderAccent}`, borderRadius: 4, padding: '2px 4px', outline: 'none' }}
+        />
+      ) : (
+        <span style={{ fontSize: 12, color: value != null ? T.textPrimary : T.textMuted, cursor: 'pointer' }}>
+          {value != null ? value : '—'}
+        </span>
+      )}
+    </td>
   );
 }
 
@@ -1105,9 +1297,10 @@ function ColorCell({ stripe, onSelect }: { stripe: string; onSelect: (v: string)
         <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: '50%', transform: 'translateX(-50%)', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, padding: 8, zIndex: 200, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', display: 'flex', gap: 6, flexWrap: 'wrap', width: 120 }}>
           {STRIPE_COLORS.map(sc => (
             <button key={sc.value} title={sc.label} onClick={e => { e.stopPropagation(); onSelect(sc.value); setOpen(false); }} style={{
-              width: 20, height: 20, borderRadius: '50%', border: sc.value === stripe ? `2px solid ${T.textAccent}` : `1px solid rgba(0,0,0,0.12)`,
+              width: 20, height: 20, borderRadius: '50%', border: `1px solid rgba(0,0,0,0.12)`,
               background: sc.value || T.surface0, cursor: 'pointer', padding: 0, flexShrink: 0,
-              outline: sc.value === '' ? `1px dashed ${T.borderStrong}` : 'none',
+              outline: sc.value === stripe ? `2px solid ${T.textAccent}` : sc.value === '' ? `1px dashed ${T.borderStrong}` : 'none',
+              outlineOffset: 2,
             }} />
           ))}
         </div>
@@ -1184,8 +1377,9 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         <div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} />
       </td>
       {/* Prompt */}
-      <td style={sticky(62, { padding: 0, overflow: 'hidden', width: activeCols.length > 0 ? 300 : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
-        <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 6, cursor: dcMode ? 'pointer' : 'default', overflow: 'hidden' }}>
+      <td style={sticky(62, { padding: 0, width: activeCols.length > 0 ? 300 : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, background: T.borderStrong, zIndex: 2 }} />
+        <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 6, cursor: dcMode ? 'pointer' : 'default', overflow: 'hidden', width: '100%' }}>
           {isChild && <span style={{ fontSize: 12, color: T.textMuted, flexShrink: 0 }}>↳</span>}
           <span style={{ fontSize: 13, color: isLinkingChild || (isActive && !dcMode) ? T.textAccent : T.textPrimary, fontWeight: isLinkingChild || (isActive && !dcMode) ? 500 : 400, flex: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.prompt}</span>
           {/* DC mode overlays */}
@@ -1253,6 +1447,41 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
             </td>
           );
         }
+        if (col.key === 'all-points') {
+          return <PointsCell key={col.key} value={item.points} onCommit={v => onUpdate(item.id, { points: v })} />;
+        }
+        if (col.key === 'yn-score-y') {
+          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
+          return <PointsCell key={col.key} value={item.scoreYes} onCommit={v => onUpdate(item.id, { scoreYes: v })} allowNegative />;
+        }
+        if (col.key === 'yn-score-n') {
+          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
+          return <PointsCell key={col.key} value={item.scoreNo} onCommit={v => onUpdate(item.id, { scoreNo: v })} allowNegative />;
+        }
+        if (col.key === 'yn-auto-complete') {
+          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {item.autoComplete
+                ? <i className="ti ti-bolt" style={{ fontSize: 15, color: T.textAccent }} title="Auto complete" />
+                : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+            </td>
+          );
+        }
+        if (col.key === 'all-print-label') {
+          const count = item.labelIds?.length ?? 0;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {count > 0 ? (
+                <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
+                  {count}
+                </span>
+              ) : (
+                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+              )}
+            </td>
+          );
+        }
         return (
           <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>
             —
@@ -1293,6 +1522,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
 // ── Main editor ────────────────────────────────────────────────────────────
 export default function JoltListEditorPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
+  const [scoringOn, setScoringOn] = useState(true);
   const [items, setItems] = useState<ListItem[]>(INITIAL_ITEMS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
@@ -1310,7 +1540,23 @@ export default function JoltListEditorPage() {
   };
   const [shownCols, setShownCols] = useState<Set<string>>(new Set([
     'all-mark-as', 'all-color', 'all-info-library', 'all-points', 'all-print-label',
+    'yn-score-y', 'yn-score-n', 'yn-auto-complete',
   ]));
+  const effectiveShownCols = React.useMemo(() => {
+    if (scoringOn) return shownCols;
+    const next = new Set(shownCols);
+    next.delete('yn-score-y');
+    next.delete('yn-score-n');
+    return next;
+  }, [shownCols, scoringOn]);
+  const handleSetScoringOn = (v: boolean) => {
+    if (!v) {
+      setItems(prev => prev.map(item => ({ ...item, scoreYes: undefined, scoreNo: undefined, scoreEnabled: undefined })));
+    } else {
+      setShownCols(prev => new Set([...prev, 'yn-score-y', 'yn-score-n']));
+    }
+    setScoringOn(v);
+  };
   const [showAddPopover, setShowAddPopover] = useState(false);
   const [kebabOpenId, setKebabOpenId] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -1478,13 +1724,13 @@ export default function JoltListEditorPage() {
           </div>
         ))}
         <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-          <ColumnPicker shownCols={shownCols} onChange={setShownCols} />
+          <ColumnPicker shownCols={effectiveShownCols} onChange={setShownCols} scoringOn={scoringOn} />
         </div>
       </div>
 
       {activeTab === 'settings' ? (
         <div style={{ flex: 1, overflowY: 'auto', background: T.surface0 }}>
-          <SettingsTab />
+          <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} />
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -1535,7 +1781,7 @@ export default function JoltListEditorPage() {
               {dcConditionState && conditionParentItem && conditionChildItem ? (
                 <div style={{ display: 'flex', height: '100%' }}>
                   <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
+                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                       onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                       onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                       onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
@@ -1549,7 +1795,7 @@ export default function JoltListEditorPage() {
                   <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onCancel={() => setDcConditionState(null)} />
                 </div>
               ) : (
-                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
+                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                   onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                   onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                   onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
@@ -1566,7 +1812,7 @@ export default function JoltListEditorPage() {
           {/* Side sheet */}
           {activeItemId && !dcMode && (() => {
             const item = findItem(items, activeItemId);
-            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => setActiveItemId(null)} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} /> : null;
+            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => setActiveItemId(null)} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} /> : null;
           })()}
         </div>
       )}
@@ -1649,17 +1895,17 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
             <th style={stickyHead(S.drag, { width: 28 })} />
             <th style={stickyHead(S.checkbox, { width: 30 })} />
             <th style={stickyHead(S.stripe, { width: 4 })} />
-            <th style={stickyHead(S.prompt, { minWidth: 200, padding: 0, borderRight: `0.5px solid ${T.borderStrong}` })}>
-              <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
-                <div
-                  onMouseDown={onResizeMouseDown}
-                  style={{ position: 'absolute', right: -4, top: 0, bottom: 0, width: 8, cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
-                  onMouseEnter={e => (e.currentTarget.children[0] as HTMLElement).style.opacity = '1'}
-                  onMouseLeave={e => (e.currentTarget.children[0] as HTMLElement).style.opacity = '0'}
-                >
-                  <div style={{ width: 2, height: 14, borderRadius: 1, background: T.borderStrong, opacity: 0, transition: 'opacity 0.15s' }} />
-                </div>
+            <th style={stickyHead(S.prompt, { minWidth: 200, padding: 0 })}>
+              <div style={{ position: 'absolute', top: 0, right: 0, width: 1, height: 38, background: T.borderStrong, zIndex: 1 }} />
+              <div
+                onMouseDown={onResizeMouseDown}
+                style={{ position: 'absolute', right: -4, top: 0, width: 8, height: 38, cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
+                onMouseEnter={e => (e.currentTarget.children[0] as HTMLElement).style.opacity = '1'}
+                onMouseLeave={e => (e.currentTarget.children[0] as HTMLElement).style.opacity = '0'}
+              >
+                <div style={{ width: 2, height: 14, borderRadius: 1, background: T.borderStrong, opacity: 0, transition: 'opacity 0.15s' }} />
               </div>
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }} />
             </th>
             <th style={{ width: 32 }} />
             <th style={{ width: 100 }} />
