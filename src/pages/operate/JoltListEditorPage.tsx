@@ -42,6 +42,10 @@ interface ListItem {
   ratingMin?: number;
   ratingMax?: number;
   bgColor?: string;
+  infoFile?: string;
+  infoInline?: boolean;
+  points?: number;
+  promptHtml?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -202,7 +206,7 @@ function Select({ value, onChange, options, style }: { value: string; onChange: 
 }
 
 // ── Side sheet sections ────────────────────────────────────────────────────
-function SsSection({ label, children, defaultOpen = true }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function SsSection({ label, children, defaultOpen = false }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ borderBottom: `0.5px solid ${T.border}` }}>
@@ -227,7 +231,7 @@ function FlagSection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: P
   ];
   const [selectedFlag, setSelectedFlag] = useState(item.flagEnabled ? 'f1' : '');
   return (
-    <SsSection label="Flags">
+    <SsSection label="Flags" defaultOpen={!!item.flagEnabled}>
       <select value={selectedFlag} onChange={e => { setSelectedFlag(e.target.value); onUpdate({ flagEnabled: !!e.target.value }); }} style={{ fontFamily: T.font, fontSize: 13, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '7px 10px', width: '100%', marginBottom: 8 }}>
         <option value="">No flag</option>
         {flags.map(f => <option key={f.id} value={f.id}>{f.emoji} {f.name}</option>)}
@@ -264,7 +268,7 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
   const removeYNRule = (id: string) => onUpdate({ caForYNRules: ynRules.filter(r => r.id !== id) });
 
   return (
-    <SsSection label="Corrective Action" defaultOpen>
+    <SsSection label="Corrective Action" defaultOpen={!!(item.caForNA || (item.caForYNRules?.length ?? 0) > 0 || item.caForRanges)}>
       {/* For N/A */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
@@ -343,7 +347,7 @@ function MCChoicesSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Pa
   const removeChoice = (id: string) => onUpdate({ choices: choices.filter(c => c.id !== id) });
 
   return (
-    <SsSection label="Choices">
+    <SsSection label="Choices" defaultOpen={(item.choices?.length ?? 0) > 0}>
       {choices.map((c, idx) => (
         <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <div onClick={() => { setPickerFor(pickerFor === c.id ? null : c.id); setPickerTab('color'); }} style={{ width: 26, height: 26, borderRadius: '50%', background: c.color || 'transparent', border: c.color ? 'none' : `1.5px dashed ${T.borderStrong}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
@@ -426,6 +430,88 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
   );
 }
 
+function PromptEditor({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = item.promptHtml ?? item.prompt;
+    }
+  }, [item.id]);
+
+  const exec = (cmd: string, value?: string) => {
+    document.execCommand(cmd, false, value);
+    editorRef.current?.focus();
+  };
+  const toolBtn = (content: React.ReactNode, onMD: () => void, title?: string) => (
+    <button title={title} onMouseDown={e => { e.preventDefault(); onMD(); }} style={{ width: 22, height: 22, borderRadius: 3, border: 'none', background: 'none', color: T.textSecondary, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.font }}>
+      {content}
+    </button>
+  );
+  const handleLink = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const url = window.prompt('Enter URL', 'https://');
+    if (url) exec('createLink', url);
+  };
+  return (
+    <div>
+      <div style={{ border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, background: T.surface2, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '5px 8px', background: T.surface0, borderBottom: `0.5px solid ${T.border}` }}>
+          {toolBtn(<b>B</b>, () => exec('bold'), 'Bold')}
+          {toolBtn(<i>I</i>, () => exec('italic'), 'Italic')}
+          {toolBtn('H', () => {
+            const block = document.queryCommandValue('formatBlock');
+            exec('formatBlock', block.toLowerCase() === 'h3' ? 'p' : 'h3');
+          }, 'Heading')}
+          <div style={{ width: 0.5, height: 12, background: T.borderStrong, margin: '0 3px' }} />
+          {toolBtn(<i className="ti ti-link" style={{ fontSize: 13, fontWeight: 400 }} />, handleLink, 'Link')}
+        </div>
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={e => {
+            const el = e.currentTarget as HTMLDivElement;
+            onUpdate({ prompt: el.innerText.trim(), promptHtml: el.innerHTML });
+          }}
+          style={{ padding: '10px 12px', fontSize: 13, color: T.textPrimary, lineHeight: 1.55, minHeight: 60, outline: 'none', fontFamily: T.font }}
+        />
+      </div>
+      <div style={{ fontSize: 11, color: T.textMuted, marginTop: 5 }}>Required — cannot be empty</div>
+    </div>
+  );
+}
+
+function InfoLibrarySection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, color: T.textPrimary }}>Display attached file inline on the app</span>
+        <Toggle on={!!item.infoInline} onChange={v => onUpdate({ infoInline: v })} />
+      </div>
+      <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={e => {
+        const file = e.target.files?.[0];
+        if (file) onUpdate({ infoFile: file.name });
+        e.target.value = '';
+      }} />
+      {item.infoFile ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.surface0, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '8px 10px' }}>
+          <i className="ti ti-file" style={{ fontSize: 15, color: T.textMuted, flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: T.textPrimary, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.infoFile}</span>
+          <button onClick={() => onUpdate({ infoFile: undefined })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', padding: 0 }}>
+            <i className="ti ti-x" />
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => fileInputRef.current?.click()} style={{ fontFamily: T.font, fontSize: 13, color: T.textAccent, background: T.surface0, border: `0.5px solid ${T.borderAccent}`, borderRadius: 6, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'center' }}>
+          <i className="ti ti-folder-open" style={{ fontSize: 15 }} /> Select File
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Side sheet ────────────────────────────────────────────────────────────
 function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void }) {
   const upd = (updates: Partial<ListItem>) => onUpdate(item.id, updates);
@@ -462,29 +548,11 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
       {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {/* Prompt */}
-        <SsSection label="Prompt">
-          <textarea defaultValue={item.prompt} onChange={e => upd({ prompt: e.target.value })} rows={2} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '7px 10px', width: '100%', resize: 'vertical' }} />
-        </SsSection>
-        {/* Background color */}
-        <SsSection label="Background Color" defaultOpen={false}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {STRIPE_COLORS.map(sc => (
-              <div key={sc.value} onClick={() => { setBgColor(sc.value); upd({ stripe: sc.value }); }} title={sc.label} style={{ width: 24, height: 24, borderRadius: 4, background: sc.value || T.surface1, border: `1.5px solid ${bgColor === sc.value ? T.textPrimary : T.borderStrong}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {!sc.value && <i className="ti ti-x" style={{ fontSize: 11, color: T.textMuted }} />}
-              </div>
-            ))}
-          </div>
-        </SsSection>
-        {/* Info library */}
-        <SsSection label="Info Library" defaultOpen={false}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontSize: 13, color: T.textPrimary }}>Attach reference</span>
-            <Toggle on={false} onChange={() => {}} />
-          </div>
-          <div style={{ fontSize: 12, color: T.textMuted }}>Link a document or URL to display alongside this item.</div>
+        <SsSection label="Prompt Text" defaultOpen>
+          <PromptEditor item={item} onUpdate={upd} />
         </SsSection>
         {/* General options */}
-        <SsSection label="General Options" defaultOpen>
+        <SsSection label="General Options" defaultOpen={!!(markAs || item.points)}>
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -505,11 +573,30 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             </div>
           </div>
           {item.type === 'yn' && (
-            <div>
+            <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Completion mode</div>
               <Select value={completionMode} onChange={setCompletionMode} options={[{ value: 'any', label: 'Any answer completes' }, { value: 'yes', label: 'Only Yes completes' }, { value: 'no', label: 'Only No completes' }]} style={{ width: '100%' }} />
             </div>
           )}
+          <div>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Points</div>
+            <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
+            <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Employees get points by completing items or half points if late.</div>
+          </div>
+        </SsSection>
+        {/* Background color */}
+        <SsSection label="Background Color" defaultOpen={!!item.stripe}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {STRIPE_COLORS.map(sc => (
+              <div key={sc.value} onClick={() => { setBgColor(sc.value); upd({ stripe: sc.value }); }} title={sc.label} style={{ width: 24, height: 24, borderRadius: 4, background: sc.value || T.surface1, border: `1.5px solid ${bgColor === sc.value ? T.textPrimary : T.borderStrong}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {!sc.value && <i className="ti ti-x" style={{ fontSize: 11, color: T.textMuted }} />}
+              </div>
+            ))}
+          </div>
+        </SsSection>
+        {/* Info library */}
+        <SsSection label="Info Library" defaultOpen={!!(item.infoFile || item.infoInline)}>
+          <InfoLibrarySection item={item} onUpdate={upd} />
         </SsSection>
         {/* Labels (tags) */}
         <SsSection label="Labels" defaultOpen={false}>
@@ -525,7 +612,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         </SsSection>
         {/* Score */}
         {(item.type === 'yn' || item.type === 'measurement' || item.type === 'checkmark') && (
-          <SsSection label="Score" defaultOpen={false}>
+          <SsSection label="Score" defaultOpen={!!(item.scoreEnabled)}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: scoreEnabled ? 12 : 0 }}>
               <span style={{ fontSize: 13, color: T.textPrimary }}>Enable scoring</span>
               <Toggle on={scoreEnabled} onChange={v => { setScoreEnabled(v); upd({ scoreEnabled: v }); }} />
@@ -996,6 +1083,39 @@ function ColumnPicker({ shownCols, onChange }: { shownCols: Set<string>; onChang
   );
 }
 
+// ── Color cell ────────────────────────────────────────────────────────────
+function ColorCell({ stripe, onSelect }: { stripe: string; onSelect: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLTableCellElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+  return (
+    <td ref={ref} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', position: 'relative' }}
+      onClick={e => { e.stopPropagation(); setOpen(o => !o); }}>
+      {stripe ? (
+        <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', background: stripe, border: `1px solid rgba(0,0,0,0.12)`, cursor: 'pointer', verticalAlign: 'middle' }} />
+      ) : (
+        <span style={{ color: T.textMuted, fontSize: 12, cursor: 'pointer' }}>—</span>
+      )}
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: '50%', transform: 'translateX(-50%)', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, padding: 8, zIndex: 200, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', display: 'flex', gap: 6, flexWrap: 'wrap', width: 120 }}>
+          {STRIPE_COLORS.map(sc => (
+            <button key={sc.value} title={sc.label} onClick={e => { e.stopPropagation(); onSelect(sc.value); setOpen(false); }} style={{
+              width: 20, height: 20, borderRadius: '50%', border: sc.value === stripe ? `2px solid ${T.textAccent}` : `1px solid rgba(0,0,0,0.12)`,
+              background: sc.value || T.surface0, cursor: 'pointer', padding: 0, flexShrink: 0,
+              outline: sc.value === '' ? `1px dashed ${T.borderStrong}` : 'none',
+            }} />
+          ))}
+        </div>
+      )}
+    </td>
+  );
+}
+
 // ── Items table row ───────────────────────────────────────────────────────
 interface RowProps {
   item: ListItem;
@@ -1010,6 +1130,7 @@ interface RowProps {
   shownCols: Set<string>;
   colValues: Record<string, Record<string, string>>;
   onColChange: (itemId: string, colKey: string, value: string | null) => void;
+  onUpdate: (id: string, patch: Partial<ListItem>) => void;
   onCheckbox: (id: string) => void;
   onRowClick: (id: string) => void;
   onKebab: (id: string) => void;
@@ -1018,7 +1139,7 @@ interface RowProps {
   onDCClick: (id: string) => void;
 }
 
-function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, colValues, onColChange, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick }: RowProps) {
+function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
@@ -1040,7 +1161,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
 
   return (
     <tr style={{
-      height: 38, borderBottom: `0.5px solid ${T.border}`,
+      height: 44, borderBottom: `0.5px solid ${T.border}`,
       background: isActive ? T.bgAccent : isLinkingChild ? T.bgAccent : T.surface2,
       opacity: isCut ? 0.4 : isTypeDimmed ? 0.28 : 1,
       position: 'relative',
@@ -1050,7 +1171,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
     >
       {/* Drag handle */}
       <td style={sticky(0, { width: 28, padding: 0 })}>
-        <div style={{ width: 28, height: 38, display: 'flex', alignItems: 'center', paddingLeft: 8, paddingRight: 3, color: T.textMuted, fontSize: 14, opacity: hovered || isActive ? 1 : 0 }}>
+        <div style={{ width: 28, height: 44, display: 'flex', alignItems: 'center', paddingLeft: 8, paddingRight: 3, color: T.textMuted, fontSize: 14, opacity: hovered || isActive ? 1 : 0 }}>
           <i className="ti ti-grip-vertical" />
         </div>
       </td>
@@ -1060,13 +1181,13 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       </td>
       {/* Stripe */}
       <td style={sticky(58, { width: 4, padding: 0 })}>
-        <div style={{ width: 4, height: 38, background: item.stripe || 'transparent' }} />
+        <div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} />
       </td>
       {/* Prompt */}
       <td style={sticky(62, { padding: 0, overflow: 'hidden', width: activeCols.length > 0 ? 300 : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
-        <div style={{ display: 'flex', alignItems: 'center', height: 38, padding: '0 8px', gap: 6, cursor: dcMode ? 'pointer' : 'default' }}>
+        <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 6, cursor: dcMode ? 'pointer' : 'default', overflow: 'hidden' }}>
           {isChild && <span style={{ fontSize: 12, color: T.textMuted, flexShrink: 0 }}>↳</span>}
-          <span style={{ fontSize: 13, color: isLinkingChild || (isActive && !dcMode) ? T.textAccent : T.textPrimary, fontWeight: isLinkingChild || (isActive && !dcMode) ? 500 : 400, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.prompt}</span>
+          <span style={{ fontSize: 13, color: isLinkingChild || (isActive && !dcMode) ? T.textAccent : T.textPrimary, fontWeight: isLinkingChild || (isActive && !dcMode) ? 500 : 400, flex: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.prompt}</span>
           {/* DC mode overlays */}
           {dcMode && !dcLinkingId && parent && (
             <span style={{ fontSize: 10, fontWeight: 500, color: 'white', background: parentColor, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{condLabel}</span>
@@ -1086,13 +1207,13 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       </td>
       {/* Type icon */}
       <td style={{ width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 38 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 44 }}>
           <i className={`ti ${meta.icon}`} style={{ fontSize: 15, color: T.textMuted }} title={meta.label} />
         </div>
       </td>
       {/* Config indicators */}
       <td style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, height: 38 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, height: 44 }}>
           {item.inds.map(ind => <i key={ind} className={`ti ${ind}`} style={{ fontSize: 13, color: indColor(ind) }} />)}
         </div>
       </td>
@@ -1117,6 +1238,18 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
               ) : (
                 <span style={{ color: T.textMuted, fontSize: 12, cursor: 'pointer' }}>—</span>
               )}
+            </td>
+          );
+        }
+        if (col.key === 'all-color') {
+          return <ColorCell key={col.key} stripe={item.stripe} onSelect={v => onUpdate(item.id, { stripe: v })} />;
+        }
+        if (col.key === 'all-info-library') {
+          const on = !!item.infoInline;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); onUpdate(item.id, { infoInline: !on }); }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
         }
@@ -1402,7 +1535,7 @@ export default function JoltListEditorPage() {
               {dcConditionState && conditionParentItem && conditionChildItem ? (
                 <div style={{ display: 'flex', height: '100%' }}>
                   <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue}
+                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                       onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                       onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                       onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
@@ -1416,7 +1549,7 @@ export default function JoltListEditorPage() {
                   <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onCancel={() => setDcConditionState(null)} />
                 </div>
               ) : (
-                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue}
+                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={shownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                   onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                   onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                   onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
@@ -1458,6 +1591,7 @@ interface ItemsTableProps {
   shownCols: Set<string>;
   colValues: Record<string, Record<string, string>>;
   onColChange: (itemId: string, colKey: string, value: string | null) => void;
+  onUpdate: (id: string, patch: Partial<ListItem>) => void;
   onCheckbox: (id: string) => void;
   onRowClick: (id: string) => void;
   onKebab: (id: string) => void;
@@ -1468,7 +1602,7 @@ interface ItemsTableProps {
   onEditCommit: () => void;
 }
 
-function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit }: ItemsTableProps) {
+function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
   // Cumulative left offsets for sticky columns: drag=0, checkbox=28, stripe=58, prompt=62
@@ -1476,16 +1610,34 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
   const stickyHead = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
     position: 'sticky', left, zIndex: 12, background: T.surface1, ...extra,
   });
-  // When optional cols are active, pin the prompt at 300px and let the table grow past the
+  // When optional cols are active, pin the prompt at promptWidth and let the table grow past the
   // container so horizontal scrolling kicks in. Without cols, fill the container normally.
   const hasCols = activeCols.length > 0;
+  const [promptWidth, setPromptWidth] = useState(300);
+  const resizingRef = useRef<{ startX: number; startW: number } | null>(null);
+  const onResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = { startX: e.clientX, startW: promptWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const w = Math.max(150, resizingRef.current.startW + ev.clientX - resizingRef.current.startX);
+      setPromptWidth(w);
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
   return (
     <table style={{ width: hasCols ? 'max-content' : '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         <col style={{ width: 28 }} />
         <col style={{ width: 30 }} />
         <col style={{ width: 4 }} />
-        <col style={{ width: hasCols ? 300 : undefined }} />
+        <col style={{ width: hasCols ? promptWidth : undefined }} />
         <col style={{ width: 32 }} />
         <col style={{ width: 100 }} />
         {activeCols.map(col => <col key={col.key} style={{ width: 100 }} />)}
@@ -1493,11 +1645,22 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
       </colgroup>
       {activeCols.length > 0 && (
         <thead style={{ position: 'sticky', top: 0, zIndex: 11 }}>
-          <tr style={{ background: T.surface1, borderBottom: `0.5px solid ${T.borderStrong}` }}>
+          <tr style={{ background: T.surface1, borderBottom: `0.5px solid ${T.borderStrong}`, height: 32 }}>
             <th style={stickyHead(S.drag, { width: 28 })} />
             <th style={stickyHead(S.checkbox, { width: 30 })} />
             <th style={stickyHead(S.stripe, { width: 4 })} />
-            <th style={stickyHead(S.prompt, { minWidth: 200 })} />
+            <th style={stickyHead(S.prompt, { minWidth: 200, padding: 0, borderRight: `0.5px solid ${T.borderStrong}` })}>
+              <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+                <div
+                  onMouseDown={onResizeMouseDown}
+                  style={{ position: 'absolute', right: -4, top: 0, bottom: 0, width: 8, cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
+                  onMouseEnter={e => (e.currentTarget.children[0] as HTMLElement).style.opacity = '1'}
+                  onMouseLeave={e => (e.currentTarget.children[0] as HTMLElement).style.opacity = '0'}
+                >
+                  <div style={{ width: 2, height: 14, borderRadius: 1, background: T.borderStrong, opacity: 0, transition: 'opacity 0.15s' }} />
+                </div>
+              </div>
+            </th>
             <th style={{ width: 32 }} />
             <th style={{ width: 100 }} />
             {activeCols.map(col => (
@@ -1519,18 +1682,18 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
       <tbody>
         {items.map(item => (
           editingRowId === item.id ? (
-            <tr key={item.id} style={{ height: 38, borderBottom: `0.5px solid ${T.borderAccent}`, background: '#F0F7FF', borderLeft: `3px solid ${T.fillAccent}` }}>
-              <td style={{ width: 28, padding: 0 }}><div style={{ width: 28, height: 38, display: 'flex', alignItems: 'center', paddingLeft: 8, color: T.textMuted, fontSize: 14 }}><i className="ti ti-grip-vertical" /></div></td>
+            <tr key={item.id} style={{ height: 44, borderBottom: `0.5px solid ${T.borderAccent}`, background: '#F0F7FF', borderLeft: `3px solid ${T.fillAccent}` }}>
+              <td style={{ width: 28, padding: 0 }}><div style={{ width: 28, height: 44, display: 'flex', alignItems: 'center', paddingLeft: 8, color: T.textMuted, fontSize: 14 }}><i className="ti ti-grip-vertical" /></div></td>
               <td style={{ width: 30, padding: '0 6px' }}><input type="checkbox" style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block' }} /></td>
-              <td style={{ width: 4, padding: 0 }}><div style={{ width: 4, height: 38, background: item.stripe || 'transparent' }} /></td>
+              <td style={{ width: 4, padding: 0 }}><div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} /></td>
               <td style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', height: 38, padding: '0 8px', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 8 }}>
                   <input ref={editInputRef} value={editingPrompt} onChange={e => onEditChange(e.target.value)} onBlur={onEditCommit} onKeyDown={e => { if (e.key === 'Enter') onEditCommit(); if (e.key === 'Escape') onEditCommit(); }} placeholder="Type prompt text…" style={{ fontFamily: T.font, fontSize: 13, border: 'none', outline: 'none', background: 'transparent', color: T.textPrimary, width: '100%' }} />
                   <span style={{ fontSize: 10, color: T.textMuted, fontStyle: 'italic', flexShrink: 0 }}>required</span>
                 </div>
               </td>
               <td style={{ width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 38 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 44 }}>
                   <i className={`ti ${TYPE_META[item.type].icon}`} style={{ fontSize: 15, color: T.textAccent }} />
                 </div>
               </td>
@@ -1539,7 +1702,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} colValues={colValues} onColChange={onColChange} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} />
           )
         ))}
       </tbody>
