@@ -52,6 +52,7 @@ interface ListItem {
   caForNANextStep?: 'repeat-item' | 'repeat-list' | 'no-repeat';
   caForNAOptional?: boolean;
   autoComplete?: { flagId: string; op: '<' | '>' | '=' | '>=' | '<='; count: number; answer: 'Yes' | 'No' };
+  savedValue?: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -847,6 +848,17 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
             <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Employees get points by completing items or half points if late.</div>
           </div>
+          {item.type === 'measurement' && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 13, color: T.textPrimary }}>Saved value</div>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4 }}>Pre-fills with the last recorded value on new list instances</div>
+                </div>
+                <Toggle on={!!item.savedValue} onChange={v => upd({ savedValue: v })} />
+              </div>
+            </div>
+          )}
           <div>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Labels</div>
             <LabelSelector item={item} onUpdate={upd} />
@@ -1856,6 +1868,7 @@ export default function JoltListEditorPage() {
       if (rules.length > 0 || m.caForNA)                       toAdd.push('ca-repeat');
       if (toAdd.length) setShownCols(prev => new Set([...prev, ...toAdd]));
     }
+    if (updates.savedValue) setShownCols(prev => new Set([...prev, 'm-saved-value']));
   }
 
   function deleteItem(id: string) {
