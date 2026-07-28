@@ -53,6 +53,9 @@ interface ListItem {
   caForNAOptional?: boolean;
   autoComplete?: { flagId: string; op: '<' | '>' | '=' | '>=' | '<='; count: number; answer: 'Yes' | 'No' };
   savedValue?: boolean;
+  locationTags?: string[];
+  scoreGroup?: string;
+  importance?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -103,6 +106,10 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
 ];
 
 const FLAG_COLORS = ['#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
+const LOCATION_TAGS = ['BOH', 'FOH', 'Bar', 'Kitchen', 'Drive-Thru', 'Prep', 'Storage', 'Receiving', 'Freezer', 'Dishwash', 'Catering', 'Patio', 'Lounge', 'Bakery', 'Deli', 'Produce', 'Dairy', 'Meat', 'Seafood', 'Checkout'];
+const SCORE_GROUPS = ['Food Safety', 'Equipment', 'Sanitation', 'Customer Experience', 'Opening', 'Closing'];
+const IMPORTANCE_LEVELS = ['Critical', 'Major', 'Minor'];
+
 const CA_LISTS = [
   { id: 'cal1', title: 'Corrective Action List' },
   { id: 'cal2', title: 'Food Safety Corrective Actions' },
@@ -362,6 +369,78 @@ function FlagSection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: P
         </div>
       )}
     </SsSection>
+  );
+}
+
+function LocationTagPicker({ selected, onChange }: { selected: string[]; onChange: (tags: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setTimeout(() => inputRef.current?.focus(), 0);
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const filtered = LOCATION_TAGS.filter(t => t.toLowerCase().includes(q.toLowerCase()));
+  const toggle = (tag: string) => onChange(selected.includes(tag) ? selected.filter(t => t !== tag) : [...selected, tag]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      {/* Selected pills */}
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+          {selected.map(tag => (
+            <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: T.bgAccent, color: T.textAccent, fontSize: 12, fontWeight: 500, padding: '3px 8px', borderRadius: 12 }}>
+              {tag}
+              <i className="ti ti-x" style={{ fontSize: 10, cursor: 'pointer' }} onClick={() => toggle(tag)} />
+            </span>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ fontFamily: T.font, fontSize: 13, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '6px 10px', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, cursor: 'pointer', color: T.textMuted }}
+      >
+        <span>Add location tag…</span>
+        <i className="ti ti-chevron-down" style={{ fontSize: 12, flexShrink: 0, color: T.textMuted }} />
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden' }}>
+          <div style={{ padding: '8px 10px', borderBottom: `0.5px solid ${T.border}` }}>
+            <input
+              ref={inputRef}
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search tags…"
+              style={{ fontFamily: T.font, fontSize: 13, border: 'none', outline: 'none', width: '100%', background: 'transparent', color: T.textPrimary }}
+            />
+          </div>
+          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}>No tags found</div>
+            )}
+            {filtered.map(tag => {
+              const active = selected.includes(tag);
+              return (
+                <div key={tag} onClick={() => toggle(tag)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: active ? T.textAccent : T.textPrimary, background: active ? T.bgAccent : 'transparent' }}
+                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = T.surface1; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = active ? T.bgAccent : 'transparent'; }}
+                >
+                  <span>{tag}</span>
+                  {active && <i className="ti ti-check" style={{ fontSize: 13, color: T.textAccent }} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -913,6 +992,35 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             <div style={{ fontSize: 12, color: T.textMuted }}>Subtitles cannot be a DC child — they are always visible.</div>
           </SsSection>
         )}
+        {/* Tags — always last */}
+        <SsSection label="Tags" defaultOpen={!!(item.locationTags?.length || item.scoreGroup || item.importance)}>
+          {/* Location — searchable multi-select */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 3 }}>Location</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Only display at locations with these tags — empty means all locations</div>
+            <LocationTagPicker selected={item.locationTags ?? []} onChange={tags => upd({ locationTags: tags.length ? tags : undefined })} />
+          </div>
+          {/* Score group — single-select */}
+          <div style={{ marginBottom: 14, borderTop: `0.5px solid ${T.border}`, paddingTop: 12 }}>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 3 }}>Score group</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Group for aggregate scoring reports</div>
+            <select value={item.scoreGroup ?? ''} onChange={e => upd({ scoreGroup: e.target.value || undefined })}
+              style={{ fontFamily: T.font, fontSize: 12, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 24px 5px 8px', width: '100%', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239898A8'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}>
+              <option value="">None</option>
+              {SCORE_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+          {/* Importance — single-select */}
+          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12 }}>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 3 }}>Importance</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Tag by importance level</div>
+            <select value={item.importance ?? ''} onChange={e => upd({ importance: e.target.value || undefined })}
+              style={{ fontFamily: T.font, fontSize: 12, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 24px 5px 8px', width: '100%', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239898A8'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}>
+              <option value="">None</option>
+              {IMPORTANCE_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+        </SsSection>
       </div>
     </div>
   );
@@ -1220,6 +1328,9 @@ const COLUMN_GROUPS: { group: string; cols: { key: string; label: string }[] }[]
     { key: 'all-info-library',      label: 'Info library inline' },
     { key: 'all-points',            label: 'Points' },
     { key: 'all-print-label',       label: 'Print Label' },
+    { key: 'all-tag-location',      label: 'Tag - Location' },
+    { key: 'all-tag-scoring',       label: 'Tag - Scoring' },
+    { key: 'all-tag-importance',    label: 'Tag - Importance' },
   ]},
   { group: 'Y/N', cols: [
     { key: 'yn-score-y',            label: 'Score - Y' },
@@ -1748,6 +1859,52 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
               {count > 0 ? (
                 <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
                   {count}
+                </span>
+              ) : (
+                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+              )}
+            </td>
+          );
+        }
+        if (col.key === 'all-tag-location') {
+          const tags = item.locationTags ?? [];
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {tags.length > 0 ? (
+                <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
+                  {tags.length}
+                </span>
+              ) : (
+                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+              )}
+            </td>
+          );
+        }
+        if (col.key === 'all-tag-scoring') {
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              {item.scoreGroup ? (
+                <span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }} title={item.scoreGroup}>
+                  {item.scoreGroup}
+                </span>
+              ) : (
+                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+              )}
+            </td>
+          );
+        }
+        if (col.key === 'all-tag-importance') {
+          const colors: Record<string, { bg: string; color: string }> = {
+            Critical: { bg: '#FDECEA', color: '#B71C1C' },
+            Major:    { bg: '#FFF3E0', color: '#E65100' },
+            Minor:    { bg: '#F3F8FF', color: T.textAccent },
+          };
+          const style = item.importance ? (colors[item.importance] ?? { bg: T.bgAccent, color: T.textAccent }) : null;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {style ? (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: style.bg, color: style.color }}>
+                  {item.importance}
                 </span>
               ) : (
                 <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
