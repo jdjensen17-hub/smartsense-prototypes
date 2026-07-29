@@ -19,7 +19,7 @@ type DCConditionMeas = { type: 'measurement'; op: '>' | '>=' | '=' | '<=' | '<';
 type DCCondition = DCConditionYN | DCConditionMeas;
 
 interface MCChoice { id: string; label: string; color: string; icon: string | null; }
-interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; }
+interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; rangeId?: string; }
 
 interface ListItem {
   id: string;
@@ -57,6 +57,7 @@ interface ListItem {
   locationTags?: string[];
   scoreGroup?: string;
   importance?: string;
+  measRanges?: { id: string; min: string; max: string }[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -691,7 +692,7 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
       <div style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (isMeas ? forRanges : ynRules.length > 0) ? 10 : 0 }}>
           <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>{isMeas ? 'For ranges' : 'For Yes/No'}</span>
-          <Toggle on={isMeas ? forRanges : ynRules.length > 0} onChange={v => { if (isMeas) { setForRanges(v); } else { if (v && ynRules.length === 0) addYNRule(); else if (!v) onUpdate({ caForYNRules: [] }); } }} />
+          <Toggle on={isMeas ? forRanges : ynRules.length > 0} onChange={v => { if (isMeas) { setForRanges(v); if (v && rangeRules.length === 0) onUpdate({ caForRanges: true, caForRangeRules: [{ id: mkid(), rangeId: item.measRanges?.[0]?.id ?? '', condition: 'Inside', caList: '', adHoc: false, nextStep: 'repeat-item' }] }); else if (!v) onUpdate({ caForRanges: false, caForRangeRules: [] }); } else { if (v && ynRules.length === 0) addYNRule(); else if (!v) onUpdate({ caForYNRules: [] }); } }} />
         </div>
         {!isMeas && ynRules.map((rule, idx) => (
           <div key={rule.id} style={{ paddingTop: 10, marginTop: 8 }}>
@@ -728,28 +729,62 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
           </div>
         ))}
         {!isMeas && ynRules.length < 2 && ynRules.length > 0 && (
-          <>
-            <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: 12 }} />
-            <button onClick={addYNRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
-              <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Condition
-            </button>
-          </>
+          <button onClick={addYNRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 16 }}>
+            <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Condition
+          </button>
         )}
-        {isMeas && forRanges && (
-          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 10, marginTop: 8 }}>
-            {rangeRules.map((rule, idx) => (
-              <div key={rule.id} style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', marginBottom: 6 }}>Rule {idx + 1}</div>
-                <Select value="range1" onChange={() => {}} options={[{ value: 'range1', label: 'Range 1 (100°F – 150°F)' }]} style={{ width: '100%', marginBottom: 6 }} />
-                <Select value={rule.condition ?? 'Inside'} onChange={v => onUpdate({ caForRangeRules: rangeRules.map(r => r.id === rule.id ? { ...r, condition: v } : r) })} options={[{ value: 'Inside', label: 'Inside range' }, { value: 'Outside', label: 'Outside range' }, { value: 'Above', label: 'Above range' }, { value: 'Below', label: 'Below range' }]} style={{ width: '100%', marginBottom: 6 }} />
-                <Select value="default" onChange={() => {}} options={[{ value: 'default', label: 'Temp Range Actions' }]} style={{ width: '100%' }} />
-              </div>
-            ))}
-            <button onClick={() => onUpdate({ caForRangeRules: [...rangeRules, { id: mkid(), condition: 'Inside', caList: '', adHoc: false, nextStep: 'repeat-item' }] })} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add range rule
-            </button>
-          </div>
-        )}
+        {isMeas && forRanges && (() => {
+          const measRanges = item.measRanges ?? [];
+          const updateRangeRule = (id: string, updates: Partial<CARule>) => onUpdate({ caForRangeRules: rangeRules.map(r => r.id === id ? { ...r, ...updates } : r) });
+          const removeRangeRule = (id: string) => onUpdate({ caForRangeRules: rangeRules.filter(r => r.id !== id) });
+          const addRangeRule = () => onUpdate({ caForRangeRules: [...rangeRules, { id: mkid(), rangeId: measRanges[0]?.id ?? '', condition: 'Inside', caList: '', adHoc: false, nextStep: 'repeat-item' }] });
+          const rangeOptions = measRanges.length > 0
+            ? measRanges.map((r, i) => ({ value: r.id, label: `Range ${i + 1}${r.min || r.max ? ` (${r.min || 'Min'} – ${r.max || 'Max'})` : ''}` }))
+            : [{ value: '', label: 'No ranges defined' }];
+          return (
+            <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 10, marginTop: 8 }}>
+              {rangeRules.map((rule, idx) => (
+                <div key={rule.id}>
+                  {idx > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0' }}>
+                      <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+                      <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: '0.05em' }}>OR</span>
+                      <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase' }}>Rule {idx + 1}</span>
+                    <button onClick={() => removeRangeRule(rule.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13, display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-x" />Remove</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Range</div>
+                  <Select value={rule.rangeId ?? ''} onChange={v => updateRangeRule(rule.id, { rangeId: v })} options={rangeOptions} style={{ width: '100%', marginBottom: 8 }} />
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Condition</div>
+                  <Select value={rule.condition ?? 'Inside'} onChange={v => updateRangeRule(rule.id, { condition: v })} options={[{ value: 'Inside', label: 'Inside range' }, { value: 'Outside', label: 'Outside range' }, { value: 'Above', label: 'Above range' }, { value: 'Below', label: 'Below range' }]} style={{ width: '100%', marginBottom: 8 }} />
+                  {!rule.adHoc && (
+                    <>
+                      <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>CA list</div>
+                      <div style={{ marginBottom: 8 }}><CAListPicker value={rule.caList ?? ''} onChange={v => updateRangeRule(rule.id, { caList: v })} /></div>
+                    </>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                    <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
+                    <Toggle on={rule.adHoc} onChange={v => updateRangeRule(rule.id, { adHoc: v, ...(v ? { caList: '' } : {}) })} />
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 10, marginBottom: 4 }}>Next step</div>
+                  <Select value={rule.nextStep ?? 'repeat-item'} onChange={v => updateRangeRule(rule.id, { nextStep: v as CARule['nextStep'] })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+                    <Toggle on={!!rule.optional} onChange={v => updateRangeRule(rule.id, { optional: v })} />
+                  </div>
+                </div>
+              ))}
+              <button onClick={addRangeRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 16 }}>
+                <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Rule
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </SsSection>
   );
@@ -817,35 +852,139 @@ function MCChoicesSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Pa
   );
 }
 
+const MOCK_SENSORS: { id: string; name: string; reading: string }[] = [
+  { id: 's1', name: 'Walk-In Cooler #1',    reading: '38.2°F' },
+  { id: 's2', name: 'Walk-In Freezer A',    reading: '-4.1°F' },
+  { id: 's3', name: 'Prep Table Surface',   reading: '41.7°F' },
+  { id: 's4', name: 'Hot Hold Cabinet',     reading: '141.3°F' },
+  { id: 's5', name: 'Receiving Dock Probe', reading: '55.0°F' },
+  { id: 's6', name: 'Dish Machine Rinse',   reading: '180.4°F' },
+];
+
+const MEAS_INPUT_METHODS: Record<string, string[]> = {
+  temperature: ['Manual Input', 'Probe', 'Sensor'],
+  weight:      ['Manual Input', 'Weight Scale'],
+  ph:          ['Manual Input', 'Probe'],
+  other:       ['Manual Input'],
+};
+
+const MEAS_UNITS: Record<string, { value: string; label: string }[]> = {
+  temperature: [
+    { value: 'F', label: 'F - Fahrenheit' },
+    { value: 'C', label: 'C - Celsius' },
+    { value: 'K', label: 'K - Kelvin' },
+  ],
+  weight: [
+    { value: 'lb', label: 'lb - Pounds' },
+    { value: 'oz', label: 'oz - Ounces' },
+    { value: 'kg', label: 'kg - Kilograms' },
+    { value: 'g', label: 'g - Grams' },
+  ],
+  ph: [
+    { value: 'pH', label: 'pH' },
+  ],
+  other: [],
+};
+
 function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
-  const [unit, setUnit] = useState('°F');
-  const [decimals, setDecimals] = useState('2');
-  const [ranges, setRanges] = useState([{ id: 'rng1', min: '100', max: '150', label: 'Normal' }]);
+  const [measType, setMeasType] = useState('temperature');
+  const [unit, setUnit] = useState('F');
+  const [customUnit, setCustomUnit] = useState('');
+  const [inputMethods, setInputMethods] = useState<string[]>(['Manual Input']);
+  const [selectedSensorId, setSelectedSensorId] = useState('');
+  const ranges = item.measRanges ?? [];
+  const setRanges = (next: { id: string; min: string; max: string }[]) => onUpdate({ measRanges: next });
+
+  const unitOptions = MEAS_UNITS[measType] ?? [];
+
+  const handleTypeChange = (t: string) => {
+    setMeasType(t);
+    const opts = MEAS_UNITS[t] ?? [];
+    if (opts.length > 0) setUnit(opts[0].value);
+    else setUnit('');
+    setInputMethods(['Manual Input']);
+  };
+
+  const toggleInputMethod = (m: string) => {
+    setInputMethods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+  };
+
   return (
     <SsSection label="Measurement Options">
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Unit</div>
-          <input value={unit} onChange={e => setUnit(e.target.value)} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%' }} />
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'flex-end' }}>
+        <div>
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Measurement Type</div>
+          <Select value={measType} onChange={handleTypeChange} options={[
+            { value: 'temperature', label: 'Temperature' },
+            { value: 'weight', label: 'Weight' },
+            { value: 'ph', label: 'pH' },
+            { value: 'other', label: 'Other' },
+          ]} />
         </div>
-        <div style={{ width: 80 }}>
-          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Decimals</div>
-          <Select value={decimals} onChange={setDecimals} options={[{value:'0',label:'0'},{value:'1',label:'1'},{value:'2',label:'2'},{value:'3',label:'3'}]} />
+        {measType !== 'ph' && (
+          <div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Unit</div>
+            {measType === 'other'
+              ? <input value={customUnit} onChange={e => setCustomUnit(e.target.value)} placeholder="Enter unit…" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 120 }} />
+              : <Select value={unit} onChange={setUnit} options={unitOptions} />
+            }
+          </div>
+        )}
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Input Methods</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {(MEAS_INPUT_METHODS[measType] ?? []).map(m => {
+            const selected = inputMethods.includes(m);
+            return (
+              <div key={m} onClick={() => toggleInputMethod(m)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1.5px solid ${selected ? T.borderAccent : T.borderStrong}`, background: selected ? T.bgAccent : T.surface2, color: selected ? T.textAccent : T.textSecondary, userSelect: 'none' }}>
+                {selected && <i className="ti ti-check" style={{ fontSize: 11 }} />}
+                {m}
+              </div>
+            );
+          })}
         </div>
       </div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Ranges</div>
-      {ranges.map((r, idx) => (
-        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <input value={r.min} onChange={e => setRanges(ranges.map(x => x.id === r.id ? { ...x, min: e.target.value } : x))} placeholder="Min" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', width: 60 }} />
-          <span style={{ color: T.textMuted, fontSize: 12 }}>–</span>
-          <input value={r.max} onChange={e => setRanges(ranges.map(x => x.id === r.id ? { ...x, max: e.target.value } : x))} placeholder="Max" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', width: 60 }} />
-          <input value={r.label} onChange={e => setRanges(ranges.map(x => x.id === r.id ? { ...x, label: e.target.value } : x))} placeholder="Label" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', flex: 1 }} />
-          <button onClick={() => setRanges(ranges.filter(x => x.id !== r.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14 }}><i className="ti ti-x" /></button>
+      {inputMethods.includes('Sensor') && (
+        <div style={{ marginBottom: 12, padding: 12, background: T.surface1, borderRadius: 8, border: `0.5px solid ${T.border}` }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Linked Sensor Data</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <Select
+                value={selectedSensorId}
+                onChange={setSelectedSensorId}
+                options={[{ value: '', label: 'Select Sensor' }, ...MOCK_SENSORS.map(s => ({ value: s.id, label: s.name }))]}
+              />
+            </div>
+            <div style={{ width: 110 }}>
+              <input
+                readOnly
+                value={selectedSensorId ? (MOCK_SENSORS.find(s => s.id === selectedSensorId)?.reading ?? '') : ''}
+                placeholder="Reading"
+                style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', boxSizing: 'border-box', background: T.surface0, color: T.textSecondary, cursor: 'default' }}
+              />
+            </div>
+          </div>
         </div>
-      ))}
-      <button onClick={() => setRanges([...ranges, { id: mkid(), min: '', max: '', label: '' }])} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-        <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add range
-      </button>
+      )}
+      <div style={{ padding: 12, background: T.surface1, borderRadius: 8, border: `0.5px solid ${T.border}` }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: ranges.length > 0 ? 10 : 0 }}>Ranges</div>
+        {ranges.map((r, idx) => (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: T.textSecondary, whiteSpace: 'nowrap', minWidth: 54 }}>Range {idx + 1}</span>
+            <input value={r.min} onChange={e => { if (/^-?\d*\.?\d*$/.test(e.target.value)) setRanges(ranges.map(x => x.id === r.id ? { ...x, min: e.target.value } : x)); }} placeholder="Min" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', width: 68 }} />
+            <span style={{ color: T.textMuted, fontSize: 12 }}>–</span>
+            <input value={r.max} onChange={e => { if (/^-?\d*\.?\d*$/.test(e.target.value)) setRanges(ranges.map(x => x.id === r.id ? { ...x, max: e.target.value } : x)); }} placeholder="Max" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', width: 68 }} />
+            <button onClick={() => setRanges(ranges.filter(x => x.id !== r.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14 }}><i className="ti ti-x" /></button>
+          </div>
+        ))}
+        {ranges.length < 3 && (
+          <button onClick={() => setRanges([...ranges, { id: mkid(), min: '', max: '' }])} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: ranges.length > 0 ? 4 : 0 }}>
+            <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add range
+          </button>
+        )}
+      </div>
     </SsSection>
   );
 }
