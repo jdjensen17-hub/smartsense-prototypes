@@ -1472,6 +1472,47 @@ function ColumnPicker({ shownCols, onChange, scoringOn }: { shownCols: Set<strin
 }
 
 // ── Points cell ───────────────────────────────────────────────────────────
+function LocationTagCell({ tags }: { tags: string[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLTableCellElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  if (tags.length === 0) {
+    return <td ref={ref} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+  }
+  if (tags.length === 1) {
+    return (
+      <td ref={ref} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+        <span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }} title={tags[0]}>{tags[0]}</span>
+      </td>
+    );
+  }
+  return (
+    <td ref={ref} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', position: 'relative' }}>
+      <span
+        onClick={() => setOpen(v => !v)}
+        title={tags.join(', ')}
+        style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, cursor: 'pointer' }}
+      >
+        {tags.length}
+      </span>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, minWidth: 180, maxWidth: 260, padding: '6px 0' }}>
+          {tags.map(tag => (
+            <div key={tag} style={{ padding: '6px 14px', fontSize: 12, color: T.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tag}</div>
+          ))}
+        </div>
+      )}
+    </td>
+  );
+}
+
 function PointsCell({ value, onCommit, allowNegative = false }: { value?: number; onCommit: (v: number | undefined) => void; allowNegative?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -1868,17 +1909,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         }
         if (col.key === 'all-tag-location') {
           const tags = item.locationTags ?? [];
-          return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              {tags.length > 0 ? (
-                <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
-                  {tags.length}
-                </span>
-              ) : (
-                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
-              )}
-            </td>
-          );
+          return <LocationTagCell key={col.key} tags={tags} />;
         }
         if (col.key === 'all-tag-scoring') {
           return (
@@ -1894,16 +1925,16 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'all-tag-importance') {
-          const colors: Record<string, { bg: string; color: string }> = {
+          const IMP_COLORS: Record<string, { bg: string; color: string }> = {
             Critical: { bg: '#FDECEA', color: '#B71C1C' },
             Major:    { bg: '#FFF3E0', color: '#E65100' },
             Minor:    { bg: '#F3F8FF', color: T.textAccent },
           };
-          const style = item.importance ? (colors[item.importance] ?? { bg: T.bgAccent, color: T.textAccent }) : null;
+          const s = item.importance ? (IMP_COLORS[item.importance] ?? { bg: T.bgAccent, color: T.textAccent }) : null;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              {style ? (
-                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: style.bg, color: style.color }}>
+              {s ? (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color }}>
                   {item.importance}
                 </span>
               ) : (
@@ -2026,6 +2057,9 @@ export default function JoltListEditorPage() {
       if (toAdd.length) setShownCols(prev => new Set([...prev, ...toAdd]));
     }
     if (updates.savedValue) setShownCols(prev => new Set([...prev, 'm-saved-value']));
+    if (updates.locationTags && (updates.locationTags as string[]).length > 0) setShownCols(prev => new Set([...prev, 'all-tag-location']));
+    if (updates.scoreGroup) setShownCols(prev => new Set([...prev, 'all-tag-scoring']));
+    if (updates.importance) setShownCols(prev => new Set([...prev, 'all-tag-importance']));
   }
 
   function deleteItem(id: string) {
