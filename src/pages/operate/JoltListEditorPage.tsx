@@ -35,7 +35,8 @@ interface ListItem {
   caForYNRules?: CARule[];
   caForRanges?: boolean;
   caForRangeRules?: CARule[];
-  flagEnabled?: boolean;
+  flagsForYes?: string[];
+  flagsForNo?: string[];
   scoreEnabled?: boolean;
   scoreYes?: number;
   scoreNo?: number;
@@ -105,7 +106,8 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
   { type: 'formula',     aliases: ['calculate','calc','equation','math'] },
 ];
 
-const FLAG_COLORS = ['#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
+const FLAG_COLORS = ['#1A1A1F','#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
+const FLAG_EMOJIS = ['🚩','⚠️','🔴','🟠','🟡','🟢','🔵','🟣','⭐','❗','❌','✅','🔥','💧','🌿','🍽️','🔧','🏥','📋','🔑'];
 const LOCATION_TAGS = ['BOH', 'FOH', 'Bar', 'Kitchen', 'Drive-Thru', 'Prep', 'Storage', 'Receiving', 'Freezer', 'Dishwash', 'Catering', 'Patio', 'Lounge', 'Bakery', 'Deli', 'Produce', 'Dairy', 'Meat', 'Seafood', 'Checkout'];
 const SCORE_GROUPS = ['Food Safety', 'Equipment', 'Sanitation', 'Customer Experience', 'Opening', 'Closing'];
 const IMPORTANCE_LEVELS = ['Critical', 'Major', 'Minor'];
@@ -118,7 +120,7 @@ const CA_LISTS = [
   { id: 'cal5', title: 'Health & Safety Incident Log' },
 ];
 
-const FLAGS = [
+const INITIAL_FLAGS = [
   { id: 'f1', name: 'Health & Safety', color: '#EF5350', emoji: '⚠️' },
   { id: 'f2', name: 'Equipment',        color: '#FF7043', emoji: '🔧' },
   { id: 'f3', name: 'Food Safety',      color: '#42A5F5', emoji: '🍽️' },
@@ -154,7 +156,7 @@ function mkid() { return Math.random().toString(36).slice(2, 9); }
 // ── Initial sample data ───────────────────────────────────────────────────
 const INITIAL_ITEMS: ListItem[] = [
   { id: 'section-opening', prompt: 'Opening Tasks', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', inds: [], allowNA: false, flagEnabled: true, caForYNRules: [], scoreYes: 1, scoreNo: 0 },
+  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', inds: [], allowNA: false, flagsForYes: [], flagsForNo: [], caForYNRules: [], scoreYes: 1, scoreNo: 0 },
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', inds: ['ti-filter'], allowNA: true, dcParentId: 'cooler-ok', dcCondition: { type: 'yn', value: 'No' } },
   { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', inds: [], allowNA: false },
   { id: 'section-food-safety', prompt: 'Food Safety', type: 'subtitle', stripe: '', inds: [], allowNA: false },
@@ -247,15 +249,16 @@ function Select({ value, onChange, options, style }: { value: string; onChange: 
 }
 
 // ── Side sheet sections ────────────────────────────────────────────────────
-function SsSection({ label, children, defaultOpen = false }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function SsSection({ label, children, defaultOpen = false, forceOpen = false }: { label: string; children: React.ReactNode; defaultOpen?: boolean; forceOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
+  const isOpen = open || forceOpen;
   return (
     <div style={{ borderBottom: `0.5px solid ${T.border}` }}>
       <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer', userSelect: 'none' }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
-        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 13, color: T.textMuted }} />
+        <i className={`ti ti-chevron-${isOpen ? 'up' : 'down'}`} style={{ fontSize: 13, color: T.textMuted }} />
       </div>
-      {open && <div style={{ padding: '0 16px 14px' }}>{children}</div>}
+      {isOpen && <div style={{ padding: '0 16px 14px' }}>{children}</div>}
     </div>
   );
 }
@@ -268,9 +271,12 @@ const COMPLETION_OPS = [
   { value: '>',  label: '>'  },
 ];
 
-function CompletionModeSection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
+type Flag = { id: string; name: string; color: string; emoji: string };
+
+function CompletionModeSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
   const isAuto = !!item.autoComplete;
   const rule = item.autoComplete ?? { flagId: '', op: '>' as const, count: 0, answer: 'No' as const };
+  const [creatingFlag, setCreatingFlag] = useState(false);
 
   const setAuto = (v: boolean) => {
     if (v) onUpdate({ autoComplete: { flagId: '', op: '>', count: 0, answer: 'No' } });
@@ -301,11 +307,12 @@ function CompletionModeSection({ item, onUpdate }: { item: ListItem; onUpdate: (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select
               value={rule.flagId}
-              onChange={e => updRule({ flagId: e.target.value })}
+              onChange={e => { if (e.target.value === '__create__') { setCreatingFlag(true); } else { setCreatingFlag(false); updRule({ flagId: e.target.value }); } }}
               style={{ fontFamily: T.font, fontSize: 13, color: rule.flagId ? T.textPrimary : T.textMuted, background: T.surface2, border: `0.5px solid ${rule.flagId ? T.borderStrong : '#EF5350'}`, borderRadius: 6, padding: '6px 8px', flex: 1 }}
             >
+              <option value="__create__">+ Create new flag…</option>
               <option value="">Select a flag…</option>
-              {FLAGS.map(f => <option key={f.id} value={f.id}>{f.emoji} {f.name}</option>)}
+              {flags.map(f => <option key={f.id} value={f.id}>{f.emoji} {f.name}</option>)}
             </select>
             <select
               value={rule.op}
@@ -323,7 +330,15 @@ function CompletionModeSection({ item, onUpdate }: { item: ListItem; onUpdate: (
               style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 8px', width: 56, textAlign: 'center' }}
             />
           </div>
-          {!rule.flagId && <div style={{ fontSize: 11, color: '#EF5350' }}>A flag is required</div>}
+          {creatingFlag && (
+            <FlagCreateForm
+              onCreateFlag={onCreateFlag}
+              onCancel={() => setCreatingFlag(false)}
+              pendingAnswer="Yes"
+              onSelect={(_ans, flagId) => { updRule({ flagId }); setCreatingFlag(false); }}
+            />
+          )}
+          {!rule.flagId && !creatingFlag && <div style={{ fontSize: 11, color: '#EF5350' }}>A flag is required</div>}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, color: T.textPrimary }}><strong style={{ fontWeight: 600 }}>THEN</strong> the answer will autocomplete to:</span>
             <select
@@ -341,33 +356,147 @@ function CompletionModeSection({ item, onUpdate }: { item: ListItem; onUpdate: (
   );
 }
 
-function FlagSection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
-  const [creating, setCreating] = useState(false);
+function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { onCreateFlag: (flag: Flag) => void; onCancel: () => void; pendingAnswer: 'Yes' | 'No'; onSelect: (answer: 'Yes' | 'No', flagId: string) => void }) {
   const [newFlagName, setNewFlagName] = useState('');
   const [newFlagColor, setNewFlagColor] = useState(FLAG_COLORS[0]);
-  const [newFlagEmoji, setNewFlagEmoji] = useState('🔴');
-  const flags = FLAGS;
-  const [selectedFlag, setSelectedFlag] = useState(item.flagEnabled ? 'f1' : '');
+  const [newFlagEmoji, setNewFlagEmoji] = useState('');
+  const [nameError, setNameError] = useState(false);
+
+  const handleCreate = () => {
+    if (!newFlagName.trim()) { setNameError(true); return; }
+    const newFlag: Flag = { id: mkid(), name: newFlagName.trim(), color: newFlagColor, emoji: newFlagEmoji };
+    onCreateFlag(newFlag);
+    onSelect(pendingAnswer, newFlag.id);
+    onCancel();
+  };
+
   return (
-    <SsSection label="Flags" defaultOpen={!!item.flagEnabled}>
-      <select value={selectedFlag} onChange={e => { setSelectedFlag(e.target.value); onUpdate({ flagEnabled: !!e.target.value }); }} style={{ fontFamily: T.font, fontSize: 13, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '7px 10px', width: '100%', marginBottom: 8 }}>
-        <option value="">No flag</option>
-        {flags.map(f => <option key={f.id} value={f.id}>{f.emoji} {f.name}</option>)}
-        <option value="__create__">Create new flag…</option>
-      </select>
-      {selectedFlag === '__create__' && (
-        <div style={{ background: T.surface1, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: 12, marginTop: 4 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>New flag</div>
-          <input value={newFlagName} onChange={e => setNewFlagName(e.target.value)} placeholder="Flag name" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', marginBottom: 8 }} />
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            {FLAG_COLORS.map(c => <div key={c} onClick={() => setNewFlagColor(c)} style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: newFlagColor === c ? `2px solid ${T.textPrimary}` : '2px solid transparent' }} />)}
+    <div style={{ background: T.surface1, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: 12, marginTop: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>New flag</div>
+      <input value={newFlagName} onChange={e => { setNewFlagName(e.target.value); if (e.target.value.trim()) setNameError(false); }} placeholder="Flag name" autoFocus
+        onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onCancel(); }}
+        style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${nameError ? '#EF5350' : T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', marginBottom: nameError ? 4 : 8 }} />
+      {nameError && <div style={{ fontSize: 11, color: '#EF5350', marginBottom: 8 }}>Flag name is required</div>}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Color</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {FLAG_COLORS.map(c => <div key={c} onClick={() => setNewFlagColor(c)} style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: newFlagColor === c ? `2px solid ${T.textPrimary}` : '2px solid transparent' }} />)}
+        </div>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Emoji</div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <div onClick={() => setNewFlagEmoji('')} style={{ width: 28, height: 28, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, cursor: 'pointer', color: T.textMuted, background: newFlagEmoji === '' ? T.bgAccent : 'transparent', border: newFlagEmoji === '' ? `0.5px solid ${T.borderAccent}` : `0.5px solid ${T.borderStrong}` }}>
+            None
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Btn primary onClick={() => { setSelectedFlag('f1'); onUpdate({ flagEnabled: true }); }}>Create & select</Btn>
-            <button onClick={() => setSelectedFlag('')} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+          {FLAG_EMOJIS.map(e => (
+            <div key={e} onClick={() => setNewFlagEmoji(e)} style={{ width: 28, height: 28, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: 'pointer', background: newFlagEmoji === e ? T.bgAccent : 'transparent', border: newFlagEmoji === e ? `0.5px solid ${T.borderAccent}` : `0.5px solid transparent` }}>
+              {e}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Btn primary onClick={handleCreate}>Create & select</Btn>
+        <button onClick={onCancel} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function FlagPicker({ answer, selectedIds, flags, onToggle, onCreateFlag, restrictedFlagId }: { answer: 'Yes' | 'No'; selectedIds: string[]; flags: Flag[]; onToggle: (flagId: string) => void; onCreateFlag: (flag: Flag) => void; restrictedFlagId?: string }) {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setCreating(false); } };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const available = flags.filter(f => f.id !== restrictedFlagId);
+  const conflictingIds = restrictedFlagId ? selectedIds.filter(id => id === restrictedFlagId) : [];
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flex: 1 }}>
+      <div style={{ minHeight: 36, border: `0.5px solid ${conflictingIds.length > 0 ? '#EF5350' : T.borderStrong}`, borderRadius: 6, padding: '4px 8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, cursor: 'pointer', background: T.surface2 }} onClick={() => setOpen(v => !v)}>
+        {selectedIds.map(id => {
+          const f = flags.find(x => x.id === id);
+          if (!f) return null;
+          const isConflict = id === restrictedFlagId;
+          return (
+            <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: isConflict ? '#FDECEA' : T.surface1, border: `1.5px solid ${isConflict ? '#EF5350' : f.color}`, borderRadius: 12, padding: '2px 8px', fontSize: 12, fontWeight: 500, color: isConflict ? '#EF5350' : T.textPrimary }}>
+              {f.emoji && <span>{f.emoji}</span>}
+              <span>{f.name}</span>
+              <i className="ti ti-x" style={{ fontSize: 10, color: isConflict ? '#EF5350' : T.textMuted, cursor: 'pointer' }} onClick={e => { e.stopPropagation(); onToggle(id); }} />
+            </span>
+          );
+        })}
+        <i className="ti ti-chevron-down" style={{ fontSize: 11, color: T.textMuted, marginLeft: 'auto' }} />
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden' }}>
+          <div onClick={() => { setCreating(true); setOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: `0.5px solid ${T.border}`, fontSize: 13, color: T.textAccent, fontWeight: 500 }}
+            onMouseEnter={e => (e.currentTarget.style.background = T.surface1)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <i className="ti ti-plus" style={{ fontSize: 12 }} /> Create new flag…
           </div>
+          {available.length === 0 && (
+            <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}>No flags available</div>
+          )}
+          {available.map(f => {
+            const isSelected = selectedIds.includes(f.id);
+            return (
+              <div key={f.id} onClick={() => { onToggle(f.id); if (!isSelected) setOpen(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: T.textPrimary, background: isSelected ? T.surface1 : 'transparent' }}
+                onMouseEnter={e => (e.currentTarget.style.background = T.surface0)} onMouseLeave={e => (e.currentTarget.style.background = isSelected ? T.surface1 : 'transparent')}>
+                <i className={`ti ${isSelected ? 'ti-check' : 'ti-circle'}`} style={{ fontSize: 12, color: isSelected ? T.textAccent : T.textMuted, flexShrink: 0 }} />
+                {f.emoji && <span>{f.emoji}</span>}<span>{f.name}</span>
+              </div>
+            );
+          })}
         </div>
       )}
+      {conflictingIds.length > 0 && (
+        <div style={{ fontSize: 11, color: '#EF5350', marginTop: 4 }}>The same flag cannot be used on a rule and on auto complete.</div>
+      )}
+      {creating && (
+        <FlagCreateForm
+          onCreateFlag={onCreateFlag}
+          onCancel={() => setCreating(false)}
+          pendingAnswer={answer}
+          onSelect={(_ans, flagId) => onToggle(flagId)}
+        />
+      )}
+    </div>
+  );
+}
+
+function FlagSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
+  const hasFlags = (item.flagsForYes?.length ?? 0) > 0 || (item.flagsForNo?.length ?? 0) > 0;
+  const restrictedFlagId = item.autoComplete?.flagId || undefined;
+  const hasConflict = !!restrictedFlagId && (
+    (item.flagsForYes ?? []).includes(restrictedFlagId) ||
+    (item.flagsForNo ?? []).includes(restrictedFlagId)
+  );
+
+  const toggle = (answer: 'Yes' | 'No', flagId: string) => {
+    const field = answer === 'Yes' ? 'flagsForYes' : 'flagsForNo';
+    const current = (answer === 'Yes' ? item.flagsForYes : item.flagsForNo) ?? [];
+    onUpdate({ [field]: current.includes(flagId) ? current.filter(id => id !== flagId) : [...current, flagId] });
+  };
+
+  return (
+    <SsSection label="Flags" defaultOpen={hasFlags} forceOpen={hasConflict}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', alignItems: 'start' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rule</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Flag</div>
+        <div style={{ fontSize: 13, color: T.textPrimary, paddingTop: 8 }}>If answer is "Yes", add</div>
+        <FlagPicker answer="Yes" selectedIds={item.flagsForYes ?? []} flags={flags} onToggle={id => toggle('Yes', id)} onCreateFlag={onCreateFlag} restrictedFlagId={restrictedFlagId} />
+        <div style={{ fontSize: 13, color: T.textPrimary, paddingTop: 8 }}>If answer is "No", add</div>
+        <FlagPicker answer="No" selectedIds={item.flagsForNo ?? []} flags={flags} onToggle={id => toggle('No', id)} onCreateFlag={onCreateFlag} restrictedFlagId={restrictedFlagId} />
+      </div>
     </SsSection>
   );
 }
@@ -866,7 +995,7 @@ function InfoLibrarySection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
 }
 
 // ── Side sheet ────────────────────────────────────────────────────────────
-function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange, scoringOn }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void; scoringOn: boolean }) {
+function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange, scoringOn, flags, onCreateFlag }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void; scoringOn: boolean; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
   const upd = (updates: Partial<ListItem>) => onUpdate(item.id, updates);
   const meta = TYPE_META[item.type];
   const [bgColor, setBgColor] = useState(item.stripe ?? '');
@@ -981,12 +1110,12 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             )}
           </SsSection>
         )}
-        {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} />}
+        {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
+        {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {/* Type-specific sections */}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} />}
         {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} />}
-        {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} />}
         {item.type === 'subtitle' && (
           <SsSection label="Display Criteria" defaultOpen={false}>
             <div style={{ fontSize: 12, color: T.textMuted }}>Subtitles cannot be a DC child — they are always visible.</div>
@@ -1632,7 +1761,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
   const isTypeDimmed = dcMode && dcLinkingId && !isEligibleParent && !isLinkingChild;
 
   const derivedInds: { icon: string; title: string }[] = [
-    ...(item.flagEnabled ? [{ icon: 'ti-flag', title: 'Flags configured' }] : []),
+    ...((item.flagsForYes?.length ?? 0) > 0 || (item.flagsForNo?.length ?? 0) > 0 ? [{ icon: 'ti-flag', title: 'Flags configured' }] : []),
     ...((item.infoInline || (item as any).infoFile) ? [{ icon: 'ti-info-circle', title: 'Info Library configured' }] : []),
     ...((item.caForYNRules?.length ?? 0) > 0 || item.caForNA ? [{ icon: 'ti-alert-triangle', title: 'Corrective Action configured' }] : []),
     ...(!!item.dcParentId || items.some(x => x.dcParentId === item.id) ? [{ icon: 'ti-filter', title: 'Display Criteria configured' }] : []),
@@ -1984,6 +2113,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
 export default function JoltListEditorPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
   const [scoringOn, setScoringOn] = useState(true);
+  const [flags, setFlags] = useState<Flag[]>(INITIAL_FLAGS);
+  const handleCreateFlag = (flag: Flag) => setFlags(prev => [...prev, flag]);
   const [caToastId, setCaToastId] = useState<string | null>(null);
   const [items, setItems] = useState<ListItem[]>(INITIAL_ITEMS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -2295,7 +2426,7 @@ export default function JoltListEditorPage() {
           {/* Side sheet */}
           {activeItemId && !dcMode && (() => {
             const item = findItem(items, activeItemId);
-            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => setActiveItemId(null)} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} /> : null;
+            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => setActiveItemId(null)} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} flags={flags} onCreateFlag={handleCreateFlag} /> : null;
           })()}
         </div>
       )}
