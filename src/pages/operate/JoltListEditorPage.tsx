@@ -673,17 +673,17 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
                 <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
               </>
             )}
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
+            <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+              <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
               <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
             </div>
-            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 10, marginTop: 3 }}>Corrective action list is created on the app.</div>
-            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
-            <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
-              <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
-            </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
           </div>
         )}
       </div>
@@ -715,17 +715,17 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
                 <div style={{ marginBottom: 8 }}><CAListPicker value={rule.caList ?? ''} onChange={v => updateYNRule(rule.id, { caList: v })} /></div>
               </>
             )}
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
+            <Select value={rule.nextStep ?? 'repeat-item'} onChange={v => updateYNRule(rule.id, { nextStep: v as CARule['nextStep'] })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+              <Toggle on={!!rule.optional} onChange={v => updateYNRule(rule.id, { optional: v })} />
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
               <Toggle on={rule.adHoc} onChange={v => updateYNRule(rule.id, { adHoc: v, ...(v ? { caList: '' } : {}) })} />
             </div>
             <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
-            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 10, marginBottom: 6 }}>Next step</div>
-            <Select value={rule.nextStep ?? 'repeat-item'} onChange={v => updateYNRule(rule.id, { nextStep: v as CARule['nextStep'] })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
-              <Toggle on={!!rule.optional} onChange={v => updateYNRule(rule.id, { optional: v })} />
-            </div>
           </div>
         ))}
         {!isMeas && ynRules.length < 2 && ynRules.length > 0 && (
@@ -766,17 +766,17 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
                       <div style={{ marginBottom: 8 }}><CAListPicker value={rule.caList ?? ''} onChange={v => updateRangeRule(rule.id, { caList: v })} /></div>
                     </>
                   )}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Next step</div>
+                  <Select value={rule.nextStep ?? 'repeat-item'} onChange={v => updateRangeRule(rule.id, { nextStep: v as CARule['nextStep'] })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+                    <Toggle on={!!rule.optional} onChange={v => updateRangeRule(rule.id, { optional: v })} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
                     <Toggle on={rule.adHoc} onChange={v => updateRangeRule(rule.id, { adHoc: v, ...(v ? { caList: '' } : {}) })} />
                   </div>
                   <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
-                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 10, marginBottom: 4 }}>Next step</div>
-                  <Select value={rule.nextStep ?? 'repeat-item'} onChange={v => updateRangeRule(rule.id, { nextStep: v as CARule['nextStep'] })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
-                    <Toggle on={!!rule.optional} onChange={v => updateRangeRule(rule.id, { optional: v })} />
-                  </div>
                 </div>
               ))}
               <button onClick={addRangeRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 16 }}>
@@ -1164,13 +1164,13 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         <button onClick={onClose} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 16, borderRadius: 5 }}><i className="ti ti-x" /></button>
       </div>
       {/* Scrollable body */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 320 }}>
         {/* Prompt */}
         <SsSection label="Prompt Text" defaultOpen>
           <PromptEditor item={item} onUpdate={upd} />
         </SsSection>
         {/* General options */}
-        <SsSection label="General Options" defaultOpen={!!(markAs || item.points || (item.labelIds?.length ?? 0) > 0)}>
+        <SsSection label="General Options" defaultOpen={!!(markAs || item.points || (item.labelIds?.length ?? 0) > 0 || item.stripe || item.infoInline || item.infoFile)}>
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -1206,24 +1206,24 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
               </div>
             </div>
           )}
-          <div>
+          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>Background Color</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {STRIPE_COLORS.map(sc => (
+                <div key={sc.value} onClick={() => { setBgColor(sc.value); upd({ stripe: sc.value }); }} title={sc.label} style={{ width: 24, height: 24, borderRadius: 4, background: sc.value || T.surface1, border: `0.5px solid ${T.borderStrong}`, outline: bgColor === sc.value ? `1.5px solid ${T.textSecondary}` : 'none', outlineOffset: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {!sc.value && <i className="ti ti-x" style={{ fontSize: 11, color: T.textMuted }} />}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>Info Library</div>
+            <InfoLibrarySection item={item} onUpdate={upd} />
+          </div>
+          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12 }}>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Labels</div>
             <LabelSelector item={item} onUpdate={upd} />
           </div>
-        </SsSection>
-        {/* Background color */}
-        <SsSection label="Background Color" defaultOpen={!!item.stripe}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {STRIPE_COLORS.map(sc => (
-              <div key={sc.value} onClick={() => { setBgColor(sc.value); upd({ stripe: sc.value }); }} title={sc.label} style={{ width: 24, height: 24, borderRadius: 4, background: sc.value || T.surface1, border: `0.5px solid ${T.borderStrong}`, outline: bgColor === sc.value ? `1.5px solid ${T.textSecondary}` : 'none', outlineOffset: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {!sc.value && <i className="ti ti-x" style={{ fontSize: 11, color: T.textMuted }} />}
-              </div>
-            ))}
-          </div>
-        </SsSection>
-        {/* Info library */}
-        <SsSection label="Info Library" defaultOpen={!!(item.infoFile || item.infoInline)}>
-          <InfoLibrarySection item={item} onUpdate={upd} />
         </SsSection>
         {/* Score */}
         {scoringOn && (item.type === 'yn' || item.type === 'measurement' || item.type === 'checkmark') && (
@@ -1249,12 +1249,12 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             )}
           </SsSection>
         )}
-        {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
-        {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {/* Type-specific sections */}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} />}
         {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} />}
+        {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
+        {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {item.type === 'subtitle' && (
           <SsSection label="Display Criteria" defaultOpen={false}>
             <div style={{ fontSize: 12, color: T.textMuted }}>Subtitles cannot be a DC child — they are always visible.</div>
@@ -2316,14 +2316,20 @@ export default function JoltListEditorPage() {
       const m = { ...current, ...updates };
       const rules: CARule[] = m.caForYNRules ?? [];
       const toAdd: string[] = [];
-      if (rules.length > 0)                                     toAdd.push('ca-turn-on');
-      if (m.caForNA)                                            toAdd.push('ca-turn-on-na');
-      if (rules.some(r => r.caList))                           toAdd.push('ca-list');
-      if (m.caForNAList)                                        toAdd.push('ca-list-na');
-      if (rules.some(r => r.condition))                        toAdd.push('ca-trigger-yn');
-      if (rules.some(r => r.adHoc) || m.caForNAAdHoc)         toAdd.push('ca-planned');
-      if (rules.some(r => r.optional) || m.caForNAOptional)   toAdd.push('ca-optional');
-      if (rules.length > 0 || m.caForNA)                       toAdd.push('ca-repeat');
+      if (rules.length > 0)                                                       toAdd.push('ca-turn-on');
+      if (m.caForNA)                                                              toAdd.push('ca-turn-on-na');
+      if (rules.some(r => r.caList))                                             toAdd.push('ca-list');
+      if (m.caForNAList)                                                          toAdd.push('ca-list-na');
+      if (rules.some(r => r.condition))                                          toAdd.push('ca-trigger-yn');
+      if (rules.some(r => r.adHoc) || m.caForNAAdHoc)                           toAdd.push('ca-planned');
+      if (rules.some(r => r.optional) || m.caForNAOptional)                     toAdd.push('ca-optional');
+      if (rules.length > 0 || m.caForNA)                                         toAdd.push('ca-repeat');
+      if ((m.caForRangeRules?.length ?? 0) > 0)                                  toAdd.push('ca-trigger-ranges');
+      if (m.autoComplete)                                                         toAdd.push('yn-auto-complete');
+      if (m.stripe)                                                               toAdd.push('all-color');
+      if (m.infoInline || m.infoFile)                                            toAdd.push('all-info-library');
+      if ((m.labelIds?.length ?? 0) > 0)                                         toAdd.push('all-print-label');
+      if (m.points != null)                                                       toAdd.push('all-points');
       if (toAdd.length) setShownCols(prev => new Set([...prev, ...toAdd]));
     }
     if (updates.savedValue) setShownCols(prev => new Set([...prev, 'm-saved-value']));
