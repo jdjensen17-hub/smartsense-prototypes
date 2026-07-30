@@ -1359,8 +1359,8 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           </SsSection>
         )}
         {/* Type-specific sections */}
-        {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} />}
+        {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} />}
         {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {item.type === 'measurement' && (item.measRanges?.length ?? 0) > 0 && (
