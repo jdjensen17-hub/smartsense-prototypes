@@ -58,6 +58,7 @@ interface ListItem {
   scoreGroup?: string;
   importance?: string;
   measRanges?: { id: string; min: string; max: string }[];
+  measFlagRules?: { id: string; condition: string; rangeId: string; flagId: string; recordColor: string }[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -381,7 +382,7 @@ function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { o
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Color</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {FLAG_COLORS.map(c => <div key={c} onClick={() => setNewFlagColor(c)} style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: newFlagColor === c ? `2px solid ${T.textPrimary}` : '2px solid transparent' }} />)}
+          {FLAG_COLORS.map(c => <div key={c} onClick={() => setNewFlagColor(c)} style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: newFlagColor === c ? `${c === '#1A1A1F' ? '1.5px' : '2px'} solid ${c === '#1A1A1F' ? '#ffffff' : T.textPrimary}` : '2px solid transparent', outline: newFlagColor === c && c === '#1A1A1F' ? `1.5px solid ${T.borderStrong}` : 'none', outlineOffset: 1 }} />)}
         </div>
       </div>
       <div style={{ marginBottom: 10 }}>
@@ -641,6 +642,114 @@ function CAListPicker({ value, onChange }: { value: string; onChange: (id: strin
         </div>
       )}
     </div>
+  );
+}
+
+const RECORD_COLORS = [
+  { value: '#378ADD', label: 'Default', bg: '#378ADD',  border: '#185FA5' },
+  { value: '#43A047', label: 'Pass',    bg: '#43A047',  border: '#2E7D32' },
+  { value: '#FFB300', label: 'Caution', bg: '#FFB300',  border: '#F57F17' },
+  { value: '#E53935', label: 'Failed',  bg: '#E53935',  border: '#B71C1C' },
+];
+
+function MeasurementFlagSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
+  const ranges = item.measRanges ?? [];
+  const rules = item.measFlagRules ?? [];
+  const [creatingForRuleId, setCreatingForRuleId] = useState<string | null>(null);
+  const [flagDropdownOpenId, setFlagDropdownOpenId] = useState<string | null>(null);
+
+  const rangeLabel = (r: { id: string; min: string; max: string }, idx: number) =>
+    `Range ${idx + 1}${r.min || r.max ? ` (${r.min || 'Min'} – ${r.max || 'Max'})` : ''}`;
+
+  const updateRule = (id: string, patch: Partial<typeof rules[0]>) =>
+    onUpdate({ measFlagRules: rules.map(r => r.id === id ? { ...r, ...patch } : r) });
+
+  const removeRule = (id: string) =>
+    onUpdate({ measFlagRules: rules.filter(r => r.id !== id) });
+
+  const addRule = () =>
+    onUpdate({ measFlagRules: [...rules, { id: mkid(), condition: 'Inside', rangeId: ranges[0]?.id ?? '', flagId: '', recordColor: '#378ADD' }] });
+
+  const rangeOptions = ranges.map((r, i) => ({ value: r.id, label: rangeLabel(r, i) }));
+
+  return (
+    <SsSection label="Flags">
+      {rules.map((rule, idx) => (
+        <div key={rule.id}>
+          {idx > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0' }}>
+              <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: '0.05em' }}>OR</span>
+              <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase' }}>Rule {idx + 1}</span>
+            <button onClick={() => removeRule(rule.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13, display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-x" />Remove</button>
+          </div>
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Condition</div>
+          <Select value={rule.condition} onChange={v => updateRule(rule.id, { condition: v })} options={[{ value: 'Inside', label: 'Inside range' }, { value: 'Outside', label: 'Outside range' }, { value: 'Above', label: 'Above range' }, { value: 'Below', label: 'Below range' }]} style={{ width: '100%', marginBottom: 8 }} />
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Range</div>
+          <Select value={rule.rangeId} onChange={v => updateRule(rule.id, { rangeId: v })} options={rangeOptions} style={{ width: '100%', marginBottom: 8 }} />
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Flag</div>
+          <div style={{ position: 'relative', marginBottom: 8 }}>
+            <div onClick={() => { setFlagDropdownOpenId(flagDropdownOpenId === rule.id ? null : rule.id); setCreatingForRuleId(null); }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', background: T.surface2, fontSize: 13, color: rule.flagId ? T.textPrimary : T.textMuted }}>
+              <span>{rule.flagId ? (() => { const f = flags.find(x => x.id === rule.flagId); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : '— none —'; })() : '— none —'}</span>
+              <i className="ti ti-chevron-down" style={{ fontSize: 11, color: T.textMuted }} />
+            </div>
+            {flagDropdownOpenId === rule.id && !creatingForRuleId && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden' }}>
+                <div onClick={() => { setCreatingForRuleId(rule.id); setFlagDropdownOpenId(null); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: `0.5px solid ${T.border}`, fontSize: 13, color: T.textAccent, fontWeight: 500 }}
+                  onMouseEnter={e => (e.currentTarget.style.background = T.surface1)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <i className="ti ti-plus" style={{ fontSize: 12 }} /> Create new flag…
+                </div>
+                <div onClick={() => { updateRule(rule.id, { flagId: '' }); setFlagDropdownOpenId(null); }}
+                  style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = T.surface1)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  — none —
+                </div>
+                {flags.map(f => (
+                  <div key={f.id} onClick={() => { updateRule(rule.id, { flagId: f.id }); setFlagDropdownOpenId(null); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: T.textPrimary, background: rule.flagId === f.id ? T.surface1 : 'transparent' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = T.surface0)} onMouseLeave={e => (e.currentTarget.style.background = rule.flagId === f.id ? T.surface1 : 'transparent')}>
+                    {rule.flagId === f.id && <i className="ti ti-check" style={{ fontSize: 12, color: T.textAccent, flexShrink: 0 }} />}
+                    {f.emoji && <span>{f.emoji}</span>}<span>{f.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {creatingForRuleId === rule.id && (
+              <FlagCreateForm
+                onCreateFlag={flag => { onCreateFlag(flag); updateRule(rule.id, { flagId: flag.id }); }}
+                onCancel={() => setCreatingForRuleId(null)}
+                pendingAnswer="Yes"
+                onSelect={() => setCreatingForRuleId(null)}
+              />
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Record Color</div>
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>Change device screen color when flag triggers</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {RECORD_COLORS.map(c => {
+              const selected = rule.recordColor === c.value;
+              return (
+                <div key={c.value} onClick={() => updateRule(rule.id, { recordColor: c.value })}
+                  title={c.label}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: c.bg, border: `2px solid ${selected ? c.border : T.borderStrong}`, outline: selected ? `2px solid ${T.textAccent}` : 'none', outlineOffset: 2 }} />
+                  <span style={{ fontSize: 10, color: selected ? T.textAccent : T.textMuted }}>{c.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <button onClick={addRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: rules.length > 0 ? 16 : 0 }}>
+        <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Rule
+      </button>
+    </SsSection>
   );
 }
 
@@ -980,7 +1089,7 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
           </div>
         ))}
         {ranges.length < 3 && (
-          <button onClick={() => setRanges([...ranges, { id: mkid(), min: '', max: '' }])} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: ranges.length > 0 ? 4 : 0 }}>
+          <button onClick={() => setRanges([...ranges, { id: mkid(), min: '', max: '' }])} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: ranges.length > 0 ? 4 : 8 }}>
             <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add range
           </button>
         )}
@@ -1226,7 +1335,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           </div>
         </SsSection>
         {/* Score */}
-        {scoringOn && (item.type === 'yn' || item.type === 'measurement' || item.type === 'checkmark') && (
+        {scoringOn && (item.type === 'yn' || item.type === 'checkmark') && (
           <SsSection label="Score" defaultOpen>
             {item.type === 'yn' && (
               <div>
@@ -1254,6 +1363,9 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} />}
         {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} />}
         {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
+        {item.type === 'measurement' && (item.measRanges?.length ?? 0) > 0 && (
+          <MeasurementFlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />
+        )}
         {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {item.type === 'subtitle' && (
           <SsSection label="Display Criteria" defaultOpen={false}>
