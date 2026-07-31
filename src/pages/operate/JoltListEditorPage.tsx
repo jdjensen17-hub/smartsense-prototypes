@@ -96,7 +96,7 @@ const TYPE_META: Record<ItemType, { label: string; icon: string }> = {
   date:        { label: 'Date',           icon: 'ti-calendar' },
   datetime:    { label: 'Date/Time',      icon: 'ti-calendar-clock' },
   time:        { label: 'Time',           icon: 'ti-clock' },
-  stopwatch:   { label: 'Stopwatch',      icon: 'ti-stopwatch' },
+  stopwatch:   { label: 'Stopwatch',      icon: 'ti-hourglass' },
   subtitle:    { label: 'Subtitle',       icon: 'ti-heading' },
   text:        { label: 'Text',           icon: 'ti-text-size' },
   barcode:     { label: 'Bar Code',       icon: 'ti-barcode' },
