@@ -14,7 +14,7 @@ const T = {
 };
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' | 'measurement' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' | 'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula';
+type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' | 'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' | 'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula';
 
 type DCConditionYN = { type: 'yn'; value: 'Yes' | 'No' };
 type DCConditionMeas = { type: 'measurement'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
@@ -70,6 +70,9 @@ interface ListItem {
   photoAllowUpload?: boolean;
   employeeRoles?: string[];
   sublistTarget?: string;
+  formulaVars?: { name: string; itemId: string }[];
+  formulaType?: 'number' | 'date' | 'text';
+  formulaExpr?: string;
   qrTarget?: string;
   barcodeTarget?: string;
 }
@@ -84,6 +87,7 @@ const TYPE_META: Record<ItemType, { label: string; icon: string }> = {
   short:       { label: 'Short Entry',    icon: 'ti-forms' },
   free:        { label: 'Free Response',  icon: 'ti-align-left' },
   measurement: { label: 'Measurement',    icon: 'ti-ruler' },
+  number:      { label: 'Number',         icon: 'ti-123' },
   photo:       { label: 'Photo',          icon: 'ti-camera' },
   qr:          { label: 'QR Code',        icon: 'ti-qrcode' },
   employee:    { label: 'Employee',       icon: 'ti-user' },
@@ -106,7 +110,8 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
   { type: 'mc',          aliases: ['mc','select','options','dropdown','pick','choice'] },
   { type: 'short',       aliases: ['short text','brief','input','entry'] },
   { type: 'free',        aliases: ['text','paragraph','write','comment','notes','long'] },
-  { type: 'measurement', aliases: ['number','num','numeric','temperature','temp','range','value'] },
+  { type: 'measurement', aliases: ['num','numeric','temperature','temp','range','value'] },
+  { type: 'number',      aliases: ['number','integer','count','quantity'] },
   { type: 'photo',       aliases: ['image','picture','pic','upload','camera'] },
   { type: 'qr',          aliases: ['qr','scan','qrcode'] },
   { type: 'employee',    aliases: ['person','staff','worker','name'] },
@@ -201,6 +206,8 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'datetime-item', prompt: 'Enter inspection date and time', type: 'datetime', stripe: '', inds: [], allowNA: false },
   { id: 'stopwatch-item', prompt: 'Time the handwashing procedure', type: 'stopwatch', stripe: '', inds: [], allowNA: false },
   { id: 'sublist-item', prompt: 'Complete equipment maintenance checklist', type: 'sublist', stripe: '', inds: [], allowNA: false },
+  { id: 'number-item', prompt: 'Enter unit count', type: 'number', stripe: '', inds: [], allowNA: false },
+  { id: 'formula-item', prompt: 'Average cooler temp', type: 'formula', stripe: '', inds: [], allowNA: false, formulaType: 'number', formulaVars: [{ name: 'A', itemId: '' }], formulaExpr: '' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1890,6 +1897,99 @@ function CodeSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial
   );
 }
 
+// ── Formula section ───────────────────────────────────────────────────────
+const FORMULA_VAR_NAMES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const FORMULA_VAR_TYPES: ItemType[] = ['measurement', 'number', 'rating', 'date', 'time', 'datetime'];
+
+function FormulaSection({ item, items, onUpdate }: { item: ListItem; items: ListItem[]; onUpdate: (u: Partial<ListItem>) => void }) {
+  const vars = item.formulaVars ?? [];
+  const formulaType = item.formulaType ?? 'number';
+  const expr = item.formulaExpr ?? '';
+
+  const eligibleItems = items.filter(it => it.id !== item.id && FORMULA_VAR_TYPES.includes(it.type));
+  const nextVarName = FORMULA_VAR_NAMES[vars.length] ?? '?';
+
+  const addVar = () => {
+    onUpdate({ formulaVars: [...vars, { name: nextVarName, itemId: '' }] });
+  };
+
+  const updateVar = (idx: number, itemId: string) => {
+    const next = vars.map((v, i) => i === idx ? { ...v, itemId } : v);
+    onUpdate({ formulaVars: next });
+  };
+
+  const removeVar = (idx: number) => {
+    const remaining = vars.filter((_, i) => i !== idx).map((v, i) => ({ ...v, name: FORMULA_VAR_NAMES[i] }));
+    onUpdate({ formulaVars: remaining });
+  };
+
+  return (
+    <SsSection label="Formula" defaultOpen>
+      {/* Variables */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 10 }}>Variables</div>
+        {vars.map((v, idx) => (
+          <div key={v.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.textSecondary, width: 24, flexShrink: 0 }}>{v.name} =</span>
+            <select
+              value={v.itemId}
+              onChange={e => updateVar(idx, e.target.value)}
+              style={{ fontFamily: T.font, fontSize: 13, flex: 1, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 24px 6px 8px', background: T.surface2, color: v.itemId ? T.textPrimary : T.textMuted, cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239898A8'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+            >
+              <option value="">Select item…</option>
+              {eligibleItems.map(it => (
+                <option key={it.id} value={it.id}>
+                  {it.prompt || `(${TYPE_META[it.type].label})`} — {TYPE_META[it.type].label}
+                </option>
+              ))}
+            </select>
+            <button onClick={() => removeVar(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 15, padding: '2px 4px', borderRadius: 4, display: 'flex', alignItems: 'center' }}>
+              <i className="ti ti-x" />
+            </button>
+          </div>
+        ))}
+        {vars.length < FORMULA_VAR_NAMES.length && (
+          <button onClick={addVar} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', letterSpacing: '0.04em' }}>
+            + ADD VARIABLE
+          </button>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div style={{ borderTop: `0.5px solid ${T.border}`, marginBottom: 16 }} />
+
+      {/* Formula type */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 10 }}>Formula</div>
+        <select
+          value={formulaType}
+          onChange={e => onUpdate({ formulaType: e.target.value as 'number' | 'date' | 'text' })}
+          style={{ fontFamily: T.font, fontSize: 13, width: '100%', border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 24px 6px 8px', background: T.surface2, color: T.textPrimary, cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239898A8'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', marginBottom: 12 }}
+        >
+          <option value="number">Number</option>
+          <option value="date">Date</option>
+          <option value="text">Text</option>
+        </select>
+
+        {/* Formula expression box */}
+        <div style={{ border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, background: T.surface2, overflow: 'hidden' }}>
+          <div style={{ fontSize: 11, color: T.textMuted, padding: '6px 10px 4px', borderBottom: `0.5px solid ${T.border}` }}>Formula</div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', padding: '8px 10px' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.textSecondary, marginRight: 6, lineHeight: '20px', flexShrink: 0 }}>=</span>
+            <textarea
+              value={expr}
+              onChange={e => onUpdate({ formulaExpr: e.target.value })}
+              spellCheck={false}
+              placeholder="SUM(A, B)"
+              style={{ fontFamily: "'Courier New', monospace", fontSize: 13, flex: 1, minHeight: 100, border: 'none', outline: 'none', resize: 'vertical', background: 'transparent', color: T.textPrimary, lineHeight: '20px', padding: 0 }}
+            />
+          </div>
+        </div>
+      </div>
+    </SsSection>
+  );
+}
+
 // ── Side sheet ────────────────────────────────────────────────────────────
 function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange, scoringOn, flags, onCreateFlag }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void; scoringOn: boolean; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
   const upd = (updates: Partial<ListItem>) => onUpdate(item.id, updates);
@@ -2044,6 +2144,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         )}
         {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {(item.type === 'qr' || item.type === 'barcode') && <CodeSection item={item} onUpdate={upd} />}
+        {item.type === 'formula' && <FormulaSection item={item} items={items} onUpdate={upd} />}
         {/* Tags — always last */}
         <SsSection label="Tags" defaultOpen={!!(item.locationTags?.length || item.scoreGroup || item.importance)}>
           {/* Location — searchable multi-select */}
@@ -3144,6 +3245,7 @@ export default function JoltListEditorPage() {
       ...(type === 'mc' ? { choices: [{ id: mkid(), label: '', color: '', icon: null }] } : {}),
       ...(type === 'qr' ? { qrTarget: mkCodeTarget() } : {}),
       ...(type === 'barcode' ? { barcodeTarget: mkCodeTarget() } : {}),
+      ...(type === 'formula' ? { formulaType: 'number' as const, formulaVars: [{ name: 'A', itemId: '' }], formulaExpr: '' } : {}),
     };
     // Insert after active item, or at end of list
     setItems(prev => {
