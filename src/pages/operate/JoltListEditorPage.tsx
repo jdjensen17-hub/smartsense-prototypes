@@ -523,7 +523,7 @@ function FlagSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; 
   );
 }
 
-function LocationTagPicker({ selected, onChange }: { selected: string[]; onChange: (tags: string[]) => void }) {
+function TagPicker({ options, selected, onChange, placeholder }: { options: string[]; selected: string[]; onChange: (tags: string[]) => void; placeholder: string }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -537,12 +537,11 @@ function LocationTagPicker({ selected, onChange }: { selected: string[]; onChang
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const filtered = LOCATION_TAGS.filter(t => t.toLowerCase().includes(q.toLowerCase()));
+  const filtered = options.filter(t => t.toLowerCase().includes(q.toLowerCase()));
   const toggle = (tag: string) => onChange(selected.includes(tag) ? selected.filter(t => t !== tag) : [...selected, tag]);
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      {/* Selected pills */}
       {selected.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
           {selected.map(tag => (
@@ -557,7 +556,7 @@ function LocationTagPicker({ selected, onChange }: { selected: string[]; onChang
         onClick={() => setOpen(v => !v)}
         style={{ fontFamily: T.font, fontSize: 13, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '6px 10px', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, cursor: 'pointer', color: T.textMuted }}
       >
-        <span>Add location tag…</span>
+        <span>{placeholder}</span>
         <i className="ti ti-chevron-down" style={{ fontSize: 12, flexShrink: 0, color: T.textMuted }} />
       </button>
       {open && (
@@ -567,13 +566,13 @@ function LocationTagPicker({ selected, onChange }: { selected: string[]; onChang
               ref={inputRef}
               value={q}
               onChange={e => setQ(e.target.value)}
-              placeholder="Search tags…"
+              placeholder="Search…"
               style={{ fontFamily: T.font, fontSize: 13, border: 'none', outline: 'none', width: '100%', background: 'transparent', color: T.textPrimary }}
             />
           </div>
           <div style={{ maxHeight: 200, overflowY: 'auto' }}>
             {filtered.length === 0 && (
-              <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}>No tags found</div>
+              <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}>No results</div>
             )}
             {filtered.map(tag => {
               const active = selected.includes(tag);
@@ -593,6 +592,10 @@ function LocationTagPicker({ selected, onChange }: { selected: string[]; onChang
       )}
     </div>
   );
+}
+
+function LocationTagPicker({ selected, onChange }: { selected: string[]; onChange: (tags: string[]) => void }) {
+  return <TagPicker options={LOCATION_TAGS} selected={selected} onChange={onChange} placeholder="Add location tag…" />;
 }
 
 function CAListPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
@@ -1970,27 +1973,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Filter by role</div>
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Only show employees with these roles — empty means all roles</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {EMPLOYEE_ROLES.map(role => {
-                  const selected = (item.employeeRoles ?? []).includes(role);
-                  return (
-                    <button key={role} onClick={() => {
-                      const current = item.employeeRoles ?? [];
-                      const next = selected ? current.filter(r => r !== role) : [...current, role];
-                      upd({ employeeRoles: next.length ? next : undefined });
-                    }} style={{
-                      fontFamily: T.font, fontSize: 12, fontWeight: 500,
-                      padding: '4px 10px', borderRadius: 5,
-                      border: `0.5px solid ${selected ? T.borderAccent : T.borderStrong}`,
-                      background: selected ? T.bgAccent : T.surface2,
-                      color: selected ? T.textAccent : T.textSecondary,
-                      cursor: 'pointer',
-                    }}>
-                      {role}
-                    </button>
-                  );
-                })}
-              </div>
+              <TagPicker options={EMPLOYEE_ROLES} selected={item.employeeRoles ?? []} onChange={roles => upd({ employeeRoles: roles.length ? roles : undefined })} placeholder="Add role…" />
             </div>
           )}
           <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 10 }}>
