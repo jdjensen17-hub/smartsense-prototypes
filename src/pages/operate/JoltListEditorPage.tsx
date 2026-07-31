@@ -68,6 +68,7 @@ interface ListItem {
   mcShowInline?: boolean;
   mcDraftChoices?: MCChoice[];
   photoAllowUpload?: boolean;
+  employeeRoles?: string[];
   qrTarget?: string;
   barcodeTarget?: string;
 }
@@ -124,6 +125,7 @@ const FLAG_EMOJIS = ['🚩','⚠️','🔴','🟠','🟡','🟢','🔵','🟣','
 const LOCATION_TAGS = ['BOH', 'FOH', 'Bar', 'Kitchen', 'Drive-Thru', 'Prep', 'Storage', 'Receiving', 'Freezer', 'Dishwash', 'Catering', 'Patio', 'Lounge', 'Bakery', 'Deli', 'Produce', 'Dairy', 'Meat', 'Seafood', 'Checkout'];
 const SCORE_GROUPS = ['Food Safety', 'Equipment', 'Sanitation', 'Customer Experience', 'Opening', 'Closing'];
 const IMPORTANCE_LEVELS = ['Critical', 'Major', 'Minor'];
+const EMPLOYEE_ROLES = ['Manager', 'Supervisor', 'Operator', 'Kitchen Manager', 'Auditor', 'Integrations Admin', 'System Admin', 'IAM Admin'];
 
 const CA_LISTS = [
   { id: 'cal1', title: 'Corrective Action List' },
@@ -1961,6 +1963,33 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: 13, color: T.textPrimary }}>Allow images to be uploaded from device</div>
                 <Toggle on={!!item.photoAllowUpload} onChange={v => upd({ photoAllowUpload: v })} />
+              </div>
+            </div>
+          )}
+          {item.type === 'employee' && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Filter by role</div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Only show employees with these roles — empty means all roles</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {EMPLOYEE_ROLES.map(role => {
+                  const selected = (item.employeeRoles ?? []).includes(role);
+                  return (
+                    <button key={role} onClick={() => {
+                      const current = item.employeeRoles ?? [];
+                      const next = selected ? current.filter(r => r !== role) : [...current, role];
+                      upd({ employeeRoles: next.length ? next : undefined });
+                    }} style={{
+                      fontFamily: T.font, fontSize: 12, fontWeight: 500,
+                      padding: '4px 10px', borderRadius: 5,
+                      border: `0.5px solid ${selected ? T.borderAccent : T.borderStrong}`,
+                      background: selected ? T.bgAccent : T.surface2,
+                      color: selected ? T.textAccent : T.textSecondary,
+                      cursor: 'pointer',
+                    }}>
+                      {role}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
