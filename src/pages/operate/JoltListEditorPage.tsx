@@ -3437,7 +3437,10 @@ export default function JoltListEditorPage() {
             {tab === 'items' ? 'Items' : 'Settings'}
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
+        <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: 6 }}>
+          <Btn onClick={() => { setDcMode(v => !v); setDcLinkingId(null); setDcConditionState(null); }} style={dcMode ? { background: '#FFF8E1', color: '#5D4037', borderColor: '#FFD54F' } : {}}>
+            <i className="ti ti-filter" /> {dcMode ? 'Exit display criteria' : 'Display criteria'}
+          </Btn>
           <ColumnPicker shownCols={effectiveShownCols} onChange={setShownCols} scoringOn={scoringOn} />
         </div>
       </div>
@@ -3474,9 +3477,6 @@ export default function JoltListEditorPage() {
               <button style={{ fontSize: 15, color: T.textMuted, padding: '4px 6px', borderRadius: 4, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Question bank">
                 <i className="ti ti-books" />
               </button>
-              <Btn onClick={() => { setDcMode(v => !v); setDcLinkingId(null); setDcConditionState(null); }} style={dcMode ? { background: '#FFF8E1', color: '#5D4037', borderColor: '#FFD54F' } : {}}>
-                <i className="ti ti-filter" /> {dcMode ? 'Exit display criteria' : 'Display criteria'}
-              </Btn>
               <div style={{ width: 32, flexShrink: 0 }} />
             </div>
 
