@@ -18,7 +18,7 @@ type DCConditionYN = { type: 'yn'; value: 'Yes' | 'No' };
 type DCConditionMeas = { type: 'measurement'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
 type DCCondition = DCConditionYN | DCConditionMeas;
 
-interface MCChoice { id: string; label: string; color: string; icon: string | null; }
+interface MCChoice { id: string; label: string; color: string; icon: string | null; score?: number | ''; flagIds?: string[]; followUpEnabled?: boolean; followUpActions?: string[]; }
 interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; rangeId?: string; }
 
 interface ListItem {
@@ -911,96 +911,297 @@ const MC_TEMPLATES: { id: string; name: string; choices: MCChoice[] }[] = [
     { id: 't1c', label: 'N/A',  color: '#546E7A', icon: null },
   ]},
   { id: 'tpl-2', name: 'Pass / Fail', choices: [
-    { id: 't2a', label: 'Pass', color: '#43A047', icon: 'ti-circle-check' },
-    { id: 't2b', label: 'Fail', color: '#E53935', icon: 'ti-alert-circle' },
+    { id: 't2a', label: 'Pass', color: '#43A047', icon: 'ti-circle-check', score: 1 },
+    { id: 't2b', label: 'Fail', color: '#E53935', icon: 'ti-alert-circle', score: 0, flagIds: ['f1'], followUpEnabled: true, followUpActions: ['Document the failure with photos', 'Notify supervisor immediately'] },
   ]},
   { id: 'tpl-3', name: 'Condition Rating', choices: [
-    { id: 't3a', label: 'Excellent', color: '#1E88E5', icon: 'ti-star' },
-    { id: 't3b', label: 'Good',      color: '#43A047', icon: null },
-    { id: 't3c', label: 'Fair',      color: '#FDD835', icon: null },
-    { id: 't3d', label: 'Poor',      color: '#FB8C00', icon: null },
-    { id: 't3e', label: 'Failing',   color: '#E53935', icon: 'ti-alert-circle' },
+    { id: 't3a', label: 'Excellent', color: '#1E88E5', icon: 'ti-star',         score: 4 },
+    { id: 't3b', label: 'Good',      color: '#43A047', icon: null,              score: 3 },
+    { id: 't3c', label: 'Fair',      color: '#FDD835', icon: null,              score: 2, followUpEnabled: true, followUpActions: ['Schedule maintenance within 30 days'] },
+    { id: 't3d', label: 'Poor',      color: '#FB8C00', icon: null,              score: 1, flagIds: ['f2'], followUpEnabled: true, followUpActions: ['Schedule maintenance within 7 days', 'Log in work order system'] },
+    { id: 't3e', label: 'Failing',   color: '#E53935', icon: 'ti-alert-circle', score: 0, flagIds: ['f1', 'f2'], followUpEnabled: true, followUpActions: ['Take out of service immediately', 'Contact facilities manager', 'File incident report'] },
   ]},
   { id: 'tpl-4', name: 'Cancel Check', choices: [
-    { id: 't4a', label: 'Cancelled', color: '#E53935', icon: 'ti-x' },
-    { id: 't4b', label: 'Completed', color: '#43A047', icon: 'ti-circle-check' },
+    { id: 't4a', label: 'Cancelled', color: '#E53935', icon: 'ti-x',           flagIds: ['f2'], followUpEnabled: true, followUpActions: ['Record reason for cancellation'] },
+    { id: 't4b', label: 'Completed', color: '#43A047', icon: 'ti-circle-check', score: 1 },
   ]},
   { id: 'tpl-5', name: 'Root Causes: Motor', choices: [
-    { id: 't5a', label: 'Overheating', color: '#FB8C00', icon: 'ti-flame' },
-    { id: 't5b', label: 'Vibration',   color: '#FDD835', icon: null },
-    { id: 't5c', label: 'Noise',       color: '#FDD835', icon: null },
-    { id: 't5d', label: 'Leaking',     color: '#1E88E5', icon: 'ti-droplet' },
-    { id: 't5e', label: 'Not running', color: '#E53935', icon: 'ti-bolt' },
+    { id: 't5a', label: 'Overheating', color: '#FB8C00', icon: 'ti-flame',    flagIds: ['f1'], followUpEnabled: true, followUpActions: ['Check coolant levels', 'Inspect fan and vents'] },
+    { id: 't5b', label: 'Vibration',   color: '#FDD835', icon: null,           followUpEnabled: true, followUpActions: ['Check mounting bolts', 'Inspect bearings'] },
+    { id: 't5c', label: 'Noise',       color: '#FDD835', icon: null,           followUpEnabled: true, followUpActions: ['Record audio sample', 'Check lubrication'] },
+    { id: 't5d', label: 'Leaking',     color: '#1E88E5', icon: 'ti-droplet',  flagIds: ['f2'], followUpEnabled: true, followUpActions: ['Identify leak source', 'Place drip pan', 'Schedule repair'] },
+    { id: 't5e', label: 'Not running', color: '#E53935', icon: 'ti-bolt',     flagIds: ['f1', 'f2'], followUpEnabled: true, followUpActions: ['Check power supply', 'Check circuit breaker', 'Contact electrician if no power issue found'] },
   ]},
 ];
 
 const MC_COLORS = ['','#E53935','#FB8C00','#FDD835','#43A047','#1E88E5','#8E24AA','#00ACC1','#6D4C41','#546E7A','#F48FB1','#A5D6A7','#90CAF9','#CE93D8','#FFE082','#BCAAA4','#B0BEC5','#EF9A9A','#1A1A1F'];
 const MC_ICONS = ['ti-star','ti-heart','ti-thumb-up','ti-thumb-down','ti-flame','ti-leaf','ti-droplet','ti-bolt','ti-circle-check','ti-alert-circle','ti-info-circle','ti-award','ti-crown','ti-diamond','ti-clock','ti-home','ti-map-pin','ti-user','ti-briefcase','ti-truck','ti-coffee','ti-tool','ti-flag','ti-mood-smile'];
 
-function MCChoiceList({ choices, locked, onUpdate, onRemove, focusId, onFocused }: { choices: MCChoice[]; locked: boolean; onUpdate?: (id: string, u: Partial<MCChoice>) => void; onRemove?: (id: string) => void; focusId?: string; onFocused?: () => void }) {
-  const [pickerFor, setPickerFor] = useState<string | null>(null);
-  const [pickerTab, setPickerTab] = useState<'color' | 'icon'>('color');
-  const pickerRef = useRef<HTMLDivElement>(null);
+function FollowUpPanel({ c, onUpdate }: { c: MCChoice; onUpdate?: (id: string, u: Partial<MCChoice>) => void }) {
+  const [newAction, setNewAction] = useState('');
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const addInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    if (!pickerFor) return;
+    if (c.followUpEnabled) setTimeout(() => addInputRef.current?.focus(), 0);
+  }, [c.followUpEnabled]);
+
+  const actions = c.followUpActions ?? [];
+
+  const addAction = () => {
+    const trimmed = newAction.trim();
+    if (!trimmed) return;
+    onUpdate?.(c.id, { followUpActions: [...actions, trimmed] });
+    setNewAction('');
+    addInputRef.current?.focus();
+  };
+
+  const removeAction = (idx: number) =>
+    onUpdate?.(c.id, { followUpActions: actions.filter((_, i) => i !== idx) });
+
+  const saveEdit = (idx: number) => {
+    const trimmed = editingText.trim();
+    if (trimmed) onUpdate?.(c.id, { followUpActions: actions.map((a, i) => i === idx ? trimmed : a) });
+    setEditingIdx(null);
+  };
+
+  return (
+    <div style={{ padding: '12px 12px 14px', borderTop: `0.5px solid ${T.border}`, background: T.surface1, borderRadius: '0 0 8px 8px' }}>
+      {/* Toggle */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: c.followUpEnabled ? 12 : 0 }}>
+        <div onClick={() => onUpdate?.(c.id, { followUpEnabled: !c.followUpEnabled, followUpActions: c.followUpActions ?? [] })}
+          style={{ width: 32, height: 18, borderRadius: 9, background: c.followUpEnabled ? T.fillAccent : T.borderStrong, position: 'relative', flexShrink: 0, transition: 'background 0.15s', cursor: 'pointer' }}>
+          <div style={{ position: 'absolute', top: 2, left: c.followUpEnabled ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: 'white', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+        </div>
+        <span style={{ fontSize: 13, color: T.textPrimary }}>Trigger a follow-up action with this answer</span>
+      </label>
+
+      {c.followUpEnabled && (
+        <>
+          {onUpdate && <p style={{ fontSize: 12, color: T.textMuted, margin: '0 0 10px' }}>Optionally add predefined actions to help your auditor complete the inspection.</p>}
+
+          {/* Add new action — editable only */}
+          {onUpdate && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: actions.length > 0 ? 8 : 0 }}>
+              <input ref={addInputRef} value={newAction} onChange={e => setNewAction(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addAction(); }}
+                placeholder="Describe a follow-up action…"
+                style={{ fontFamily: T.font, fontSize: 13, flex: 1, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', background: T.surface0 }} />
+              <button onClick={addAction} disabled={!newAction.trim()}
+                style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 5, border: 'none', background: newAction.trim() ? T.fillAccent : T.borderStrong, color: 'white', cursor: newAction.trim() ? 'pointer' : 'default', flexShrink: 0 }}>
+                Add
+              </button>
+            </div>
+          )}
+
+          {/* Existing actions */}
+          {actions.map((action, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              {!onUpdate
+                ? <div style={{ flex: 1, fontSize: 13, color: T.textPrimary, padding: '5px 8px', background: T.surface0, border: `0.5px solid ${T.border}`, borderRadius: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {action}
+                  </div>
+                : editingIdx === idx
+                  ? <input autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
+                      onBlur={() => saveEdit(idx)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(idx); if (e.key === 'Escape') setEditingIdx(null); }}
+                      style={{ fontFamily: T.font, fontSize: 13, flex: 1, border: `0.5px solid ${T.borderAccent}`, borderRadius: 5, padding: '5px 8px' }} />
+                  : <div onClick={() => { setEditingIdx(idx); setEditingText(action); }}
+                      style={{ flex: 1, fontSize: 13, color: T.textPrimary, padding: '5px 8px', background: T.surface0, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, cursor: 'text', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {action}
+                    </div>
+              }
+              {onUpdate && (
+                <button onClick={() => removeAction(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', flexShrink: 0 }}>
+                  <i className="ti ti-x" />
+                </button>
+              )}
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function MCChoiceRow({ c, idx, locked, flags, onUpdate, onRemove, focusId, onFocused }: {
+  c: MCChoice; idx: number; locked: boolean; flags: Flag[];
+  onUpdate?: (id: string, u: Partial<MCChoice>) => void;
+  onRemove?: (id: string) => void;
+  focusId?: string; onFocused?: () => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTab, setPickerTab] = useState<'color' | 'icon'>('color');
+  const [expandedPanel, setExpandedPanel] = useState<'flag' | 'ca' | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
     const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setPickerFor(null);
-      }
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [pickerFor]);
+  }, [pickerOpen]);
+
+  useEffect(() => {
+    if (!expandedPanel) return;
+    const handler = (e: MouseEvent) => {
+      if (rowRef.current && !e.composedPath().includes(rowRef.current)) setExpandedPanel(null);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [expandedPanel]);
+
+  const hasFlag = (c.flagIds?.length ?? 0) > 0;
+  const hasCa = !!c.followUpEnabled;
+
+  const togglePanel = (panel: 'flag' | 'ca') =>
+    setExpandedPanel(prev => prev === panel ? null : panel);
+
   return (
-    <div>
-      {choices.map((c, idx) => (
-        <div key={c.id} style={{ marginBottom: 6, position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {!locked && <i className="ti ti-grip-vertical" style={{ fontSize: 13, color: T.textMuted, cursor: 'grab', flexShrink: 0 }} />}
-            <div onClick={() => { if (!locked) { setPickerFor(pickerFor === c.id ? null : c.id); setPickerTab('color'); } }}
-              style={{ width: 26, height: 26, borderRadius: '50%', background: c.color || 'transparent', border: c.color ? 'none' : `1.5px dashed ${T.borderStrong}`, cursor: locked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: locked ? 0.7 : 1 }}>
-              {c.icon && <i className={`ti ${c.icon}`} style={{ fontSize: 13, color: c.color ? 'white' : T.textMuted }} />}
-              {!c.icon && !c.color && !locked && <i className="ti ti-plus" style={{ fontSize: 11, color: T.textMuted }} />}
+    <div ref={rowRef} style={{ marginBottom: 8, position: 'relative', border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, background: T.surface0, overflow: 'visible' }}
+>
+
+      {/* Line 1: drag · circle · text · delete */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 8px' }}>
+        {!locked && <i className="ti ti-grip-vertical" style={{ fontSize: 13, color: T.textMuted, cursor: 'grab', flexShrink: 0 }} />}
+        <div onClick={() => { if (!locked) { setPickerOpen(o => !o); setPickerTab('color'); } }}
+          style={{ width: 26, height: 26, borderRadius: '50%', background: c.color || 'transparent', border: c.color ? 'none' : `1.5px dashed ${T.borderStrong}`, cursor: locked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: locked ? 0.7 : 1 }}>
+          {c.icon && <i className={`ti ${c.icon}`} style={{ fontSize: 13, color: c.color ? 'white' : T.textMuted }} />}
+          {!c.icon && !c.color && !locked && <i className="ti ti-plus" style={{ fontSize: 11, color: T.textMuted }} />}
+        </div>
+        {locked
+          ? <span style={{ flex: 1, fontSize: 13, color: T.textPrimary, padding: '5px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label || <span style={{ color: T.textMuted, fontStyle: 'italic' }}>Choice {idx + 1}</span>}</span>
+          : <input ref={el => { if (el && c.id === focusId) { el.focus(); onFocused?.(); } }} value={c.label} onChange={e => onUpdate?.(c.id, { label: e.target.value })} placeholder={`Choice ${idx + 1}`} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', flex: 1, minWidth: 0 }} />
+        }
+        {!locked && <button onClick={() => onRemove?.(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', flexShrink: 0 }}><i className="ti ti-x" /></button>}
+      </div>
+
+      {/* Line 2: score · flag · follow-up */}
+      {(!locked || (c.score !== undefined && c.score !== '') || hasFlag || hasCa) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 38px', borderTop: `0.5px solid ${T.border}` }}>
+          {/* Score */}
+          {(!locked || (c.score !== undefined && c.score !== '')) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 11, color: T.textMuted }}>Score</span>
+              {locked
+                ? <span style={{ fontSize: 12, color: T.textPrimary, padding: '2px 10px', border: `0.5px solid ${T.border}`, borderRadius: 4, background: T.surface1, minWidth: 72, textAlign: 'center', display: 'inline-block' }}>{c.score ?? '—'}</span>
+                : <input type="number" value={c.score ?? ''}
+                    onFocus={() => { if (c.score === undefined || c.score === '') onUpdate?.(c.id, { score: 0 }); }}
+                    onChange={e => onUpdate?.(c.id, { score: e.target.value === '' ? '' : Number(e.target.value) })}
+                    placeholder="—"
+                    style={{ fontFamily: T.font, fontSize: 12, width: 72, border: `0.5px solid ${T.borderStrong}`, borderRadius: 4, padding: '2px 10px', textAlign: 'center', color: T.textPrimary }} />
+              }
             </div>
-            {locked
-              ? <span style={{ flex: 1, fontSize: 13, color: T.textPrimary, padding: '5px 0' }}>{c.label || <span style={{ color: T.textMuted, fontStyle: 'italic' }}>Choice {idx + 1}</span>}</span>
-              : <input ref={el => { if (el && c.id === focusId) { el.focus(); onFocused?.(); } }} value={c.label} onChange={e => onUpdate?.(c.id, { label: e.target.value })} placeholder={`Choice ${idx + 1}`} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', flex: 1 }} />
-            }
-            {!locked && <button onClick={() => onRemove?.(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', flexShrink: 0 }}><i className="ti ti-x" /></button>}
-          </div>
-          {pickerFor === c.id && (
-            <div ref={pickerRef} style={{ position: 'absolute', left: 0, width: 228, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, marginTop: 4, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', borderBottom: `0.5px solid ${T.border}` }}>
-                {(['color','icon'] as const).map(tab => (
-                  <div key={tab} onClick={() => setPickerTab(tab)} style={{ flex: 1, padding: '8px 0', textAlign: 'center', fontSize: 12, fontWeight: 500, cursor: 'pointer', color: pickerTab === tab ? T.textAccent : T.textMuted, borderBottom: pickerTab === tab ? `2px solid ${T.fillAccent}` : '2px solid transparent' }}>
-                    {tab === 'color' ? 'Color' : 'Icon'}
-                  </div>
-                ))}
-                <div onClick={() => setPickerFor(null)} style={{ padding: '8px 10px', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', alignItems: 'center' }}>
-                  <i className="ti ti-x" />
+          )}
+
+          {(!locked || (c.score !== undefined && c.score !== '') || hasFlag || hasCa) && <div style={{ width: 1, height: 14, background: T.border }} />}
+
+          {/* Flag indicator/button */}
+          {(!locked || hasFlag) && (
+            locked
+              ? <span onClick={() => togglePanel('flag')} style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid #F57F17`, background: '#FFF8E1', color: '#F57F17', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                  <i className="ti ti-flag" style={{ fontSize: 11 }} /> Flag ({c.flagIds!.length})
+                </span>
+              : <button onClick={() => togglePanel('flag')}
+                  style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid ${hasFlag ? '#F57F17' : T.borderStrong}`, background: hasFlag ? '#FFF8E1' : expandedPanel === 'flag' ? T.surface1 : 'transparent', color: hasFlag ? '#F57F17' : T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <i className="ti ti-flag" style={{ fontSize: 11 }} />
+                  {hasFlag ? `Flag (${c.flagIds!.length})` : 'Flag'}
+                </button>
+          )}
+
+          {/* Follow-up indicator/button */}
+          {(!locked || hasCa) && (
+            locked
+              ? <span onClick={() => togglePanel('ca')} style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid ${T.borderAccent}`, background: T.bgAccent, color: T.textAccent, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                  <i className="ti ti-arrow-back-up" style={{ fontSize: 11 }} /> Follow-up ✓
+                </span>
+              : <button onClick={() => togglePanel('ca')}
+                  style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid ${hasCa ? T.borderAccent : T.borderStrong}`, background: hasCa ? T.bgAccent : expandedPanel === 'ca' ? T.surface1 : 'transparent', color: hasCa ? T.textAccent : T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <i className="ti ti-arrow-back-up" style={{ fontSize: 11 }} />
+                  {hasCa ? 'Follow-up ✓' : 'Follow-up'}
+                </button>
+          )}
+        </div>
+      )}
+
+      {/* Expanded: Flag panel (read-only when locked) */}
+      {expandedPanel === 'flag' && (
+        <div style={{ padding: '10px 12px', borderTop: `0.5px solid ${T.border}`, background: T.surface1, borderRadius: '0 0 8px 8px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Flags</div>
+          {flags.filter(f => locked ? c.flagIds?.includes(f.id) : true).map(f => {
+            const selected = c.flagIds?.includes(f.id) ?? false;
+            return locked
+              ? <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.color, flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontSize: 13, color: T.textPrimary }}>{f.name}</span>
                 </div>
+              : <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={selected} onChange={() => {
+                    const current = c.flagIds ?? [];
+                    onUpdate?.(c.id, { flagIds: selected ? current.filter(x => x !== f.id) : [...current, f.id] });
+                  }} />
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.color, flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontSize: 13, color: T.textPrimary }}>{f.name}</span>
+                </label>;
+          })}
+        </div>
+      )}
+
+      {/* Expanded: Follow-up panel */}
+      {expandedPanel === 'ca' && (
+        <FollowUpPanel c={c} onUpdate={locked ? undefined : onUpdate} />
+      )}
+
+      {/* Color/icon floating picker */}
+      {pickerOpen && (
+        <div ref={pickerRef} style={{ position: 'absolute', left: 0, width: 228, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, marginTop: 4, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', borderBottom: `0.5px solid ${T.border}` }}>
+            {(['color','icon'] as const).map(tab => (
+              <div key={tab} onClick={() => setPickerTab(tab)} style={{ flex: 1, padding: '8px 0', textAlign: 'center', fontSize: 12, fontWeight: 500, cursor: 'pointer', color: pickerTab === tab ? T.textAccent : T.textMuted, borderBottom: pickerTab === tab ? `2px solid ${T.fillAccent}` : '2px solid transparent' }}>
+                {tab === 'color' ? 'Color' : 'Icon'}
               </div>
-              {pickerTab === 'color' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, padding: 10 }}>
-                  {MC_COLORS.filter(col => col !== '').map(col => (
-                    <div key={col} onClick={() => { onUpdate?.(c.id, { color: c.color === col ? '' : col }); }} style={{ width: 28, height: 28, borderRadius: '50%', background: col, border: c.color === col ? `${col === '#1A1A1F' ? '1.5px' : '2px'} solid ${col === '#1A1A1F' ? '#ffffff' : T.textPrimary}` : '2px solid transparent', outline: c.color === col && col === '#1A1A1F' ? `1.5px solid ${T.borderStrong}` : 'none', outlineOffset: 1, cursor: 'pointer' }} />
-                  ))}
+            ))}
+            <div onClick={() => setPickerOpen(false)} style={{ padding: '8px 10px', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', alignItems: 'center' }}>
+              <i className="ti ti-x" />
+            </div>
+          </div>
+          {pickerTab === 'color' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, padding: 10 }}>
+              {MC_COLORS.filter(col => col !== '').map(col => (
+                <div key={col} onClick={() => { onUpdate?.(c.id, { color: c.color === col ? '' : col }); }} style={{ width: 28, height: 28, borderRadius: '50%', background: col, border: c.color === col ? `${col === '#1A1A1F' ? '1.5px' : '2px'} solid ${col === '#1A1A1F' ? '#ffffff' : T.textPrimary}` : '2px solid transparent', outline: c.color === col && col === '#1A1A1F' ? `1.5px solid ${T.borderStrong}` : 'none', outlineOffset: 1, cursor: 'pointer' }} />
+              ))}
+            </div>
+          )}
+          {pickerTab === 'icon' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, padding: 10 }}>
+              {MC_ICONS.map(ic => (
+                <div key={ic} onClick={() => { onUpdate?.(c.id, { icon: c.icon === ic ? null : ic }); }} style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: c.icon === ic ? T.fillAccent : T.surface1, border: c.icon === ic ? `2px solid ${T.fillAccent}` : `0.5px solid ${T.border}` }}>
+                  <i className={`ti ${ic}`} style={{ fontSize: 14, color: c.icon === ic ? 'white' : T.textMuted }} />
                 </div>
-              )}
-              {pickerTab === 'icon' && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, padding: 10 }}>
-                    {MC_ICONS.map(ic => (
-                      <div key={ic} onClick={() => { onUpdate?.(c.id, { icon: c.icon === ic ? null : ic }); }} style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: c.icon === ic ? T.fillAccent : T.surface1, border: c.icon === ic ? `2px solid ${T.fillAccent}` : `0.5px solid ${T.border}` }}>
-                        <i className={`ti ${ic}`} style={{ fontSize: 14, color: c.icon === ic ? 'white' : T.textMuted }} />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              ))}
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function MCChoiceList({ choices, locked, flags, onUpdate, onRemove, focusId, onFocused }: {
+  choices: MCChoice[]; locked: boolean; flags: Flag[];
+  onUpdate?: (id: string, u: Partial<MCChoice>) => void;
+  onRemove?: (id: string) => void;
+  focusId?: string; onFocused?: () => void
+}) {
+  return (
+    <div>
+      {choices.map((c, idx) => (
+        <MCChoiceRow key={c.id} c={c} idx={idx} locked={locked} flags={flags}
+          onUpdate={onUpdate} onRemove={onRemove} focusId={focusId} onFocused={onFocused} />
       ))}
     </div>
   );
@@ -1020,7 +1221,7 @@ function TemplateRow({ tpl, onUse, onCopy }: { tpl: { id: string; name: string; 
   );
 }
 
-function MCChoicesSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+function MCChoicesSection({ item, onUpdate, flags }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void; flags: Flag[] }) {
   const usingTemplate = !!item.mcTemplateId;
   const template = usingTemplate ? MC_TEMPLATES.find(t => t.id === item.mcTemplateId) : null;
   const choices = item.choices ?? [];
@@ -1123,7 +1324,7 @@ function MCChoicesSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Pa
       {/* Choices */}
       <div style={{ padding: 12, background: T.surface1, borderRadius: 8, border: `0.5px solid ${T.border}` }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: choices.length > 0 ? 10 : 0 }}>Choices</div>
-        <MCChoiceList choices={choices} locked={usingTemplate} onUpdate={updateChoice} onRemove={removeChoice} focusId={newChoiceId ?? undefined} onFocused={() => setNewChoiceId(null)} />
+        <MCChoiceList choices={choices} locked={usingTemplate} flags={flags} onUpdate={updateChoice} onRemove={removeChoice} focusId={newChoiceId ?? undefined} onFocused={() => setNewChoiceId(null)} />
         {!usingTemplate && (
           <button onClick={addChoice} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: choices.length > 0 ? 8 : 8 }}>
             <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add choice
@@ -1544,7 +1745,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           </SsSection>
         )}
         {/* Type-specific sections */}
-        {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} />}
+        {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} flags={flags} />}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} />}
         {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
