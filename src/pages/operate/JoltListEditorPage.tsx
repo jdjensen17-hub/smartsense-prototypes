@@ -195,6 +195,10 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'employee-select', prompt: 'Select responsible employee', type: 'employee', stripe: '', inds: [], allowNA: false },
   { id: 'qr-scan', prompt: 'Scan equipment QR code', type: 'qr', stripe: '', inds: [], allowNA: false, qrTarget: 'EQ-140CD22' },
   { id: 'barcode-scan', prompt: 'Scan product barcode', type: 'barcode', stripe: '', inds: [], allowNA: false, barcodeTarget: 'PROD-A4F9B1' },
+  { id: 'date-item', prompt: 'Enter inspection date', type: 'date', stripe: '', inds: [], allowNA: false },
+  { id: 'time-item', prompt: 'Enter inspection time', type: 'time', stripe: '', inds: [], allowNA: false },
+  { id: 'datetime-item', prompt: 'Enter inspection date and time', type: 'datetime', stripe: '', inds: [], allowNA: false },
+  { id: 'stopwatch-item', prompt: 'Time the handwashing procedure', type: 'stopwatch', stripe: '', inds: [], allowNA: false },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -2030,11 +2034,6 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           <MeasurementFlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />
         )}
         {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
-        {item.type === 'subtitle' && (
-          <SsSection label="Display Criteria" defaultOpen={false}>
-            <div style={{ fontSize: 12, color: T.textMuted }}>Subtitles cannot be a DC child — they are always visible.</div>
-          </SsSection>
-        )}
         {(item.type === 'qr' || item.type === 'barcode') && <CodeSection item={item} onUpdate={upd} />}
         {/* Tags — always last */}
         <SsSection label="Tags" defaultOpen={!!(item.locationTags?.length || item.scoreGroup || item.importance)}>
