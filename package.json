@@ -16,7 +16,9 @@
     "ag-grid-community": "^36.0.0",
     "ag-grid-react": "^36.0.0",
     "lucide-react": "^1.22.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
+    "react-barcode": "^1.6.1",
     "react-complex-tree": "^2.6.1",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.1"

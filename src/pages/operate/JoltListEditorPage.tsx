@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import Barcode from 'react-barcode';
 
 // ── Design tokens ───────────────────────────────────────────────────────────
 const T = {
@@ -66,6 +68,8 @@ interface ListItem {
   mcShowInline?: boolean;
   mcDraftChoices?: MCChoice[];
   photoAllowUpload?: boolean;
+  qrTarget?: string;
+  barcodeTarget?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -161,6 +165,7 @@ const STRIPE_COLORS = [
 const DC_COLORS = ['#2196F3','#E91E63','#4CAF50','#FF9800','#9C27B0','#00BCD4'];
 
 function mkid() { return Math.random().toString(36).slice(2, 9); }
+function mkCodeTarget() { return Math.random().toString(36).slice(2, 10).toUpperCase(); }
 
 // ── Initial sample data ───────────────────────────────────────────────────
 const INITIAL_ITEMS: ListItem[] = [
@@ -186,6 +191,8 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'text-info', prompt: 'Read the food safety guidelines before proceeding', type: 'text', stripe: '', inds: [], allowNA: false },
   { id: 'free-notes', prompt: 'Enter any additional notes', type: 'free', stripe: '', inds: [], allowNA: false },
   { id: 'employee-select', prompt: 'Select responsible employee', type: 'employee', stripe: '', inds: [], allowNA: false },
+  { id: 'qr-scan', prompt: 'Scan equipment QR code', type: 'qr', stripe: '', inds: [], allowNA: false, qrTarget: 'EQ-140CD22' },
+  { id: 'barcode-scan', prompt: 'Scan product barcode', type: 'barcode', stripe: '', inds: [], allowNA: false, barcodeTarget: 'PROD-A4F9B1' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1821,6 +1828,57 @@ function InfoLibrarySection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
   );
 }
 
+// ── QR / Barcode section ──────────────────────────────────────────────────
+function CodeSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+  const isQR = item.type === 'qr';
+  const targetKey = isQR ? 'qrTarget' : 'barcodeTarget';
+  const target = (isQR ? item.qrTarget : item.barcodeTarget) ?? '';
+  const [draft, setDraft] = useState(target);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setDraft(isQR ? item.qrTarget ?? '' : item.barcodeTarget ?? ''); }, [item.qrTarget, item.barcodeTarget, isQR]);
+
+  const handlePrint = () => {
+    if (!printRef.current) return;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;margin:0">${printRef.current.innerHTML}</body></html>`);
+    w.document.close();
+    w.focus();
+    w.print();
+    w.close();
+  };
+
+  return (
+    <SsSection label={isQR ? 'QR Code' : 'Barcode'} defaultOpen>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>{isQR ? 'QR Code Target' : 'Barcode Target'}<span style={{ color: T.textDanger }}>*</span></div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={() => { if (draft.trim()) onUpdate({ [targetKey]: draft.trim() }); }}
+            placeholder="Enter target value"
+            style={{ fontFamily: T.font, fontSize: 13, flex: 1, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px' }}
+          />
+          <button onClick={handlePrint} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, padding: '6px 16px', border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, background: T.surface2, color: T.textPrimary, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Print
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>*Required</div>
+      </div>
+      {target && (
+        <div ref={printRef} style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
+          {isQR
+            ? <QRCodeSVG value={target} size={160} />
+            : <Barcode value={target} width={1.4} height={80} fontSize={13} />
+          }
+        </div>
+      )}
+    </SsSection>
+  );
+}
+
 // ── Side sheet ────────────────────────────────────────────────────────────
 function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange, scoringOn, flags, onCreateFlag }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void; scoringOn: boolean; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
   const upd = (updates: Partial<ListItem>) => onUpdate(item.id, updates);
@@ -1965,6 +2023,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             <div style={{ fontSize: 12, color: T.textMuted }}>Subtitles cannot be a DC child — they are always visible.</div>
           </SsSection>
         )}
+        {(item.type === 'qr' || item.type === 'barcode') && <CodeSection item={item} onUpdate={upd} />}
         {/* Tags — always last */}
         <SsSection label="Tags" defaultOpen={!!(item.locationTags?.length || item.scoreGroup || item.importance)}>
           {/* Location — searchable multi-select */}
@@ -3063,6 +3122,8 @@ export default function JoltListEditorPage() {
     const newItem: ListItem = {
       id: mkid(), prompt: '', type, stripe: '', inds: [], allowNA: false,
       ...(type === 'mc' ? { choices: [{ id: mkid(), label: '', color: '', icon: null }] } : {}),
+      ...(type === 'qr' ? { qrTarget: mkCodeTarget() } : {}),
+      ...(type === 'barcode' ? { barcodeTarget: mkCodeTarget() } : {}),
     };
     // Insert after active item, or at end of list
     setItems(prev => {
