@@ -69,6 +69,7 @@ interface ListItem {
   mcDraftChoices?: MCChoice[];
   photoAllowUpload?: boolean;
   employeeRoles?: string[];
+  sublistTarget?: string;
   qrTarget?: string;
   barcodeTarget?: string;
 }
@@ -199,6 +200,7 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'time-item', prompt: 'Enter inspection time', type: 'time', stripe: '', inds: [], allowNA: false },
   { id: 'datetime-item', prompt: 'Enter inspection date and time', type: 'datetime', stripe: '', inds: [], allowNA: false },
   { id: 'stopwatch-item', prompt: 'Time the handwashing procedure', type: 'stopwatch', stripe: '', inds: [], allowNA: false },
+  { id: 'sublist-item', prompt: 'Complete equipment maintenance checklist', type: 'sublist', stripe: '', inds: [], allowNA: false },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1978,6 +1980,13 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Filter by role</div>
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Only show employees with these roles — empty means all roles</div>
               <TagPicker options={EMPLOYEE_ROLES} selected={item.employeeRoles ?? []} onChange={roles => upd({ employeeRoles: roles.length ? roles : undefined })} placeholder="Add role…" />
+            </div>
+          )}
+          {item.type === 'sublist' && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Linked list</div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Select the list that will be launched when this item is completed</div>
+              <CAListPicker value={item.sublistTarget ?? ''} onChange={v => upd({ sublistTarget: v })} />
             </div>
           )}
           <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 10 }}>
