@@ -14,7 +14,7 @@ const T = {
 };
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' | 'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' | 'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula';
+type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' | 'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' | 'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula' | 'asset';
 
 type DCConditionYN = { type: 'yn'; value: 'Yes' | 'No' };
 type DCConditionMeas = { type: 'measurement'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
@@ -73,6 +73,8 @@ interface ListItem {
   formulaVars?: { name: string; itemId: string }[];
   formulaType?: 'number' | 'date' | 'text';
   formulaExpr?: string;
+  assetFilterByUser?: boolean;
+  assetType?: string;
   qrTarget?: string;
   barcodeTarget?: string;
 }
@@ -100,6 +102,7 @@ const TYPE_META: Record<ItemType, { label: string; icon: string }> = {
   barcode:     { label: 'Bar Code',       icon: 'ti-barcode' },
   sublist:     { label: 'Sublist',        icon: 'ti-layout-list' },
   formula:     { label: 'Formula',        icon: 'ti-math-function' },
+  asset:       { label: 'Asset',          icon: 'ti-building-factory' },
 };
 
 const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
@@ -124,6 +127,7 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
   { type: 'barcode',     aliases: ['upc','scan','product','bar code'] },
   { type: 'sublist',     aliases: ['nested','child','sub'] },
   { type: 'formula',     aliases: ['calculate','calc','equation','math'] },
+  { type: 'asset',       aliases: ['asset','equipment','device','machine'] },
 ];
 
 const FLAG_COLORS = ['#1A1A1F','#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
@@ -132,6 +136,7 @@ const LOCATION_TAGS = ['BOH', 'FOH', 'Bar', 'Kitchen', 'Drive-Thru', 'Prep', 'St
 const SCORE_GROUPS = ['Food Safety', 'Equipment', 'Sanitation', 'Customer Experience', 'Opening', 'Closing'];
 const IMPORTANCE_LEVELS = ['Critical', 'Major', 'Minor'];
 const EMPLOYEE_ROLES = ['Manager', 'Supervisor', 'Operator', 'Kitchen Manager', 'Auditor', 'Integrations Admin', 'System Admin', 'IAM Admin'];
+const ASSET_TYPES = ['Inspection Type', 'Equipment'];
 
 const CA_LISTS = [
   { id: 'cal1', title: 'Corrective Action List' },
@@ -208,6 +213,7 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'sublist-item', prompt: 'Complete equipment maintenance checklist', type: 'sublist', stripe: '', inds: [], allowNA: false },
   { id: 'number-item', prompt: 'Enter unit count', type: 'number', stripe: '', inds: [], allowNA: false },
   { id: 'formula-item', prompt: 'Average cooler temp', type: 'formula', stripe: '', inds: [], allowNA: false, formulaType: 'number', formulaVars: [{ name: 'A', itemId: '' }], formulaExpr: '' },
+  { id: 'asset-item', prompt: 'Select asset to inspect', type: 'asset', stripe: '', inds: [], allowNA: false, assetType: 'Inspection Type' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1897,6 +1903,64 @@ function CodeSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial
   );
 }
 
+// ── Asset section ─────────────────────────────────────────────────────────
+function AssetSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+  const [tipVisible, setTipVisible] = useState(false);
+
+  return (
+    <SsSection label="Asset Options" defaultOpen>
+      {/* Filter by user toggle */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13, color: T.textPrimary }}>Filter asset list on app by user</span>
+            <div style={{ position: 'relative', display: 'inline-flex' }}
+              onMouseEnter={() => setTipVisible(true)}
+              onMouseLeave={() => setTipVisible(false)}
+            >
+              <i className="ti ti-info-circle" style={{ fontSize: 14, color: T.textMuted, cursor: 'default' }} />
+              {tipVisible && (
+                <div style={{
+                  position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)',
+                  background: '#1A1A1F', color: '#fff', fontSize: 12, lineHeight: 1.4,
+                  padding: '7px 10px', borderRadius: 6, zIndex: 400,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)', pointerEvents: 'none',
+                  width: 220, whiteSpace: 'normal', textAlign: 'center',
+                }}>
+                  Turn this on to filter the asset list on the app to the auditor's assets.
+                </div>
+              )}
+            </div>
+          </div>
+          <Toggle on={!!item.assetFilterByUser} onChange={v => onUpdate({ assetFilterByUser: v })} />
+        </div>
+      </div>
+
+      {/* Asset type selector */}
+      <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12 }}>
+        <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>Asset Type</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {ASSET_TYPES.map(type => {
+            const selected = (item.assetType ?? 'Inspection Type') === type;
+            return (
+              <div key={type} onClick={() => onUpdate({ assetType: type })}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, cursor: 'pointer', background: selected ? T.bgAccent : 'transparent', border: `0.5px solid ${selected ? T.borderAccent : 'transparent'}` }}
+                onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = T.surface1; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selected ? T.bgAccent : 'transparent'; }}
+              >
+                <div style={{ width: 14, height: 14, borderRadius: '50%', border: `1.5px solid ${selected ? T.fillAccent : T.borderStrong}`, background: selected ? T.fillAccent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {selected && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff' }} />}
+                </div>
+                <span style={{ fontSize: 13, color: selected ? T.textAccent : T.textPrimary }}>{type}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </SsSection>
+  );
+}
+
 // ── Formula section ───────────────────────────────────────────────────────
 const FORMULA_VAR_NAMES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const FORMULA_VAR_TYPES: ItemType[] = ['measurement', 'number', 'rating', 'date', 'time', 'datetime'];
@@ -2144,6 +2208,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         )}
         {item.type === 'yn' && <CompletionModeSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {(item.type === 'qr' || item.type === 'barcode') && <CodeSection item={item} onUpdate={upd} />}
+        {item.type === 'asset' && <AssetSection item={item} onUpdate={upd} />}
         {item.type === 'formula' && <FormulaSection item={item} items={items} onUpdate={upd} />}
         {/* Tags — always last */}
         <SsSection label="Tags" defaultOpen={!!(item.locationTags?.length || item.scoreGroup || item.importance)}>
