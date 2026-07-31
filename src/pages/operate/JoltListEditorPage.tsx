@@ -43,6 +43,7 @@ interface ListItem {
   scoreNo?: number;
   ratingMin?: number;
   ratingMax?: number;
+  ratingScores?: Record<number, number>;
   bgColor?: string;
   infoFile?: string;
   infoInline?: boolean;
@@ -1493,6 +1494,82 @@ const MEAS_UNITS: Record<string, { value: string; label: string }[]> = {
   other: [],
 };
 
+function RatingSection({ item, onUpdate, scoringOn }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void; scoringOn: boolean }) {
+  const min = item.ratingMin ?? 1;
+  const max = item.ratingMax ?? 5;
+  const scores = item.ratingScores ?? {};
+
+  const clampMin = (v: number) => Math.min(Math.max(Math.round(v), 1), 9);
+  const clampMax = (v: number) => Math.min(Math.max(Math.round(v), 2), 10);
+
+  const setMin = (v: number) => {
+    const newMin = clampMin(v);
+    const newMax = max <= newMin ? newMin + 1 : max;
+    const newScores: Record<number, number> = {};
+    for (let i = newMin; i <= newMax; i++) if (scores[i] !== undefined) newScores[i] = scores[i];
+    onUpdate({ ratingMin: newMin, ratingMax: newMax, ratingScores: newScores });
+  };
+
+  const setMax = (v: number) => {
+    const newMax = clampMax(v);
+    const newMin = min >= newMax ? newMax - 1 : min;
+    const newScores: Record<number, number> = {};
+    for (let i = newMin; i <= newMax; i++) if (scores[i] !== undefined) newScores[i] = scores[i];
+    onUpdate({ ratingMin: newMin, ratingMax: newMax, ratingScores: newScores });
+  };
+
+  const values = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+
+  return (
+    <SsSection label="Rating Options" defaultOpen>
+      {/* Range */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: scoringOn ? 20 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: T.textSecondary }}>Min</span>
+          <input
+            type="number" value={min} min={1} max={9}
+            onChange={e => onUpdate({ ratingMin: Number(e.target.value) })}
+            onBlur={e => setMin(Number(e.target.value))}
+            style={{ fontFamily: T.font, fontSize: 13, width: 56, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', textAlign: 'center', color: T.textPrimary }}
+          />
+        </div>
+        <span style={{ fontSize: 13, color: T.textMuted }}>—</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: T.textSecondary }}>Max</span>
+          <input
+            type="number" value={max} min={2} max={10}
+            onChange={e => onUpdate({ ratingMax: Number(e.target.value) })}
+            onBlur={e => setMax(Number(e.target.value))}
+            style={{ fontFamily: T.font, fontSize: 13, width: 56, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', textAlign: 'center', color: T.textPrimary }}
+          />
+        </div>
+        <span style={{ fontSize: 12, color: T.textMuted }}>{max - min + 1} values</span>
+      </div>
+
+      {/* Score per value */}
+      {scoringOn && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Score per rating</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+            {values.map(v => (
+              <div key={v} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 11, color: T.textMuted }}>Rating {v}</span>
+                <input
+                  type="number"
+                  value={scores[v] ?? ''}
+                  onFocus={() => { if (scores[v] === undefined) onUpdate({ ratingScores: { ...scores, [v]: 0 } }); }}
+                  onChange={e => onUpdate({ ratingScores: { ...scores, [v]: e.target.value === '' ? 0 : Number(e.target.value) } })}
+                  style={{ fontFamily: T.font, fontSize: 13, width: '100%', border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 4px', textAlign: 'center', color: T.textPrimary }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </SsSection>
+  );
+}
+
 function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
   const [measType, setMeasType] = useState('temperature');
   const [unit, setUnit] = useState('F');
@@ -1859,6 +1936,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         {/* Type-specific sections */}
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} flags={flags} />}
         {item.type === 'mc' && <MCCASection item={item} onUpdate={upd} markAs={markAs} />}
+        {item.type === 'rating' && <RatingSection item={item} onUpdate={upd} scoringOn={scoringOn} />}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} markAs={markAs} />}
         {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
