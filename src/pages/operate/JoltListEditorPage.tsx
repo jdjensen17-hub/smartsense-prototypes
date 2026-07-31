@@ -35,6 +35,7 @@ interface ListItem {
   caForYNRules?: CARule[];
   caForRanges?: boolean;
   caForRangeRules?: CARule[];
+  caForMCRules?: CARule[];
   flagsForYes?: string[];
   flagsForNo?: string[];
   scoreEnabled?: boolean;
@@ -754,6 +755,107 @@ function MeasurementFlagSection({ item, onUpdate, flags, onCreateFlag }: { item:
       <button onClick={addRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: rules.length > 0 ? 16 : 0 }}>
         <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Rule
       </button>
+    </SsSection>
+  );
+}
+
+function MCCASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
+  const forNA = item.caForNA ?? false;
+  const mcRules = item.caForMCRules ?? [];
+  const choices = item.choices ?? [];
+
+  const addRule = () => onUpdate({ caForMCRules: [...mcRules, { id: mkid(), condition: choices[0]?.id ?? '', caList: '', adHoc: false, nextStep: 'repeat-item' }] });
+  const removeRule = (id: string) => onUpdate({ caForMCRules: mcRules.filter(r => r.id !== id) });
+  const updateRule = (id: string, updates: Partial<CARule>) => onUpdate({ caForMCRules: mcRules.map(r => r.id === id ? { ...r, ...updates } : r) });
+
+  const choiceOptions = choices.map(c => ({ value: c.id, label: c.label || '(unnamed)' }));
+
+  return (
+    <SsSection label="Corrective Action" defaultOpen={!!(item.caForNA || mcRules.length > 0)}>
+      {/* For N/A */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
+          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For N/A</span>
+          <Toggle on={forNA} onChange={v => onUpdate({ caForNA: v })} />
+        </div>
+        {forNA && (
+          <div style={{ paddingTop: 10, marginTop: 8 }}>
+            {!item.caForNAAdHoc && (
+              <>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
+                <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
+              </>
+            )}
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
+            <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+              <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
+              <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
+            </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
+          </div>
+        )}
+      </div>
+
+      {/* For choices */}
+      <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mcRules.length > 0 ? 10 : 0 }}>
+          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For choices</span>
+          <Toggle on={mcRules.length > 0} onChange={v => { if (v && mcRules.length === 0) addRule(); else if (!v) onUpdate({ caForMCRules: [] }); }} />
+        </div>
+        {mcRules.length > 0 && choices.length === 0 && (
+          <div style={{ fontSize: 12, color: T.textMuted, marginTop: 4 }}>Add choices above before configuring rules.</div>
+        )}
+        {mcRules.map((rule, idx) => (
+          <div key={rule.id} style={{ paddingTop: 10, marginTop: 8 }}>
+            {idx > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: '0.05em' }}>OR</span>
+                <div style={{ flex: 1, height: '0.5px', background: T.border }} />
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase' }}>Rule {idx + 1}</span>
+              <button onClick={() => removeRule(rule.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13, display: 'flex', alignItems: 'center', gap: 3 }}><i className="ti ti-x" />Remove</button>
+            </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Choice</div>
+            <Select value={rule.condition ?? ''} onChange={v => updateRule(rule.id, { condition: v })}
+              options={(() => {
+                const usedByOthers = mcRules.filter(r => r.id !== rule.id).map(r => r.condition);
+                const available = choiceOptions.filter(o => !usedByOthers.includes(o.value));
+                return available.length > 0 ? available : [{ value: '', label: 'No choices available' }];
+              })()}
+              style={{ width: '100%', marginBottom: 8 }} />
+            {!rule.adHoc && (
+              <>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>CA list</div>
+                <div style={{ marginBottom: 8 }}><CAListPicker value={rule.caList ?? ''} onChange={v => updateRule(rule.id, { caList: v })} /></div>
+              </>
+            )}
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
+            <Select value={rule.nextStep ?? 'repeat-item'} onChange={v => updateRule(rule.id, { nextStep: v as CARule['nextStep'] })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+              <Toggle on={!!rule.optional} onChange={v => updateRule(rule.id, { optional: v })} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
+              <Toggle on={rule.adHoc} onChange={v => updateRule(rule.id, { adHoc: v, ...(v ? { caList: '' } : {}) })} />
+            </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
+          </div>
+        ))}
+        {mcRules.length > 0 && mcRules.length < choices.length && (
+          <button onClick={addRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 16 }}>
+            <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Rule
+          </button>
+        )}
+      </div>
     </SsSection>
   );
 }
@@ -1746,6 +1848,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         )}
         {/* Type-specific sections */}
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} flags={flags} />}
+        {item.type === 'mc' && <MCCASection item={item} onUpdate={upd} />}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
         {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} />}
         {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
