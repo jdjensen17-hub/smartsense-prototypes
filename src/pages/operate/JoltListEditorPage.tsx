@@ -759,7 +759,7 @@ function MeasurementFlagSection({ item, onUpdate, flags, onCreateFlag }: { item:
   );
 }
 
-function MCCASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
+function MCCASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void; markAs: string | null }) {
   const forNA = item.caForNA ?? false;
   const mcRules = item.caForMCRules ?? [];
   const choices = item.choices ?? [];
@@ -772,37 +772,42 @@ function MCCASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: P
 
   return (
     <SsSection label="Corrective Action" defaultOpen={!!(item.caForNA || mcRules.length > 0)}>
-      {/* For N/A */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For N/A</span>
-          <Toggle on={forNA} onChange={v => onUpdate({ caForNA: v })} />
-        </div>
-        {forNA && (
-          <div style={{ paddingTop: 10, marginTop: 8 }}>
-            {!item.caForNAAdHoc && (
-              <>
-                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
-                <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
-              </>
+      {/* For N/A / OOO */}
+      {markAs && (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For {markAs}</span>
+              <Toggle on={forNA} onChange={v => onUpdate({ caForNA: v })} />
+            </div>
+            {forNA && (
+              <div style={{ paddingTop: 10, marginTop: 8 }}>
+                {!item.caForNAAdHoc && (
+                  <>
+                    <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
+                    <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
+                  </>
+                )}
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
+                <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+                  <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
+                  <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
+                </div>
+                <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
+              </div>
             )}
-            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
-            <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
-              <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
-              <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
-            </div>
-            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
           </div>
-        )}
-      </div>
+          <div style={{ borderTop: `0.5px solid ${T.border}`, marginBottom: 12 }} />
+        </>
+      )}
 
       {/* For choices */}
-      <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12 }}>
+      <div style={{ paddingTop: markAs ? 0 : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mcRules.length > 0 ? 10 : 0 }}>
           <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For choices</span>
           <Toggle on={mcRules.length > 0} onChange={v => { if (v && mcRules.length === 0) addRule(); else if (!v) onUpdate({ caForMCRules: [] }); }} />
@@ -860,7 +865,7 @@ function MCCASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: P
   );
 }
 
-function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void }) {
+function CASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void; markAs: string | null }) {
   const forNA = item.caForNA ?? false;
   const ynRules = item.caForYNRules ?? [];
   const forRanges = item.caForRanges ?? false;
@@ -875,36 +880,41 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
 
   return (
     <SsSection label="Corrective Action" defaultOpen={!!(item.caForNA || (item.caForYNRules?.length ?? 0) > 0 || item.caForRanges)}>
-      {/* For N/A */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For N/A</span>
-          <Toggle on={forNA} onChange={setForNA} />
-        </div>
-        {forNA && (
-          <div style={{ paddingTop: 10, marginTop: 8 }}>
-            {!item.caForNAAdHoc && (
-              <>
-                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
-                <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
-              </>
+      {/* For N/A / OOO — only shown when markAs is set */}
+      {markAs && (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For {markAs}</span>
+              <Toggle on={forNA} onChange={setForNA} />
+            </div>
+            {forNA && (
+              <div style={{ paddingTop: 10, marginTop: 8 }}>
+                {!item.caForNAAdHoc && (
+                  <>
+                    <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
+                    <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
+                  </>
+                )}
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
+                <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+                  <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
+                  <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
+                </div>
+                <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
+              </div>
             )}
-            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
-            <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
-              <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
-              <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
-            </div>
-            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
           </div>
-        )}
-      </div>
+          <div style={{ borderTop: `0.5px solid ${T.border}`, marginBottom: 12 }} />
+        </>
+      )}
       {/* For Yes/No or ranges */}
-      <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: forNA ? 12 : 0 }} />
+      {markAs && <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: forNA ? 12 : 0 }} />}
       <div style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (isMeas ? forRanges : ynRules.length > 0) ? 10 : 0 }}>
           <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>{isMeas ? 'For ranges' : 'For Yes/No'}</span>
@@ -1848,9 +1858,9 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         )}
         {/* Type-specific sections */}
         {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} flags={flags} />}
-        {item.type === 'mc' && <MCCASection item={item} onUpdate={upd} />}
+        {item.type === 'mc' && <MCCASection item={item} onUpdate={upd} markAs={markAs} />}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
-        {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} />}
+        {(item.type === 'yn' || item.type === 'measurement') && <CASection item={item} onUpdate={upd} markAs={markAs} />}
         {item.type === 'yn' && <FlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />}
         {item.type === 'measurement' && (item.measRanges?.length ?? 0) > 0 && (
           <MeasurementFlagSection item={item} onUpdate={upd} flags={flags} onCreateFlag={onCreateFlag} />
