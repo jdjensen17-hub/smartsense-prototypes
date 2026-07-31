@@ -182,6 +182,8 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'section-read-only', prompt: 'Read Only', type: 'subtitle', stripe: '', inds: [], allowNA: false },
   { id: 'temp-guidelines', prompt: 'Temperature Guidelines', type: 'subtitle', stripe: '', inds: [], allowNA: false },
   { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', inds: [], allowNA: false, ratingMin: 1, ratingMax: 5 },
+  { id: 'text-info', prompt: 'Read the food safety guidelines before proceeding', type: 'text', stripe: '', inds: [], allowNA: false },
+  { id: 'free-notes', prompt: 'Enter any additional notes', type: 'free', stripe: '', inds: [], allowNA: false },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1855,30 +1857,34 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         </SsSection>
         {/* General options */}
         <SsSection label="General Options" defaultOpen={!!(markAs || item.points || (item.labelIds?.length ?? 0) > 0 || item.stripe || item.infoInline || item.infoFile)}>
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(['N/A', 'OOO'] as const).map(val => {
-                const active = markAs === val;
-                return (
-                  <button key={val} onClick={() => onMarkAsChange(active ? null : val)} style={{
-                    fontFamily: T.font, fontSize: 12, fontWeight: 600, padding: '4px 14px',
-                    borderRadius: 5, border: `0.5px solid ${active ? T.borderAccent : T.borderStrong}`,
-                    background: active ? T.bgAccent : T.surface2,
-                    color: active ? T.textAccent : T.textSecondary,
-                    cursor: 'pointer',
-                  }}>
-                    {val}
-                  </button>
-                );
-              })}
+          {item.type !== 'text' && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {(['N/A', 'OOO'] as const).map(val => {
+                  const active = markAs === val;
+                  return (
+                    <button key={val} onClick={() => onMarkAsChange(active ? null : val)} style={{
+                      fontFamily: T.font, fontSize: 12, fontWeight: 600, padding: '4px 14px',
+                      borderRadius: 5, border: `0.5px solid ${active ? T.borderAccent : T.borderStrong}`,
+                      background: active ? T.bgAccent : T.surface2,
+                      color: active ? T.textAccent : T.textSecondary,
+                      cursor: 'pointer',
+                    }}>
+                      {val}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Points</div>
-            <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
-            <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Employees get points by completing items or half points if late.</div>
-          </div>
+          )}
+          {item.type !== 'text' && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Points</div>
+              <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
+              <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Employees get points by completing items or half points if late.</div>
+            </div>
+          )}
           {item.type === 'measurement' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1910,7 +1916,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           </div>
         </SsSection>
         {/* Score */}
-        {scoringOn && (item.type === 'yn' || item.type === 'checkmark') && (
+        {scoringOn && item.type === 'yn' && (
           <SsSection label="Score" defaultOpen>
             {item.type === 'yn' && (
               <div>
