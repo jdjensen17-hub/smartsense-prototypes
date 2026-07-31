@@ -65,6 +65,7 @@ interface ListItem {
   mcMultiSelect?: boolean;
   mcShowInline?: boolean;
   mcDraftChoices?: MCChoice[];
+  photoAllowUpload?: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -184,6 +185,7 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', inds: [], allowNA: false, ratingMin: 1, ratingMax: 5 },
   { id: 'text-info', prompt: 'Read the food safety guidelines before proceeding', type: 'text', stripe: '', inds: [], allowNA: false },
   { id: 'free-notes', prompt: 'Enter any additional notes', type: 'free', stripe: '', inds: [], allowNA: false },
+  { id: 'employee-select', prompt: 'Select responsible employee', type: 'employee', stripe: '', inds: [], allowNA: false },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1857,7 +1859,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         </SsSection>
         {/* General options */}
         <SsSection label="General Options" defaultOpen={!!(markAs || item.points || (item.labelIds?.length ?? 0) > 0 || item.stripe || item.infoInline || item.infoFile)}>
-          {item.type !== 'text' && (
+          {item.type !== 'text' && item.type !== 'employee' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -1878,7 +1880,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
               </div>
             </div>
           )}
-          {item.type !== 'text' && (
+          {item.type !== 'text' && item.type !== 'employee' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Points</div>
               <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
@@ -1893,6 +1895,14 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
                   <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4 }}>Pre-fills with the last recorded value on new list instances</div>
                 </div>
                 <Toggle on={!!item.savedValue} onChange={v => upd({ savedValue: v })} />
+              </div>
+            </div>
+          )}
+          {item.type === 'photo' && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 13, color: T.textPrimary }}>Allow images to be uploaded from device</div>
+                <Toggle on={!!item.photoAllowUpload} onChange={v => upd({ photoAllowUpload: v })} />
               </div>
             </div>
           )}
