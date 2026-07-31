@@ -14,7 +14,7 @@ const T = {
 };
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' | 'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' | 'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula' | 'asset';
+type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' | 'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' | 'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula' | 'asset' | 'email';
 
 type DCConditionYN = { type: 'yn'; value: 'Yes' | 'No' };
 type DCConditionMeas = { type: 'measurement'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
@@ -103,6 +103,7 @@ const TYPE_META: Record<ItemType, { label: string; icon: string }> = {
   sublist:     { label: 'Sublist',        icon: 'ti-layout-list' },
   formula:     { label: 'Formula',        icon: 'ti-math-function' },
   asset:       { label: 'Asset',          icon: 'ti-building-factory' },
+  email:       { label: 'External Email', icon: 'ti-mail' },
 };
 
 const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
@@ -128,6 +129,7 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
   { type: 'sublist',     aliases: ['nested','child','sub'] },
   { type: 'formula',     aliases: ['calculate','calc','equation','math'] },
   { type: 'asset',       aliases: ['asset','equipment','device','machine'] },
+  { type: 'email',       aliases: ['email','external email','notify','send'] },
 ];
 
 const FLAG_COLORS = ['#1A1A1F','#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
@@ -214,6 +216,7 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'number-item', prompt: 'Enter unit count', type: 'number', stripe: '', inds: [], allowNA: false },
   { id: 'formula-item', prompt: 'Average cooler temp', type: 'formula', stripe: '', inds: [], allowNA: false, formulaType: 'number', formulaVars: [{ name: 'A', itemId: '' }], formulaExpr: '' },
   { id: 'asset-item', prompt: 'Select asset to inspect', type: 'asset', stripe: '', inds: [], allowNA: false, assetType: 'Inspection Type' },
+  { id: 'email-item', prompt: 'Send inspection report', type: 'email', stripe: '', inds: [], allowNA: false },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
