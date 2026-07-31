@@ -18,6 +18,7 @@ import JoltListEditorPage from '@/pages/operate/JoltListEditorPage';
 import JoltListPreviewPage from '@/pages/operate/JoltListPreviewPage';
 import LabelTemplatesPage from '@/pages/operate/LabelTemplatesPage';
 import CreateListPage from '@/pages/operate/CreateListPage';
+import MCTemplatesPage from '@/pages/operate/MCTemplatesPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -322,6 +323,7 @@ export default function App() {
           <Route path="/operate/jolt-preview" element={<JoltListPreviewPage />} />
           <Route path="/operate/label-templates" element={<LabelTemplatesPage />} />
           <Route path="/operate/create-list" element={<CreateListPage />} />
+          <Route path="/operate/mc-templates" element={<MCTemplatesPage />} />
           <Route path="/mobile/operate/pdf-search" element={<PdfSearchPage />} />
         </Routes>
       </Shell>

@@ -59,6 +59,10 @@ interface ListItem {
   importance?: string;
   measRanges?: { id: string; min: string; max: string }[];
   measFlagRules?: { id: string; condition: string; rangeId: string; flagId: string; recordColor: string }[];
+  mcTemplateId?: string;
+  mcMultiSelect?: boolean;
+  mcShowInline?: boolean;
+  mcDraftChoices?: MCChoice[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -172,6 +176,7 @@ const INITIAL_ITEMS: ListItem[] = [
     { id: 'c2', label: 'US Foods', color: '#2196F3', icon: null },
     { id: 'c3', label: 'Performance Food Group', color: '#FF9800', icon: null },
   ]},
+  { id: 'mc-blank', prompt: 'New multiple choice item', type: 'mc', stripe: '', inds: [], allowNA: false, choices: [] },
   { id: 'section-read-only', prompt: 'Read Only', type: 'subtitle', stripe: '', inds: [], allowNA: false },
   { id: 'temp-guidelines', prompt: 'Temperature Guidelines', type: 'subtitle', stripe: '', inds: [], allowNA: false },
   { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', inds: [], allowNA: false, ratingMin: 1, ratingMax: 5 },
@@ -899,64 +904,244 @@ function CASection({ item, onUpdate }: { item: ListItem; onUpdate: (updates: Par
   );
 }
 
-function MCChoicesSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
-  const choices = item.choices ?? [];
+const MC_TEMPLATES: { id: string; name: string; choices: MCChoice[] }[] = [
+  { id: 'tpl-1', name: 'Yes / No / N/A', choices: [
+    { id: 't1a', label: 'Yes',  color: '#43A047', icon: 'ti-check' },
+    { id: 't1b', label: 'No',   color: '#E53935', icon: 'ti-x' },
+    { id: 't1c', label: 'N/A',  color: '#546E7A', icon: null },
+  ]},
+  { id: 'tpl-2', name: 'Pass / Fail', choices: [
+    { id: 't2a', label: 'Pass', color: '#43A047', icon: 'ti-circle-check' },
+    { id: 't2b', label: 'Fail', color: '#E53935', icon: 'ti-alert-circle' },
+  ]},
+  { id: 'tpl-3', name: 'Condition Rating', choices: [
+    { id: 't3a', label: 'Excellent', color: '#1E88E5', icon: 'ti-star' },
+    { id: 't3b', label: 'Good',      color: '#43A047', icon: null },
+    { id: 't3c', label: 'Fair',      color: '#FDD835', icon: null },
+    { id: 't3d', label: 'Poor',      color: '#FB8C00', icon: null },
+    { id: 't3e', label: 'Failing',   color: '#E53935', icon: 'ti-alert-circle' },
+  ]},
+  { id: 'tpl-4', name: 'Cancel Check', choices: [
+    { id: 't4a', label: 'Cancelled', color: '#E53935', icon: 'ti-x' },
+    { id: 't4b', label: 'Completed', color: '#43A047', icon: 'ti-circle-check' },
+  ]},
+  { id: 'tpl-5', name: 'Root Causes: Motor', choices: [
+    { id: 't5a', label: 'Overheating', color: '#FB8C00', icon: 'ti-flame' },
+    { id: 't5b', label: 'Vibration',   color: '#FDD835', icon: null },
+    { id: 't5c', label: 'Noise',       color: '#FDD835', icon: null },
+    { id: 't5d', label: 'Leaking',     color: '#1E88E5', icon: 'ti-droplet' },
+    { id: 't5e', label: 'Not running', color: '#E53935', icon: 'ti-bolt' },
+  ]},
+];
+
+const MC_COLORS = ['','#E53935','#FB8C00','#FDD835','#43A047','#1E88E5','#8E24AA','#00ACC1','#6D4C41','#546E7A','#F48FB1','#A5D6A7','#90CAF9','#CE93D8','#FFE082','#BCAAA4','#B0BEC5','#EF9A9A','#1A1A1F'];
+const MC_ICONS = ['ti-star','ti-heart','ti-thumb-up','ti-thumb-down','ti-flame','ti-leaf','ti-droplet','ti-bolt','ti-circle-check','ti-alert-circle','ti-info-circle','ti-award','ti-crown','ti-diamond','ti-clock','ti-home','ti-map-pin','ti-user','ti-briefcase','ti-truck','ti-coffee','ti-tool','ti-flag','ti-mood-smile'];
+
+function MCChoiceList({ choices, locked, onUpdate, onRemove, focusId, onFocused }: { choices: MCChoice[]; locked: boolean; onUpdate?: (id: string, u: Partial<MCChoice>) => void; onRemove?: (id: string) => void; focusId?: string; onFocused?: () => void }) {
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [pickerTab, setPickerTab] = useState<'color' | 'icon'>('color');
-  const MC_COLORS = ['','#E53935','#FB8C00','#FDD835','#43A047','#1E88E5','#8E24AA','#00ACC1','#6D4C41','#546E7A','#F48FB1','#A5D6A7','#90CAF9','#CE93D8','#FFE082','#BCAAA4','#B0BEC5','#EF9A9A'];
-  const MC_ICONS = ['ti-star','ti-heart','ti-thumb-up','ti-flame','ti-leaf','ti-drop','ti-bolt','ti-circle-check','ti-alert-circle','ti-info-circle','ti-award','ti-crown','ti-diamond','ti-clock','ti-home','ti-map-pin','ti-user','ti-briefcase','ti-truck','ti-coffee'];
-
-  const updateChoice = (id: string, updates: Partial<MCChoice>) => onUpdate({ choices: choices.map(c => c.id === id ? { ...c, ...updates } : c) });
-  const addChoice = () => onUpdate({ choices: [...choices, { id: mkid(), label: '', color: '', icon: null }] });
-  const removeChoice = (id: string) => onUpdate({ choices: choices.filter(c => c.id !== id) });
-
+  const pickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!pickerFor) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerFor(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pickerFor]);
   return (
-    <SsSection label="Choices" defaultOpen={(item.choices?.length ?? 0) > 0}>
+    <div>
       {choices.map((c, idx) => (
-        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <div onClick={() => { setPickerFor(pickerFor === c.id ? null : c.id); setPickerTab('color'); }} style={{ width: 26, height: 26, borderRadius: '50%', background: c.color || 'transparent', border: c.color ? 'none' : `1.5px dashed ${T.borderStrong}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
-            {c.icon && <i className={`ti ${c.icon}`} style={{ fontSize: 13, color: c.color ? 'white' : T.textMuted }} />}
-            {!c.icon && !c.color && <i className="ti ti-plus" style={{ fontSize: 11, color: T.textMuted }} />}
+        <div key={c.id} style={{ marginBottom: 6, position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!locked && <i className="ti ti-grip-vertical" style={{ fontSize: 13, color: T.textMuted, cursor: 'grab', flexShrink: 0 }} />}
+            <div onClick={() => { if (!locked) { setPickerFor(pickerFor === c.id ? null : c.id); setPickerTab('color'); } }}
+              style={{ width: 26, height: 26, borderRadius: '50%', background: c.color || 'transparent', border: c.color ? 'none' : `1.5px dashed ${T.borderStrong}`, cursor: locked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: locked ? 0.7 : 1 }}>
+              {c.icon && <i className={`ti ${c.icon}`} style={{ fontSize: 13, color: c.color ? 'white' : T.textMuted }} />}
+              {!c.icon && !c.color && !locked && <i className="ti ti-plus" style={{ fontSize: 11, color: T.textMuted }} />}
+            </div>
+            {locked
+              ? <span style={{ flex: 1, fontSize: 13, color: T.textPrimary, padding: '5px 0' }}>{c.label || <span style={{ color: T.textMuted, fontStyle: 'italic' }}>Choice {idx + 1}</span>}</span>
+              : <input ref={el => { if (el && c.id === focusId) { el.focus(); onFocused?.(); } }} value={c.label} onChange={e => onUpdate?.(c.id, { label: e.target.value })} placeholder={`Choice ${idx + 1}`} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', flex: 1 }} />
+            }
+            {!locked && <button onClick={() => onRemove?.(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', flexShrink: 0 }}><i className="ti ti-x" /></button>}
           </div>
-          <input value={c.label} onChange={e => updateChoice(c.id, { label: e.target.value })} placeholder={`Choice ${idx + 1}`} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', flex: 1 }} />
-          <button onClick={() => removeChoice(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex' }}><i className="ti ti-x" /></button>
           {pickerFor === c.id && (
-            <div style={{ position: 'absolute', right: 16, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, width: 240, zIndex: 50, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', overflow: 'hidden', marginTop: 80 }}>
-              <div style={{ display: 'flex', borderBottom: `0.5px solid ${T.border}` }}>
+            <div ref={pickerRef} style={{ position: 'absolute', left: 0, width: 228, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, marginTop: 4, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', borderBottom: `0.5px solid ${T.border}` }}>
                 {(['color','icon'] as const).map(tab => (
                   <div key={tab} onClick={() => setPickerTab(tab)} style={{ flex: 1, padding: '8px 0', textAlign: 'center', fontSize: 12, fontWeight: 500, cursor: 'pointer', color: pickerTab === tab ? T.textAccent : T.textMuted, borderBottom: pickerTab === tab ? `2px solid ${T.fillAccent}` : '2px solid transparent' }}>
                     {tab === 'color' ? 'Color' : 'Icon'}
                   </div>
                 ))}
+                <div onClick={() => setPickerFor(null)} style={{ padding: '8px 10px', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', alignItems: 'center' }}>
+                  <i className="ti ti-x" />
+                </div>
               </div>
               {pickerTab === 'color' && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, padding: 10 }}>
-                  {MC_COLORS.map(col => (
-                    <div key={col} onClick={() => { updateChoice(c.id, { color: col }); setPickerFor(null); }} style={{ width: 28, height: 28, borderRadius: '50%', background: col || 'transparent', border: col ? `2px solid ${c.color === col ? T.textPrimary : 'transparent'}` : `1.5px dashed ${T.borderStrong}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {!col && <i className="ti ti-x" style={{ fontSize: 12, color: T.textMuted }} />}
-                    </div>
+                  {MC_COLORS.filter(col => col !== '').map(col => (
+                    <div key={col} onClick={() => { onUpdate?.(c.id, { color: c.color === col ? '' : col }); }} style={{ width: 28, height: 28, borderRadius: '50%', background: col, border: c.color === col ? `${col === '#1A1A1F' ? '1.5px' : '2px'} solid ${col === '#1A1A1F' ? '#ffffff' : T.textPrimary}` : '2px solid transparent', outline: c.color === col && col === '#1A1A1F' ? `1.5px solid ${T.borderStrong}` : 'none', outlineOffset: 1, cursor: 'pointer' }} />
                   ))}
                 </div>
               )}
               {pickerTab === 'icon' && (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, padding: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, padding: 10 }}>
                     {MC_ICONS.map(ic => (
-                      <div key={ic} onClick={() => { updateChoice(c.id, { icon: c.icon === ic ? null : ic }); }} style={{ width: 36, height: 36, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: c.icon === ic ? T.fillAccent : T.surface1, border: c.icon === ic ? `2px solid ${T.fillAccent}` : `0.5px solid ${T.border}` }}>
-                        <i className={`ti ${ic}`} style={{ fontSize: 17, color: c.icon === ic ? 'white' : T.textMuted }} />
+                      <div key={ic} onClick={() => { onUpdate?.(c.id, { icon: c.icon === ic ? null : ic }); }} style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: c.icon === ic ? T.fillAccent : T.surface1, border: c.icon === ic ? `2px solid ${T.fillAccent}` : `0.5px solid ${T.border}` }}>
+                        <i className={`ti ${ic}`} style={{ fontSize: 14, color: c.icon === ic ? 'white' : T.textMuted }} />
                       </div>
                     ))}
                   </div>
-                  <div style={{ fontSize: 10, color: T.textMuted, padding: '0 10px 8px', textAlign: 'center' }}>Tap selected icon again to remove it</div>
                 </>
               )}
             </div>
           )}
         </div>
       ))}
-      <button onClick={addChoice} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
-        <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add choice
-      </button>
+    </div>
+  );
+}
+
+function TemplateRow({ tpl, onUse, onCopy }: { tpl: { id: string; name: string; choices: MCChoice[] }; onUse: () => void; onCopy: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', borderBottom: `0.5px solid ${T.border}`, background: hovered ? T.surface1 : 'transparent' }}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <span style={{ fontSize: 13, color: T.textPrimary }}>{tpl.name}</span>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', opacity: hovered ? 1 : 0, transition: 'opacity 0.1s' }}>
+        <button onMouseDown={e => { e.preventDefault(); onCopy(); }} style={{ fontFamily: T.font, fontSize: 12, padding: '3px 10px', borderRadius: 4, border: `0.5px solid ${T.borderStrong}`, background: T.surface0, color: T.textSecondary, cursor: 'pointer' }}>Copy</button>
+        <button onMouseDown={e => { e.preventDefault(); onUse(); }} style={{ fontFamily: T.font, fontSize: 12, padding: '3px 10px', borderRadius: 4, border: 'none', background: T.fillAccent, color: 'white', cursor: 'pointer' }}>Use</button>
+      </div>
+    </div>
+  );
+}
+
+function MCChoicesSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+  const usingTemplate = !!item.mcTemplateId;
+  const template = usingTemplate ? MC_TEMPLATES.find(t => t.id === item.mcTemplateId) : null;
+  const choices = item.choices ?? [];
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [newChoiceId, setNewChoiceId] = useState<string | null>(null);
+  const templateDropdownRef = useRef<HTMLDivElement>(null);
+  const templateInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!templatePickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)) {
+        setTemplatePickerOpen(false);
+        setTemplateSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [templatePickerOpen]);
+
+  const selectTemplate = (tplId: string) => {
+    const tpl = MC_TEMPLATES.find(t => t.id === tplId);
+    if (!tpl) return;
+    onUpdate({ mcTemplateId: tplId, mcDraftChoices: choices.length > 0 ? choices : item.mcDraftChoices, choices: tpl.choices });
+    setTemplatePickerOpen(false);
+  };
+
+  const copyTemplate = (tplId: string) => {
+    const tpl = MC_TEMPLATES.find(t => t.id === tplId);
+    if (!tpl) return;
+    onUpdate({ mcTemplateId: undefined, choices: tpl.choices.map(c => ({ ...c, id: mkid() })), mcDraftChoices: undefined });
+    setTemplatePickerOpen(false);
+    setTemplateSearch('');
+  };
+
+  const updateChoice = (id: string, updates: Partial<MCChoice>) => onUpdate({ choices: choices.map(c => c.id === id ? { ...c, ...updates } : c) });
+  const addChoice = () => { const id = mkid(); setNewChoiceId(id); onUpdate({ choices: [...choices, { id, label: '', color: '', icon: null }] }); };
+  const removeChoice = (id: string) => onUpdate({ choices: choices.filter(c => c.id !== id) });
+
+  return (
+    <SsSection label="Multiple Choice Options" defaultOpen>
+      {/* Template searchable dropdown */}
+      <div ref={templateDropdownRef} style={{ position: 'relative', marginBottom: 14, display: usingTemplate && !templatePickerOpen ? 'none' : 'block' }}>
+        <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${templatePickerOpen ? T.borderAccent : T.borderStrong}`, borderRadius: 6, background: T.surface0, padding: '6px 10px', gap: 6, cursor: 'text' }} onClick={() => { setTemplatePickerOpen(true); templateInputRef.current?.focus(); }}>
+          <i className="ti ti-template" style={{ fontSize: 13, color: T.textSecondary, flexShrink: 0 }} />
+          <input
+            ref={templateInputRef}
+            value={templateSearch}
+            onChange={e => { setTemplateSearch(e.target.value); setTemplatePickerOpen(true); }}
+            onFocus={() => setTemplatePickerOpen(true)}
+            placeholder="Use template…"
+            className="mc-tpl-search"
+            style={{ fontFamily: T.font, fontSize: 13, border: 'none', outline: 'none', background: 'transparent', flex: 1, color: T.textPrimary }}
+          />
+          {templateSearch && <i className="ti ti-x" style={{ fontSize: 12, color: T.textSecondary, cursor: 'pointer', flexShrink: 0 }} onMouseDown={e => { e.preventDefault(); setTemplateSearch(''); templateInputRef.current?.focus(); }} />}
+          {!templateSearch && <i className="ti ti-chevron-down" style={{ fontSize: 12, color: T.textSecondary, flexShrink: 0 }} />}
+        </div>
+        {templatePickerOpen && (() => {
+          const filtered = MC_TEMPLATES.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase()));
+          return (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, background: T.surface2, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 100, maxHeight: 220, overflowY: 'auto' }}>
+              {usingTemplate && !templateSearch && (
+                <div onMouseDown={e => { e.preventDefault(); onUpdate({ mcTemplateId: undefined, choices: item.mcDraftChoices ?? [], mcDraftChoices: undefined }); setTemplatePickerOpen(false); setTemplateSearch(''); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `0.5px solid ${T.border}`, cursor: 'pointer', color: T.textDanger ?? '#E53935' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#FFF5F5')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <i className="ti ti-x" style={{ fontSize: 13 }} />
+                  <span style={{ fontSize: 13 }}>Remove template</span>
+                </div>
+              )}
+              {filtered.length === 0
+                ? <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted }}>No templates found</div>
+                : filtered.map(tpl => (
+                    <TemplateRow key={tpl.id} tpl={tpl} onUse={() => { selectTemplate(tpl.id); setTemplateSearch(''); }} onCopy={() => copyTemplate(tpl.id)} />
+                  ))
+              }
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Template active bar */}
+      {usingTemplate && template && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 6, padding: '7px 10px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-template" style={{ fontSize: 13, color: T.textAccent }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.textAccent }}>{template.name} <span style={{ fontWeight: 400, opacity: 0.75 }}>(template)</span></span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button onClick={() => window.open(window.location.href.split('#')[0] + '#/operate/mc-templates', '_blank')} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+              <i className="ti ti-external-link" style={{ fontSize: 11 }} /> Edit
+            </button>
+            <button onClick={() => { setTemplatePickerOpen(true); setTimeout(() => templateInputRef.current?.focus(), 0); }} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>
+              Change
+            </button>
+          </div>
+        </div>
+      )}
+
+
+      {/* Choices */}
+      <div style={{ padding: 12, background: T.surface1, borderRadius: 8, border: `0.5px solid ${T.border}` }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: choices.length > 0 ? 10 : 0 }}>Choices</div>
+        <MCChoiceList choices={choices} locked={usingTemplate} onUpdate={updateChoice} onRemove={removeChoice} focusId={newChoiceId ?? undefined} onFocused={() => setNewChoiceId(null)} />
+        {!usingTemplate && (
+          <button onClick={addChoice} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: choices.length > 0 ? 8 : 8 }}>
+            <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add choice
+          </button>
+        )}
+      </div>
+
+      {/* Boolean options */}
+      <div style={{ marginTop: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 13, color: T.textPrimary }}>Allow multiple selections</span>
+          <Toggle on={!!item.mcMultiSelect} onChange={v => onUpdate({ mcMultiSelect: v })} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, color: T.textPrimary }}>Show options inline on mobile</span>
+          <Toggle on={!!item.mcShowInline} onChange={v => onUpdate({ mcShowInline: v })} />
+        </div>
+      </div>
     </SsSection>
   );
 }
@@ -2570,6 +2755,7 @@ export default function JoltListEditorPage() {
 
   return (
     <div style={{ fontFamily: T.font, height: 'calc(100vh - 52px)', background: T.surface0, overflow: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+      <style>{`.mc-tpl-search::placeholder { color: ${T.textSecondary}; }`}</style>
       <div style={{ width: '100%', maxWidth: 1026, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: T.surface2 }}>
       {/* Editor topbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: T.surface1, borderBottom: `0.5px solid ${T.border}`, flexShrink: 0 }}>
