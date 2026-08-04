@@ -2542,49 +2542,60 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
 }
 
 // ── Column picker ─────────────────────────────────────────────────────────
-const COLUMN_GROUPS: { group: string; cols: { key: string; label: string }[] }[] = [
+interface ColDef {
+  key: string;
+  label: string;
+  /** If set, renders a blank cell for item types not in this list */
+  types?: ItemType[];
+  /** Returns true if item has a non-default value for this column (drives auto-on/off) */
+  detect: (item: ListItem) => boolean;
+  /** Always on by default; excluded from auto-off */
+  defaultOn?: boolean;
+}
+
+const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
   { group: 'All', cols: [
-    { key: 'all-mark-as',           label: 'Mark as' },
-    { key: 'all-color',             label: 'Color' },
-    { key: 'all-info-library',      label: 'Info library inline' },
-    { key: 'all-points',            label: 'Points' },
-    { key: 'all-print-label',       label: 'Print Label' },
-    { key: 'all-tag-location',      label: 'Tag - Location' },
-    { key: 'all-tag-scoring',       label: 'Tag - Scoring' },
-    { key: 'all-tag-importance',    label: 'Tag - Importance' },
+    { key: 'all-mark-as',        label: 'Mark as',            defaultOn: true, detect: () => false },
+    { key: 'all-color',          label: 'Color',              defaultOn: true, detect: i => !!i.stripe },
+    { key: 'all-info-library',   label: 'Info library inline',defaultOn: true, detect: i => !!(i.infoInline || i.infoFile) },
+    { key: 'all-points',         label: 'Points',             defaultOn: true, detect: i => i.points != null },
+    { key: 'all-print-label',    label: 'Print Label',        defaultOn: true, detect: i => (i.labelIds?.length ?? 0) > 0 },
+    { key: 'all-tag-location',   label: 'Tag - Location',     defaultOn: true, detect: i => (i.locationTags?.length ?? 0) > 0 },
+    { key: 'all-tag-scoring',    label: 'Tag - Scoring',      defaultOn: true, detect: i => !!i.scoreGroup },
+    { key: 'all-tag-importance', label: 'Tag - Importance',   defaultOn: true, detect: i => !!i.importance },
   ]},
   { group: 'Y/N', cols: [
-    { key: 'yn-score-y',            label: 'Score - Y' },
-    { key: 'yn-score-n',            label: 'Score - N' },
-    { key: 'yn-auto-complete',      label: 'Auto Complete' },
+    { key: 'yn-score-y',       label: 'Score - Y',     types: ['yn'], detect: i => i.scoreYes != null },
+    { key: 'yn-score-n',       label: 'Score - N',     types: ['yn'], detect: i => i.scoreNo != null },
+    { key: 'yn-auto-complete', label: 'Auto Complete', types: ['yn'], detect: i => !!i.autoComplete },
   ]},
   { group: 'M — Measurement', cols: [
-    { key: 'm-saved-value',         label: 'Saved Value' },
-    { key: 'm-type',                label: 'Type' },
-    { key: 'm-method',              label: 'Method' },
-    { key: 'm-unit',                label: 'Unit' },
-    { key: 'm-range1-min',          label: 'Range 1 Min' },
-    { key: 'm-range1-max',          label: 'Range 1 Max' },
-    { key: 'm-range2-min',          label: 'Range 2 Min' },
-    { key: 'm-range2-max',          label: 'Range 2 Max' },
-    { key: 'm-range3-min',          label: 'Range 3 Min' },
-    { key: 'm-range3-max',          label: 'Range 3 Max' },
-    { key: 'm-sensor-name',         label: 'Sensor name' },
+    { key: 'm-saved-value', label: 'Saved Value', types: ['measurement'], detect: i => !!i.savedValue },
+    { key: 'm-type',        label: 'Type',        types: ['measurement'], detect: () => false },
+    { key: 'm-method',      label: 'Method',      types: ['measurement'], detect: () => false },
+    { key: 'm-unit',        label: 'Unit',        types: ['measurement'], detect: () => false },
+    { key: 'm-range1-min',  label: 'Range 1 Min', types: ['measurement'], detect: i => !!i.measRanges?.[0]?.min },
+    { key: 'm-range1-max',  label: 'Range 1 Max', types: ['measurement'], detect: i => !!i.measRanges?.[0]?.max },
+    { key: 'm-range2-min',  label: 'Range 2 Min', types: ['measurement'], detect: i => !!i.measRanges?.[1]?.min },
+    { key: 'm-range2-max',  label: 'Range 2 Max', types: ['measurement'], detect: i => !!i.measRanges?.[1]?.max },
+    { key: 'm-range3-min',  label: 'Range 3 Min', types: ['measurement'], detect: i => !!i.measRanges?.[2]?.min },
+    { key: 'm-range3-max',  label: 'Range 3 Max', types: ['measurement'], detect: i => !!i.measRanges?.[2]?.max },
+    { key: 'm-sensor-name', label: 'Sensor name', types: ['measurement'], detect: () => false },
   ]},
   { group: 'MC — Multiple Choice', cols: [
-    { key: 'mc-multi-select',       label: 'Multi-select' },
-    { key: 'mc-show-inline',        label: 'Show inline' },
+    { key: 'mc-multi-select', label: 'Multi-select', types: ['mc'], detect: () => false },
+    { key: 'mc-show-inline',  label: 'Show inline',  types: ['mc'], detect: i => !!i.mcShowInline },
   ]},
   { group: 'CA — Corrective Action', cols: [
-    { key: 'ca-turn-on',            label: 'Turn on for Y/N' },
-    { key: 'ca-list',               label: 'CA List' },
-    { key: 'ca-turn-on-na',         label: 'Turn on for N/A' },
-    { key: 'ca-list-na',            label: 'List for NA' },
-    { key: 'ca-trigger-yn',         label: 'Condition' },
-    { key: 'ca-trigger-ranges',     label: 'Trigger Ranges' },
-    { key: 'ca-planned',            label: 'Ad Hoc' },
-    { key: 'ca-optional',           label: 'Optional' },
-    { key: 'ca-repeat',             label: 'Repeat' },
+    { key: 'ca-turn-on',       label: 'Turn on for Y/N', types: ['yn'],                    detect: i => (i.caForYNRules?.length ?? 0) > 0 },
+    { key: 'ca-list',          label: 'CA List',                                            detect: i => i.caForYNRules?.some(r => !!r.caList) ?? false },
+    { key: 'ca-turn-on-na',    label: 'Turn on for N/A', types: ['yn', 'measurement'],      detect: i => !!i.caForNA },
+    { key: 'ca-list-na',       label: 'List for NA',                                        detect: i => !!i.caForNAList },
+    { key: 'ca-trigger-yn',    label: 'Condition',                                          detect: i => i.caForYNRules?.some(r => !!r.condition) ?? false },
+    { key: 'ca-trigger-ranges',label: 'Trigger Ranges',  types: ['measurement'],            detect: i => (i.caForRangeRules?.length ?? 0) > 0 },
+    { key: 'ca-planned',       label: 'Ad Hoc',                                             detect: i => (i.caForYNRules?.some(r => !!r.adHoc) ?? false) || !!i.caForNAAdHoc },
+    { key: 'ca-optional',      label: 'Optional',                                           detect: i => (i.caForYNRules?.some(r => !!r.optional) ?? false) || !!i.caForNAOptional },
+    { key: 'ca-repeat',        label: 'Repeat',                                             detect: i => (i.caForYNRules?.length ?? 0) > 0 || !!i.caForNA },
   ]},
 ];
 
@@ -2925,6 +2936,9 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       </td>
       {/* Optional columns */}
       {activeCols.map(col => {
+        if (col.types && !col.types.includes(item.type)) {
+          return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
+        }
         if (col.key === 'all-mark-as') {
           const CYCLE: (string | null)[] = [null, 'N/A', 'OOO'];
           const CHIP: Record<string, { bg: string; color: string }> = {
@@ -2963,7 +2977,6 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           return <PointsCell key={col.key} value={item.points} onCommit={v => onUpdate(item.id, { points: v })} />;
         }
         if (col.key === 'ca-turn-on-na') {
-          if (item.type !== 'yn' && item.type !== 'measurement') return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           const on = !!item.caForNA;
           const unconfigured = isNACaUnconfigured(item);
           const toastKey = `${item.id}:ca-turn-on-na`;
@@ -2992,7 +3005,6 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'ca-turn-on') {
-          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           const on = (item.caForYNRules?.length ?? 0) > 0;
           const unconfigured = isYNCaUnconfigured(item);
           const toastKey = `${item.id}:ca-turn-on`;
@@ -3097,15 +3109,12 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'yn-score-y') {
-          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
           return <PointsCell key={col.key} value={item.scoreYes} onCommit={v => onUpdate(item.id, { scoreYes: v })} allowNegative />;
         }
         if (col.key === 'yn-score-n') {
-          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
           return <PointsCell key={col.key} value={item.scoreNo} onCommit={v => onUpdate(item.id, { scoreNo: v })} allowNegative />;
         }
         if (col.key === 'yn-auto-complete') {
-          if (item.type !== 'yn') return <td key={col.key} style={{ width: 100, padding: '0 12px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', color: T.textMuted, fontSize: 12 }}>—</td>;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               {item.autoComplete
@@ -3265,34 +3274,31 @@ export default function JoltListEditorPage() {
   function updateItem(id: string, updates: Partial<ListItem>) {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
     const current = items.find(it => it.id === id);
-    if (current) {
-      const m = { ...current, ...updates };
-      const rules: CARule[] = m.caForYNRules ?? [];
-      const toAdd: string[] = [];
-      if (rules.length > 0)                                                       toAdd.push('ca-turn-on');
-      if (m.caForNA)                                                              toAdd.push('ca-turn-on-na');
-      if (rules.some(r => r.caList))                                             toAdd.push('ca-list');
-      if (m.caForNAList)                                                          toAdd.push('ca-list-na');
-      if (rules.some(r => r.condition))                                          toAdd.push('ca-trigger-yn');
-      if (rules.some(r => r.adHoc) || m.caForNAAdHoc)                           toAdd.push('ca-planned');
-      if (rules.some(r => r.optional) || m.caForNAOptional)                     toAdd.push('ca-optional');
-      if (rules.length > 0 || m.caForNA)                                         toAdd.push('ca-repeat');
-      if ((m.caForRangeRules?.length ?? 0) > 0)                                  toAdd.push('ca-trigger-ranges');
-      if (m.autoComplete)                                                         toAdd.push('yn-auto-complete');
-      if (m.stripe)                                                               toAdd.push('all-color');
-      if (m.infoInline || m.infoFile)                                            toAdd.push('all-info-library');
-      if ((m.labelIds?.length ?? 0) > 0)                                         toAdd.push('all-print-label');
-      if (m.points != null)                                                       toAdd.push('all-points');
-      if (toAdd.length) setShownCols(prev => new Set([...prev, ...toAdd]));
-    }
-    if (updates.savedValue) setShownCols(prev => new Set([...prev, 'm-saved-value']));
-    if (updates.locationTags && (updates.locationTags as string[]).length > 0) setShownCols(prev => new Set([...prev, 'all-tag-location']));
-    if (updates.scoreGroup) setShownCols(prev => new Set([...prev, 'all-tag-scoring']));
-    if (updates.importance) setShownCols(prev => new Set([...prev, 'all-tag-importance']));
+    if (!current) return;
+    const merged = { ...current, ...updates };
+    const updatedItems = items.map(it => it.id === id ? merged : it);
+    setShownCols(prev => {
+      const next = new Set(prev);
+      for (const col of ALL_COLS) {
+        if (col.defaultOn) continue;
+        if (!next.has(col.key) && col.detect(merged)) next.add(col.key);
+        if (next.has(col.key) && !updatedItems.some(it => col.detect(it))) next.delete(col.key);
+      }
+      return next;
+    });
   }
 
   function deleteItem(id: string) {
+    const remainingItems = items.filter(it => it.id !== id);
     setItems(prev => prev.filter(it => it.id !== id).map(it => it.dcParentId === id ? { ...it, dcParentId: undefined, dcCondition: undefined } : it));
+    setShownCols(prev => {
+      const next = new Set(prev);
+      for (const col of ALL_COLS) {
+        if (col.defaultOn) continue;
+        if (next.has(col.key) && !remainingItems.some(it => col.detect(it))) next.delete(col.key);
+      }
+      return next;
+    });
     if (activeItemId === id) setActiveItemId(null);
   }
 
