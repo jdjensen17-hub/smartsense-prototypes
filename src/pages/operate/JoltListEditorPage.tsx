@@ -1633,7 +1633,7 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
   };
 
   return (
-    <SsSection label="Measurement Options">
+    <SsSection label="Measurement Options" defaultOpen={!!(item.measType || item.measUnit || (item.measRanges?.length ?? 0) > 0)}>
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'flex-end' }}>
         <div>
           <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Measurement Type</div>
@@ -2575,12 +2575,12 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
     { key: 'm-type',        label: 'Type',        types: ['measurement'], detect: i => !!i.measType },
     { key: 'm-method',      label: 'Method',      types: ['measurement'], detect: i => (i.measMethods?.length ?? 0) > 0 },
     { key: 'm-unit',        label: 'Unit',        types: ['measurement'], detect: i => !!i.measUnit },
-    { key: 'm-range1-min',  label: 'Range 1 Min', types: ['measurement'], detect: i => !!i.measRanges?.[0]?.min },
-    { key: 'm-range1-max',  label: 'Range 1 Max', types: ['measurement'], detect: i => !!i.measRanges?.[0]?.max },
-    { key: 'm-range2-min',  label: 'Range 2 Min', types: ['measurement'], detect: i => !!i.measRanges?.[1]?.min },
-    { key: 'm-range2-max',  label: 'Range 2 Max', types: ['measurement'], detect: i => !!i.measRanges?.[1]?.max },
-    { key: 'm-range3-min',  label: 'Range 3 Min', types: ['measurement'], detect: i => !!i.measRanges?.[2]?.min },
-    { key: 'm-range3-max',  label: 'Range 3 Max', types: ['measurement'], detect: i => !!i.measRanges?.[2]?.max },
+    { key: 'm-range1-min',  label: 'Range 1 Min', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 },
+    { key: 'm-range1-max',  label: 'Range 1 Max', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 },
+    { key: 'm-range2-min',  label: 'Range 2 Min', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 },
+    { key: 'm-range2-max',  label: 'Range 2 Max', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 },
+    { key: 'm-range3-min',  label: 'Range 3 Min', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 },
+    { key: 'm-range3-max',  label: 'Range 3 Max', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 },
     { key: 'm-sensor-name', label: 'Sensor name', types: ['measurement'], detect: i => !!i.measSensorId },
   ]},
   { group: 'MC — Multiple Choice', cols: [
@@ -3422,6 +3422,22 @@ export default function JoltListEditorPage() {
     next.delete('yn-score-n');
     return next;
   }, [shownCols, scoringOn]);
+
+  // Auto-on columns for existing data when an item is first opened
+  useEffect(() => {
+    if (!activeItemId) return;
+    const item = items.find(i => i.id === activeItemId);
+    if (!item) return;
+    setShownCols(prev => {
+      const next = new Set(prev);
+      for (const col of ALL_COLS) {
+        if (col.defaultOn) continue;
+        if (!next.has(col.key) && col.detect(item)) next.add(col.key);
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeItemId]);
   const handleSetScoringOn = (v: boolean) => {
     if (!v) {
       setItems(prev => prev.map(item => ({ ...item, scoreYes: undefined, scoreNo: undefined, scoreEnabled: undefined })));
