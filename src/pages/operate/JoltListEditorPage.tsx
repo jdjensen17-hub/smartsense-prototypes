@@ -61,6 +61,10 @@ interface ListItem {
   locationTags?: string[];
   scoreGroup?: string;
   importance?: string;
+  measType?: string;
+  measUnit?: string;
+  measMethods?: string[];
+  measSensorId?: string;
   measRanges?: { id: string; min: string; max: string }[];
   measFlagRules?: { id: string; condition: string; rangeId: string; flagId: string; recordColor: string }[];
   mcTemplateId?: string;
@@ -189,7 +193,7 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', inds: ['ti-filter'], allowNA: true, dcParentId: 'cooler-ok', dcCondition: { type: 'yn', value: 'No' } },
   { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', inds: [], allowNA: false },
   { id: 'section-food-safety', prompt: 'Food Safety', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'prep-temp', prompt: 'Record prep cooler temp °F', type: 'measurement', stripe: '#C1E1C5', inds: [], allowNA: true },
+  { id: 'prep-temp', prompt: 'Record prep cooler temp °F', type: 'measurement', stripe: '#C1E1C5', inds: [], allowNA: true, measType: 'temperature', measUnit: 'F', measMethods: ['Manual Input'], measRanges: [{ id: 'r1', min: '32', max: '40' }] },
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', inds: ['ti-filter'], allowNA: false, dcParentId: 'prep-temp', dcCondition: { type: 'measurement', op: '>=', value: 41 } },
   { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', inds: [], allowNA: false },
   { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', inds: [], allowNA: false, scoreYes: 1, scoreNo: 0 },
@@ -1609,26 +1613,23 @@ function RatingSection({ item, onUpdate, scoringOn }: { item: ListItem; onUpdate
 }
 
 function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
-  const [measType, setMeasType] = useState('temperature');
-  const [unit, setUnit] = useState('F');
-  const [customUnit, setCustomUnit] = useState('');
-  const [inputMethods, setInputMethods] = useState<string[]>(['Manual Input']);
-  const [selectedSensorId, setSelectedSensorId] = useState('');
+  const measType = item.measType ?? 'temperature';
+  const measUnit = item.measUnit ?? 'F';
+  const measMethods = item.measMethods ?? ['Manual Input'];
+  const measSensorId = item.measSensorId ?? '';
   const ranges = item.measRanges ?? [];
   const setRanges = (next: { id: string; min: string; max: string }[]) => onUpdate({ measRanges: next });
 
   const unitOptions = MEAS_UNITS[measType] ?? [];
 
   const handleTypeChange = (t: string) => {
-    setMeasType(t);
     const opts = MEAS_UNITS[t] ?? [];
-    if (opts.length > 0) setUnit(opts[0].value);
-    else setUnit('');
-    setInputMethods(['Manual Input']);
+    onUpdate({ measType: t, measUnit: opts.length > 0 ? opts[0].value : '', measMethods: ['Manual Input'] });
   };
 
   const toggleInputMethod = (m: string) => {
-    setInputMethods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+    const next = measMethods.includes(m) ? measMethods.filter(x => x !== m) : [...measMethods, m];
+    onUpdate({ measMethods: next });
   };
 
   return (
@@ -1647,8 +1648,8 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
           <div>
             <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Unit</div>
             {measType === 'other'
-              ? <input value={customUnit} onChange={e => setCustomUnit(e.target.value)} placeholder="Enter unit…" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 120 }} />
-              : <Select value={unit} onChange={setUnit} options={unitOptions} />
+              ? <input value={measUnit} onChange={e => onUpdate({ measUnit: e.target.value })} placeholder="Enter unit…" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 120 }} />
+              : <Select value={measUnit} onChange={v => onUpdate({ measUnit: v })} options={unitOptions} />
             }
           </div>
         )}
@@ -1657,7 +1658,7 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
         <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Input Methods</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {(MEAS_INPUT_METHODS[measType] ?? []).map(m => {
-            const selected = inputMethods.includes(m);
+            const selected = measMethods.includes(m);
             return (
               <div key={m} onClick={() => toggleInputMethod(m)}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1.5px solid ${selected ? T.borderAccent : T.borderStrong}`, background: selected ? T.bgAccent : T.surface2, color: selected ? T.textAccent : T.textSecondary, userSelect: 'none' }}>
@@ -1668,21 +1669,21 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
           })}
         </div>
       </div>
-      {inputMethods.includes('Sensor') && (
+      {measMethods.includes('Sensor') && (
         <div style={{ marginBottom: 12, padding: 12, background: T.surface1, borderRadius: 8, border: `0.5px solid ${T.border}` }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Linked Sensor Data</div>
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <Select
-                value={selectedSensorId}
-                onChange={setSelectedSensorId}
+                value={measSensorId}
+                onChange={v => onUpdate({ measSensorId: v })}
                 options={[{ value: '', label: 'Select Sensor' }, ...MOCK_SENSORS.map(s => ({ value: s.id, label: s.name }))]}
               />
             </div>
             <div style={{ width: 110 }}>
               <input
                 readOnly
-                value={selectedSensorId ? (MOCK_SENSORS.find(s => s.id === selectedSensorId)?.reading ?? '') : ''}
+                value={measSensorId ? (MOCK_SENSORS.find(s => s.id === measSensorId)?.reading ?? '') : ''}
                 placeholder="Reading"
                 style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', boxSizing: 'border-box', background: T.surface0, color: T.textSecondary, cursor: 'default' }}
               />
@@ -2571,19 +2572,19 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
   ]},
   { group: 'M — Measurement', cols: [
     { key: 'm-saved-value', label: 'Saved Value', types: ['measurement'], detect: i => !!i.savedValue },
-    { key: 'm-type',        label: 'Type',        types: ['measurement'], detect: () => false },
-    { key: 'm-method',      label: 'Method',      types: ['measurement'], detect: () => false },
-    { key: 'm-unit',        label: 'Unit',        types: ['measurement'], detect: () => false },
+    { key: 'm-type',        label: 'Type',        types: ['measurement'], detect: i => !!i.measType },
+    { key: 'm-method',      label: 'Method',      types: ['measurement'], detect: i => (i.measMethods?.length ?? 0) > 0 },
+    { key: 'm-unit',        label: 'Unit',        types: ['measurement'], detect: i => !!i.measUnit },
     { key: 'm-range1-min',  label: 'Range 1 Min', types: ['measurement'], detect: i => !!i.measRanges?.[0]?.min },
     { key: 'm-range1-max',  label: 'Range 1 Max', types: ['measurement'], detect: i => !!i.measRanges?.[0]?.max },
     { key: 'm-range2-min',  label: 'Range 2 Min', types: ['measurement'], detect: i => !!i.measRanges?.[1]?.min },
     { key: 'm-range2-max',  label: 'Range 2 Max', types: ['measurement'], detect: i => !!i.measRanges?.[1]?.max },
     { key: 'm-range3-min',  label: 'Range 3 Min', types: ['measurement'], detect: i => !!i.measRanges?.[2]?.min },
     { key: 'm-range3-max',  label: 'Range 3 Max', types: ['measurement'], detect: i => !!i.measRanges?.[2]?.max },
-    { key: 'm-sensor-name', label: 'Sensor name', types: ['measurement'], detect: () => false },
+    { key: 'm-sensor-name', label: 'Sensor name', types: ['measurement'], detect: i => !!i.measSensorId },
   ]},
   { group: 'MC — Multiple Choice', cols: [
-    { key: 'mc-multi-select', label: 'Multi-select', types: ['mc'], detect: () => false },
+    { key: 'mc-multi-select', label: 'Multi-select', types: ['mc'], detect: i => !!i.mcMultiSelect },
     { key: 'mc-show-inline',  label: 'Show inline',  types: ['mc'], detect: i => !!i.mcShowInline },
   ]},
   { group: 'CA — Corrective Action', cols: [
@@ -3193,6 +3194,80 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
               ) : (
                 <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
               )}
+            </td>
+          );
+        }
+        if (col.key === 'm-saved-value') {
+          const on = !!item.savedValue;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
+            </td>
+          );
+        }
+        if (col.key === 'm-type') {
+          const MEAS_LABELS: Record<string, string> = { temperature: 'Temperature', weight: 'Weight', ph: 'pH', other: 'Other' };
+          const label = MEAS_LABELS[item.measType ?? ''] ?? item.measType ?? '';
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {label ? <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>{label}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+            </td>
+          );
+        }
+        if (col.key === 'm-unit') {
+          const u = item.measUnit ?? '';
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {u ? <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>{u}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+            </td>
+          );
+        }
+        if (col.key === 'm-method') {
+          const methods = item.measMethods ?? [];
+          if (methods.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const label = methods.length === 1 ? methods[0] : `${methods.length} methods`;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              <span title={methods.join(', ')} style={{ fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: T.surface0, color: T.textSecondary, display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                {label}
+              </span>
+            </td>
+          );
+        }
+        if (col.key === 'm-sensor-name') {
+          const sensor = MOCK_SENSORS.find(s => s.id === item.measSensorId);
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              {sensor ? <span title={sensor.name} style={{ fontSize: 11, fontWeight: 500, color: T.textSecondary, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sensor.name}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+            </td>
+          );
+        }
+        if (col.key.startsWith('m-range')) {
+          const match = col.key.match(/m-range(\d)-(min|max)/);
+          if (match) {
+            const idx = parseInt(match[1]) - 1;
+            const side = match[2] as 'min' | 'max';
+            const val = item.measRanges?.[idx]?.[side] ?? '';
+            return (
+              <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+                {val ? <span style={{ fontSize: 12, fontWeight: 500, color: T.textPrimary }}>{val}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+              </td>
+            );
+          }
+        }
+        if (col.key === 'mc-multi-select') {
+          const on = !!item.mcMultiSelect;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
+            </td>
+          );
+        }
+        if (col.key === 'mc-show-inline') {
+          const on = !!item.mcShowInline;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
         }
