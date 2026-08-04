@@ -1,5 +1,5 @@
 import styled from '@emotion/styled';
-import colors from '@joltup/colors';
+const colors = { white: { white: '#ffffff' }, grey: { 200: '#eeeeee', 300: '#e0e0e0', 400: '#bdbdbd', 900: '#212121' } };
 import { Icon } from '@/components/shared/Icon';
 import { mdiMenuChunky, mdiChevronDown } from '@/icons/mdi';
 import { SHELL_HEX } from '@/theme/shellHex';

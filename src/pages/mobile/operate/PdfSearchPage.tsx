@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import styled from '@emotion/styled';
-import colors from '@joltup/colors';
+const colors = { white: { white: '#ffffff' }, grey: { 50: '#fafafa', 100: '#f5f5f5', 200: '#eeeeee', 300: '#e0e0e0' }, blue: { 800: '#1565c0' }, green: { 400: '#66bb6a' } };
 import { Icon } from '@/components/shared/Icon';
 import {
   mdiChevronDown,
