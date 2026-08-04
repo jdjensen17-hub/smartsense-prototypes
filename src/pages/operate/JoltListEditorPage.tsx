@@ -3721,19 +3721,22 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
         <thead style={{ position: 'sticky', top: 0, zIndex: 11 }}>
           {/* Group header row */}
           {(() => {
-            const CA_KEYS = new Set(['ca-turn-on','ca-turn-on-na','ca-list','ca-list-na','ca-trigger-yn','ca-planned','ca-optional','ca-repeat']);
-            // Build segments: runs of CA vs non-CA cols
-            const segments: { ca: boolean; count: number }[] = [];
+            const colGroup = new Map<string, string>();
+            for (const g of COLUMN_GROUPS) for (const c of g.cols) colGroup.set(c.key, g.group);
+            const segments: { group: string; count: number }[] = [];
             for (const col of activeCols) {
-              const ca = CA_KEYS.has(col.key);
-              if (segments.length && segments[segments.length - 1].ca === ca) segments[segments.length - 1].count++;
-              else segments.push({ ca, count: 1 });
+              const group = colGroup.get(col.key) ?? 'All';
+              if (segments.length && segments[segments.length - 1].group === group) segments[segments.length - 1].count++;
+              else segments.push({ group, count: 1 });
             }
-            const hasCaGroup = activeCols.some(c => CA_KEYS.has(c.key));
-            if (!hasCaGroup) return null;
+            const GROUP_LABEL: Record<string, string> = {
+              'All': 'General', 'Y/N': 'Y/N', 'M — Measurement': 'Measurement',
+              'MC — Multiple Choice': 'Multiple Choice', 'CA — Corrective Action': 'Corrective Action',
+              'Rating': 'Rating', 'Photo': 'Photo', 'Employee': 'Employee',
+              'QR / Barcode': 'QR / Barcode', 'Formula': 'Formula', 'Asset': 'Asset', 'Sublist': 'Sublist',
+            };
             return (
               <tr style={{ background: T.surface1, height: 20 }}>
-                {/* Sticky frozen cols */}
                 <th style={{ ...stickyHead(S.drag, { width: 28, padding: 0 }) }} />
                 <th style={{ ...stickyHead(S.checkbox, { width: 30, padding: 0 }) }} />
                 <th style={{ ...stickyHead(S.stripe, { width: 4, padding: 0 }) }} />
@@ -3742,19 +3745,22 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
                 </th>
                 <th style={{ width: 32, padding: 0 }} />
                 <th style={{ width: 100, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
-                {segments.map((seg, i) => (
-                  <th key={i} colSpan={seg.count} style={{
-                    padding: '0 8px', textAlign: 'center', fontSize: 9, fontWeight: 700,
-                    letterSpacing: '0.07em', textTransform: 'uppercase',
-                    background: seg.ca ? '#E3EEF7' : T.surface1,
-                    color: seg.ca ? T.textAccent : 'transparent',
-                    borderLeft: seg.ca ? `0.5px solid ${T.borderAccent}` : 'none',
-                    borderRight: seg.ca ? `0.5px solid ${T.borderAccent}` : 'none',
-                    borderBottom: seg.ca ? `0.5px solid ${T.borderAccent}` : `0.5px solid ${T.borderStrong}`,
-                  }}>
-                    {seg.ca ? 'Corrective Action' : ''}
-                  </th>
-                ))}
+                {segments.map((seg, i) => {
+                  const isCA = seg.group === 'CA — Corrective Action';
+                  return (
+                    <th key={i} colSpan={seg.count} style={{
+                      padding: '0 8px', textAlign: 'center', fontSize: 9, fontWeight: 700,
+                      letterSpacing: '0.07em', textTransform: 'uppercase',
+                      background: isCA ? '#E3EEF7' : T.surface1,
+                      color: isCA ? T.textAccent : T.textMuted,
+                      borderLeft: `0.5px solid ${isCA ? T.borderAccent : T.border}`,
+                      borderRight: `0.5px solid ${isCA ? T.borderAccent : T.border}`,
+                      borderBottom: `0.5px solid ${isCA ? T.borderAccent : T.borderStrong}`,
+                    }}>
+                      {GROUP_LABEL[seg.group] ?? seg.group}
+                    </th>
+                  );
+                })}
                 <th style={{ width: 32, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
               </tr>
             );
