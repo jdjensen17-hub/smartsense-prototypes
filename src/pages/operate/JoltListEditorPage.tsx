@@ -3798,6 +3798,7 @@ interface ItemsTableProps {
 function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, caToastId, onCaToast }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
+  const [promptWidth, setPromptWidth] = useState(300);
   // Cumulative left offsets for sticky columns: drag=0, checkbox=28, stripe=58, prompt=62, type=62+promptWidth
   const S = { drag: 0, checkbox: 28, stripe: 58, prompt: 62, type: 62 + promptWidth };
   const stickyHead = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
@@ -3806,7 +3807,6 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
   // When optional cols are active, pin the prompt at promptWidth and let the table grow past the
   // container so horizontal scrolling kicks in. Without cols, fill the container normally.
   const hasCols = activeCols.length > 0;
-  const [promptWidth, setPromptWidth] = useState(300);
   const resizingRef = useRef<{ startX: number; startW: number } | null>(null);
   const onResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
