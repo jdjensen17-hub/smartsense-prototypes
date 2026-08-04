@@ -3115,6 +3115,26 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
             </td>
           );
         }
+        if (col.key === 'ca-trigger-ranges') {
+          const rules = item.caForRangeRules ?? [];
+          if (rules.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                {rules.map(r => {
+                  const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
+                  const label = `R${rangeIdx + 1} ${r.condition ?? ''}`;
+                  const isInside = r.condition === 'Inside';
+                  return (
+                    <span key={r.id} style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: isInside ? '#E8F5E9' : '#FFF3E0', color: isInside ? '#388E3C' : '#E65100' }}>
+                      {label}
+                    </span>
+                  );
+                })}
+              </div>
+            </td>
+          );
+        }
         if (col.key === 'ca-list' || col.key === 'ca-list-na') {
           const listId = col.key === 'ca-list'
             ? (item.caForYNRules?.find(r => r.caList)?.caList ?? '')
@@ -3247,10 +3267,17 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           if (match) {
             const idx = parseInt(match[1]) - 1;
             const side = match[2] as 'min' | 'max';
+            const rangeExists = (item.measRanges?.length ?? 0) > idx;
             const val = item.measRanges?.[idx]?.[side] ?? '';
+            const openLabel = side === 'min' ? 'Min' : 'Max';
             return (
               <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-                {val ? <span style={{ fontSize: 12, fontWeight: 500, color: T.textPrimary }}>{val}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+                {!rangeExists
+                  ? <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+                  : val
+                    ? <span style={{ fontSize: 12, fontWeight: 500, color: T.textPrimary }}>{val}</span>
+                    : <span style={{ fontSize: 11, fontWeight: 500, color: T.textMuted, fontStyle: 'italic' }}>{openLabel}</span>
+                }
               </td>
             );
           }
