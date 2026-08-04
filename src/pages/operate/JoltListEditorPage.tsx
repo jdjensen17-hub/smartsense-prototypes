@@ -2855,6 +2855,7 @@ interface RowProps {
   dcColors: Record<string, string>;
   kebabOpenId: string | null;
   shownCols: Set<string>;
+  promptWidth: number;
   colValues: Record<string, Record<string, string>>;
   onColChange: (itemId: string, colKey: string, value: string | null) => void;
   onUpdate: (id: string, patch: Partial<ListItem>) => void;
@@ -2875,7 +2876,7 @@ const isYNCaUnconfigured = (item: ListItem) =>
 const isNACaUnconfigured = (item: ListItem) =>
   !!item.caForNA && !item.caForNAList && !item.caForNAAdHoc;
 
-function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, caToastId, onCaToast }: RowProps) {
+function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, caToastId, onCaToast }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
@@ -2924,7 +2925,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         <div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} />
       </td>
       {/* Prompt */}
-      <td style={sticky(62, { padding: 0, width: activeCols.length > 0 ? 300 : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
+      <td style={sticky(62, { padding: 0, width: activeCols.length > 0 ? promptWidth : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, background: T.borderStrong, zIndex: 2 }} />
         <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 6, cursor: dcMode ? 'pointer' : 'default', overflow: 'hidden', width: '100%' }}>
           {isChild && <span style={{ fontSize: 12, color: T.textMuted, flexShrink: 0 }}>↳</span>}
@@ -2946,8 +2947,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           )}
         </div>
       </td>
-      {/* Type icon */}
-      <td style={{ width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+      {/* Type icon — sticky just past the prompt */}
+      <td style={sticky(62 + promptWidth, { width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.borderStrong}`, textAlign: 'center' })}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 44 }}>
           <i className={`ti ${meta.icon}`} style={{ fontSize: 15, color: T.textMuted }} title={meta.label} />
         </div>
@@ -3385,8 +3386,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           </td>
         );
       })}
-      {/* Kebab */}
-      <td style={{ width: 32, padding: '0 4px', position: 'relative', borderLeft: hovered || isActive ? `0.5px solid ${T.border}` : '0.5px solid transparent' }}>
+      {/* Kebab — sticky right */}
+      <td style={{ width: 32, padding: '0 4px', position: 'sticky', right: 0, zIndex: 1, background: stickyBg, borderLeft: hovered || isActive ? `0.5px solid ${T.border}` : `0.5px solid ${stickyBg}` }}>
         <button onClick={(e) => { e.stopPropagation(); onKebab(item.id); }} style={{ width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: T.textSecondary, border: 'none', background: 'none', cursor: 'pointer', opacity: hovered || isActive || kebabOpenId === item.id ? 1 : 0, margin: 'auto' }}>
           <i className="ti ti-dots-vertical" />
         </button>
@@ -3797,8 +3798,8 @@ interface ItemsTableProps {
 function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, caToastId, onCaToast }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
-  // Cumulative left offsets for sticky columns: drag=0, checkbox=28, stripe=58, prompt=62
-  const S = { drag: 0, checkbox: 28, stripe: 58, prompt: 62 };
+  // Cumulative left offsets for sticky columns: drag=0, checkbox=28, stripe=58, prompt=62, type=62+promptWidth
+  const S = { drag: 0, checkbox: 28, stripe: 58, prompt: 62, type: 62 + promptWidth };
   const stickyHead = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
     position: 'sticky', left, zIndex: 12, background: T.surface1, ...extra,
   });
@@ -3861,7 +3862,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
                 <th style={{ ...stickyHead(S.prompt, { padding: 0 }) }}>
                   <div style={{ position: 'absolute', top: 0, right: 0, width: 1, height: '100%', background: T.borderStrong, zIndex: 1 }} />
                 </th>
-                <th style={{ width: 32, padding: 0 }} />
+                <th style={{ ...stickyHead(S.type, { width: 32, padding: 0, borderLeft: `0.5px solid ${T.borderStrong}`, borderBottom: `0.5px solid ${T.borderStrong}` }) }} />
                 <th style={{ width: 100, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
                 {segments.map((seg, i) => {
                   const bg = i % 2 === 0 ? T.surface1 : T.surface0;
@@ -3878,7 +3879,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
                     </th>
                   );
                 })}
-                <th style={{ width: 32, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
+                <th style={{ position: 'sticky', right: 0, zIndex: 12, background: T.surface1, width: 32, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
               </tr>
             );
           })()}
@@ -3898,7 +3899,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               </div>
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }} />
             </th>
-            <th style={{ width: 32 }} />
+            <th style={stickyHead(S.type, { width: 32, borderLeft: `0.5px solid ${T.borderStrong}` })} />
             <th style={{ width: 100, padding: '5px 8px', borderLeft: `0.5px solid ${T.border}`, borderTop: `0.5px solid ${T.border}`, fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', verticalAlign: 'middle' }}>Config</th>
             {activeCols.map(col => (
               <th key={col.key} style={{
@@ -3912,7 +3913,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
                 {col.label}
               </th>
             ))}
-            <th style={{ width: 32 }} />
+            <th style={{ position: 'sticky', right: 0, zIndex: 12, background: T.surface1, width: 32 }} />
           </tr>
         </thead>
       )}
@@ -3939,7 +3940,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} caToastId={caToastId} onCaToast={onCaToast} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} caToastId={caToastId} onCaToast={onCaToast} />
           )
         ))}
       </tbody>
