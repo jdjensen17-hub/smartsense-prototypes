@@ -3746,16 +3746,15 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
                 <th style={{ width: 32, padding: 0 }} />
                 <th style={{ width: 100, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
                 {segments.map((seg, i) => {
-                  const isCA = seg.group === 'CA — Corrective Action';
+                  const bg = i % 2 === 0 ? T.surface1 : T.surface0;
                   return (
                     <th key={i} colSpan={seg.count} style={{
                       padding: '0 8px', textAlign: 'center', fontSize: 9, fontWeight: 700,
                       letterSpacing: '0.07em', textTransform: 'uppercase',
-                      background: isCA ? '#E3EEF7' : T.surface1,
-                      color: isCA ? T.textAccent : T.textMuted,
-                      borderLeft: `0.5px solid ${isCA ? T.borderAccent : T.border}`,
-                      borderRight: `0.5px solid ${isCA ? T.borderAccent : T.border}`,
-                      borderBottom: `0.5px solid ${isCA ? T.borderAccent : T.borderStrong}`,
+                      background: bg, color: T.textMuted,
+                      borderLeft: `0.5px solid ${T.borderStrong}`,
+                      borderRight: `0.5px solid ${T.borderStrong}`,
+                      borderBottom: `0.5px solid ${T.borderStrong}`,
                     }}>
                       {GROUP_LABEL[seg.group] ?? seg.group}
                     </th>
