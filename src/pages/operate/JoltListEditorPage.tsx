@@ -2597,6 +2597,29 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
     { key: 'ca-optional',      label: 'Optional',                                           detect: i => (i.caForYNRules?.some(r => !!r.optional) ?? false) || !!i.caForNAOptional },
     { key: 'ca-repeat',        label: 'Repeat',                                             detect: i => (i.caForYNRules?.length ?? 0) > 0 || !!i.caForNA },
   ]},
+  { group: 'Rating', cols: [
+    { key: 'rating-range', label: 'Range', types: ['rating'], detect: i => i.ratingMin != null || i.ratingMax != null },
+  ]},
+  { group: 'Photo', cols: [
+    { key: 'photo-allow-upload', label: 'Allow Upload', types: ['photo'], detect: i => !!i.photoAllowUpload },
+  ]},
+  { group: 'Employee', cols: [
+    { key: 'employee-roles', label: 'Role Filter', types: ['employee'], detect: i => (i.employeeRoles?.length ?? 0) > 0 },
+  ]},
+  { group: 'QR / Barcode', cols: [
+    { key: 'qr-target',      label: 'QR Target',      types: ['qr'],      detect: i => !!i.qrTarget },
+    { key: 'barcode-target', label: 'Barcode Target',  types: ['barcode'], detect: i => !!i.barcodeTarget },
+  ]},
+  { group: 'Formula', cols: [
+    { key: 'formula-type', label: 'Formula Type', types: ['formula'], detect: i => !!i.formulaType },
+  ]},
+  { group: 'Asset', cols: [
+    { key: 'asset-type',        label: 'Asset Type',     types: ['asset'], detect: i => !!i.assetType },
+    { key: 'asset-filter-user', label: 'Filter by User', types: ['asset'], detect: i => !!i.assetFilterByUser },
+  ]},
+  { group: 'Sublist', cols: [
+    { key: 'sublist-target', label: 'Linked List', types: ['sublist'], detect: i => !!i.sublistTarget },
+  ]},
 ];
 
 const ALL_COLS = COLUMN_GROUPS.flatMap(g => g.cols);
@@ -3170,6 +3193,87 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
               ) : (
                 <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
               )}
+            </td>
+          );
+        }
+        if (col.key === 'rating-range') {
+          const min = item.ratingMin ?? 1;
+          const max = item.ratingMax ?? 5;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
+                {min} – {max}
+              </span>
+            </td>
+          );
+        }
+        if (col.key === 'photo-allow-upload') {
+          const on = !!item.photoAllowUpload;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
+            </td>
+          );
+        }
+        if (col.key === 'employee-roles') {
+          const roles = item.employeeRoles ?? [];
+          if (roles.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
+                {roles.length === 1 ? roles[0] : `${roles.length} roles`}
+              </span>
+            </td>
+          );
+        }
+        if (col.key === 'qr-target' || col.key === 'barcode-target') {
+          const val = col.key === 'qr-target' ? item.qrTarget : item.barcodeTarget;
+          if (!val) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              <span title={val} style={{ fontSize: 11, fontWeight: 500, color: T.textSecondary, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                {val}
+              </span>
+            </td>
+          );
+        }
+        if (col.key === 'formula-type') {
+          const t = item.formulaType ?? 'number';
+          const label = t === 'number' ? 'Number' : t === 'date' ? 'Date' : 'Text';
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>
+                {label}
+              </span>
+            </td>
+          );
+        }
+        if (col.key === 'asset-type') {
+          const t = item.assetType ?? 'Inspection Type';
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>
+                {t}
+              </span>
+            </td>
+          );
+        }
+        if (col.key === 'asset-filter-user') {
+          const on = !!item.assetFilterByUser;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
+            </td>
+          );
+        }
+        if (col.key === 'sublist-target') {
+          const listName = CA_LISTS.find(l => l.id === item.sublistTarget)?.title ?? '';
+          if (!listName) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              <span title={listName} style={{ fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                {listName}
+              </span>
             </td>
           );
         }
