@@ -3431,7 +3431,7 @@ export default function JoltListEditorPage() {
   };
   const [shownCols, setShownCols] = useState<Set<string>>(new Set([
     'all-mark-as', 'all-color', 'all-info-library', 'all-points', 'all-print-label',
-    'yn-score-y', 'yn-score-n', 'yn-auto-complete',
+    'yn-score-y', 'yn-score-n',
   ]));
   const effectiveShownCols = React.useMemo(() => {
     if (scoringOn) return shownCols;
