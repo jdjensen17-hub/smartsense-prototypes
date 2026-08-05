@@ -225,6 +225,28 @@ function indColor(ind: string) {
   return T.textMuted;
 }
 
+function Tooltip({ children, text }: { children: React.ReactNode; text: string }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      {children}
+      {visible && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)',
+          background: '#1C1C1E', color: '#fff', fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+          padding: '5px 9px', borderRadius: 6, whiteSpace: 'pre', zIndex: 9999,
+          pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function dcCondLabel(cond?: DCCondition) {
   if (!cond) return '';
   if (cond.type === 'yn') return `if ${cond.value}`;
@@ -2555,6 +2577,8 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
     { key: 'yn-score-y',       label: 'Score - Y',     types: ['yn'], detect: i => i.scoreYes != null },
     { key: 'yn-score-n',       label: 'Score - N',     types: ['yn'], detect: i => i.scoreNo != null },
     { key: 'yn-auto-complete', label: 'Auto Complete', types: ['yn'], detect: i => !!i.autoComplete },
+    { key: 'yn-flags-yes',     label: 'Flags - Yes',   types: ['yn'], detect: i => (i.flagsForYes?.length ?? 0) > 0 },
+    { key: 'yn-flags-no',      label: 'Flags - No',    types: ['yn'], detect: i => (i.flagsForNo?.length ?? 0) > 0 },
   ]},
   { group: 'M — Measurement', cols: [
     { key: 'm-saved-value', label: 'Saved Value', types: ['measurement'], detect: i => !!i.savedValue },
@@ -2568,6 +2592,12 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
     { key: 'm-range3-min',  label: 'Range 3 Min', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 },
     { key: 'm-range3-max',  label: 'Range 3 Max', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 },
     { key: 'm-sensor-name', label: 'Sensor name', types: ['measurement'], detect: i => !!i.measSensorId },
+    { key: 'm-flag-r1',    label: 'Flag - R1',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[0]?.id) ?? false) },
+    { key: 'm-color-r1',   label: 'Color - R1',  types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[0]?.id) ?? false) },
+    { key: 'm-flag-r2',    label: 'Flag - R2',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[1]?.id) ?? false) },
+    { key: 'm-color-r2',   label: 'Color - R2',  types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[1]?.id) ?? false) },
+    { key: 'm-flag-r3',    label: 'Flag - R3',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[2]?.id) ?? false) },
+    { key: 'm-color-r3',   label: 'Color - R3',  types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[2]?.id) ?? false) },
   ]},
   { group: 'MC — Multiple Choice', cols: [
     { key: 'mc-multi-select', label: 'Multi-select', types: ['mc'], detect: i => !!i.mcMultiSelect },
@@ -2851,6 +2881,7 @@ interface RowProps {
   onKebabClose: () => void;
   onKebabAction: (action: string, id: string) => void;
   onDCClick: (id: string) => void;
+  flags: Flag[];
   caToastId: string | null;
   onCaToast: (key: string | null) => void;
 }
@@ -2862,7 +2893,7 @@ const isYNCaUnconfigured = (item: ListItem) =>
 const isNACaUnconfigured = (item: ListItem) =>
   !!item.caForNA && !item.caForNAList && !item.caForNAAdHoc;
 
-function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, caToastId, onCaToast }: RowProps) {
+function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, flags, caToastId, onCaToast }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
@@ -2875,8 +2906,15 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
   const isTypeDimmed = dcMode && dcLinkingId && !isEligibleParent && !isLinkingChild;
 
   const derivedInds: { icon: string; title: string }[] = [
-    ...((item.flagsForYes?.length ?? 0) > 0 || (item.flagsForNo?.length ?? 0) > 0 ? [{ icon: 'ti-flag', title: 'Flags configured' }] : []),
-    ...((item.infoInline || (item as any).infoFile) ? [{ icon: 'ti-info-circle', title: 'Info Library configured' }] : []),
+    ...(() => {
+      const yesIds = item.flagsForYes ?? [];
+      const noIds = item.flagsForNo ?? [];
+      if (yesIds.length === 0 && noIds.length === 0) return [];
+      const toName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; };
+      const lines = [...(yesIds.length > 0 ? [`Yes: ${yesIds.map(toName).join(', ')}`] : []), ...(noIds.length > 0 ? [`No: ${noIds.map(toName).join(', ')}`] : [])];
+      return [{ icon: 'ti-flag', title: lines.join('\n') }];
+    })(),
+    ...((item.infoInline || item.infoFile) ? [{ icon: 'ti-info-circle', title: item.infoFile ?? 'Info Library configured' }] : []),
     ...((item.caForYNRules?.length ?? 0) > 0 || item.caForNA ? [{ icon: 'ti-alert-triangle', title: 'Corrective Action configured' }] : []),
     ...(!!item.dcParentId || items.some(x => x.dcParentId === item.id) ? [{ icon: 'ti-filter', title: 'Display Criteria configured' }] : []),
   ];
@@ -2943,7 +2981,11 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       {/* Config indicators */}
       <td style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, height: 44 }}>
-          {derivedInds.map(ind => <i key={ind.icon} className={`ti ${ind.icon}`} style={{ fontSize: 13, color: indColor(ind.icon) }} title={ind.title} />)}
+          {derivedInds.map(ind => (
+            <Tooltip key={ind.icon} text={ind.title}>
+              <i className={`ti ${ind.icon}`} style={{ fontSize: 13, color: indColor(ind.icon) }} />
+            </Tooltip>
+          ))}
         </div>
       </td>
       {/* Optional columns */}
@@ -3155,6 +3197,20 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
             </td>
           );
         }
+        if (col.key === 'yn-flags-yes' || col.key === 'yn-flags-no') {
+          const ids = col.key === 'yn-flags-yes' ? (item.flagsForYes ?? []) : (item.flagsForNo ?? []);
+          const names = ids.map(id => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; });
+          return (
+            <td key={col.key} style={{ width: 120, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+              {names.length === 0
+                ? <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+                : names.length === 1
+                  ? <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }} title={names[0]}>{names[0]}</span>
+                  : <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, cursor: 'default' }} title={names.join('\n')}>{names.length} flags</span>
+              }
+            </td>
+          );
+        }
         if (col.key === 'all-print-label') {
           const count = item.labelIds?.length ?? 0;
           return (
@@ -3268,6 +3324,36 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
                 }
               </td>
             );
+          }
+        }
+        if (col.key.startsWith('m-flag-r') || col.key.startsWith('m-color-r')) {
+          const match = col.key.match(/m-(flag|color)-r(\d)/);
+          if (match) {
+            const kind = match[1] as 'flag' | 'color';
+            const idx = parseInt(match[2]) - 1;
+            const range = item.measRanges?.[idx];
+            const rule = range ? (item.measFlagRules ?? []).find(r => r.rangeId === range.id) : undefined;
+            const rangeLabel = range ? `R${idx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : '';
+            if (kind === 'flag') {
+              const f = rule?.flagId ? flags.find(x => x.id === rule.flagId) : undefined;
+              const name = f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : '';
+              return (
+                <td key={col.key} style={{ width: 120, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+                  {name
+                    ? <Tooltip text={`${name}\n${rangeLabel}`}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{name}</span></Tooltip>
+                    : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+                </td>
+              );
+            } else {
+              const color = rule?.recordColor;
+              return (
+                <td key={col.key} style={{ width: 80, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+                  {color
+                    ? <Tooltip text={rangeLabel}><span style={{ display: 'inline-block', width: 18, height: 18, borderRadius: 4, background: color, border: `0.5px solid ${T.borderStrong}`, verticalAlign: 'middle' }} /></Tooltip>
+                    : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+                </td>
+              );
+            }
           }
         }
         if (col.key === 'mc-multi-select') {
@@ -3720,7 +3806,7 @@ export default function JoltListEditorPage() {
                       onDCClick={handleDCClick}
                       onEditChange={setEditingPrompt}
                       onEditCommit={commitEdit}
-                      caToastId={caToastId} onCaToast={setCaToastId}
+                      flags={flags} caToastId={caToastId} onCaToast={setCaToastId}
                     />
                   </div>
                   <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onCancel={() => setDcConditionState(null)} />
@@ -3735,7 +3821,7 @@ export default function JoltListEditorPage() {
                   onDCClick={handleDCClick}
                   onEditChange={setEditingPrompt}
                   onEditCommit={commitEdit}
-                  caToastId={caToastId} onCaToast={setCaToastId}
+                  flags={flags} caToastId={caToastId} onCaToast={setCaToastId}
                 />
               )}
             </div>
@@ -3778,11 +3864,12 @@ interface ItemsTableProps {
   onDCClick: (id: string) => void;
   onEditChange: (v: string) => void;
   onEditCommit: () => void;
+  flags: Flag[];
   caToastId: string | null;
   onCaToast: (key: string | null) => void;
 }
 
-function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, caToastId, onCaToast }: ItemsTableProps) {
+function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, flags, caToastId, onCaToast }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
   const [promptWidth, setPromptWidth] = useState(300);
@@ -3927,7 +4014,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} caToastId={caToastId} onCaToast={onCaToast} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} flags={flags} caToastId={caToastId} onCaToast={onCaToast} />
           )
         ))}
       </tbody>
