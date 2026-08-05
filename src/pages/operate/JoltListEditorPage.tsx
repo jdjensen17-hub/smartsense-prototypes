@@ -2885,7 +2885,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
     ...(!!item.dcParentId || items.some(x => x.dcParentId === item.id) ? [{ icon: 'ti-filter', title: 'Display Criteria configured' }] : []),
   ];
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
-  const stickyBg = isActive || isLinkingChild ? T.bgAccent : T.surface2;
+  const rowBg = isActive || isLinkingChild ? T.bgAccent : hovered ? T.surface1 : T.surface2;
+  const stickyBg = rowBg;
   const sticky = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
     position: 'sticky', left, zIndex: 1, background: stickyBg, ...extra,
   });
@@ -2893,7 +2894,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
   return (
     <tr style={{
       height: 44, borderBottom: `0.5px solid ${T.border}`,
-      background: isActive ? T.bgAccent : isLinkingChild ? T.bgAccent : T.surface2,
+      background: rowBg,
       opacity: isCut ? 0.4 : isTypeDimmed ? 0.28 : 1,
       position: 'relative',
     }}
