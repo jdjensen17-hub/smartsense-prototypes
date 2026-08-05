@@ -2085,7 +2085,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           <PromptEditor item={item} onUpdate={upd} />
         </SsSection>
         {/* General options */}
-        <SsSection label="General Options" defaultOpen={!!(markAs || item.points || (item.labelIds?.length ?? 0) > 0 || item.stripe || item.infoInline || item.infoFile)}>
+        <SsSection label="General Options" defaultOpen={true}>
           {item.type !== 'text' && item.type !== 'employee' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
