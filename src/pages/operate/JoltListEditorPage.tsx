@@ -1623,7 +1623,14 @@ function MeasurementSection({ item, onUpdate }: { item: ListItem; onUpdate: (u: 
   };
 
   return (
-    <SsSection label="Measurement Options" defaultOpen={!!(item.measType || item.measUnit || (item.measRanges?.length ?? 0) > 0)}>
+    <SsSection label="Measurement Options" defaultOpen>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, color: T.textPrimary }}>Saved value</div>
+          <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4 }}>Pre-fills with the last recorded value on new list instances</div>
+        </div>
+        <Toggle on={!!item.savedValue} onChange={v => onUpdate({ savedValue: v })} />
+      </div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'flex-end' }}>
         <div>
           <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Measurement Type</div>
@@ -2086,7 +2093,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         </SsSection>
         {/* General options */}
         <SsSection label="General Options" defaultOpen={true}>
-          {item.type !== 'text' && item.type !== 'employee' && (
+          {item.type !== 'text' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -2107,44 +2114,11 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
               </div>
             </div>
           )}
-          {item.type !== 'text' && item.type !== 'employee' && (
+          {item.type !== 'text' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Points</div>
               <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
               <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Employees get points by completing items or half points if late.</div>
-            </div>
-          )}
-          {item.type === 'measurement' && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontSize: 13, color: T.textPrimary }}>Saved value</div>
-                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4 }}>Pre-fills with the last recorded value on new list instances</div>
-                </div>
-                <Toggle on={!!item.savedValue} onChange={v => upd({ savedValue: v })} />
-              </div>
-            </div>
-          )}
-          {item.type === 'photo' && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 13, color: T.textPrimary }}>Allow images to be uploaded from device</div>
-                <Toggle on={!!item.photoAllowUpload} onChange={v => upd({ photoAllowUpload: v })} />
-              </div>
-            </div>
-          )}
-          {item.type === 'employee' && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Filter by role</div>
-              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Only show employees with these roles — empty means all roles</div>
-              <TagPicker options={EMPLOYEE_ROLES} selected={item.employeeRoles ?? []} onChange={roles => upd({ employeeRoles: roles.length ? roles : undefined })} placeholder="Add role…" />
-            </div>
-          )}
-          {item.type === 'sublist' && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Linked list</div>
-              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Select the list that will be launched when this item is completed</div>
-              <CAListPicker value={item.sublistTarget ?? ''} onChange={v => upd({ sublistTarget: v })} />
             </div>
           )}
           <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 10 }}>
@@ -2204,6 +2178,28 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         {(item.type === 'qr' || item.type === 'barcode') && <CodeSection item={item} onUpdate={upd} />}
         {item.type === 'asset' && <AssetSection item={item} onUpdate={upd} />}
         {item.type === 'formula' && <FormulaSection item={item} items={items} onUpdate={upd} />}
+        {item.type === 'sublist' && (
+          <SsSection label="Sublist Options" defaultOpen>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Linked list</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Select the list that will be launched when this item is completed</div>
+            <CAListPicker value={item.sublistTarget ?? ''} onChange={v => upd({ sublistTarget: v })} />
+          </SsSection>
+        )}
+        {item.type === 'photo' && (
+          <SsSection label="Photo Options" defaultOpen>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, color: T.textPrimary }}>Allow images to be uploaded from device</div>
+              <Toggle on={!!item.photoAllowUpload} onChange={v => upd({ photoAllowUpload: v })} />
+            </div>
+          </SsSection>
+        )}
+        {item.type === 'employee' && (
+          <SsSection label="Employee Options" defaultOpen>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 4 }}>Filter by role</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>Only show employees with these roles — empty means all roles</div>
+            <TagPicker options={EMPLOYEE_ROLES} selected={item.employeeRoles ?? []} onChange={roles => upd({ employeeRoles: roles.length ? roles : undefined })} placeholder="Add role…" />
+          </SsSection>
+        )}
         {/* Tags — always last */}
         <SsSection label="Tags" defaultOpen={!!(item.locationTags?.length || item.scoreGroup || item.importance)}>
           {/* Location — searchable multi-select */}
