@@ -188,39 +188,28 @@ function mkCodeTarget() { return Math.random().toString(36).slice(2, 10).toUpper
 
 // ── Initial sample data ───────────────────────────────────────────────────
 const INITIAL_ITEMS: ListItem[] = [
-  { id: 'section-opening', prompt: 'Opening Tasks', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', inds: [], allowNA: false, flagsForYes: [], flagsForNo: [], caForYNRules: [], scoreYes: 1, scoreNo: 0 },
-  { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', inds: ['ti-filter'], allowNA: true, dcParentId: 'cooler-ok', dcCondition: { type: 'yn', value: 'No' } },
-  { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', inds: [], allowNA: false },
-  { id: 'section-food-safety', prompt: 'Food Safety', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'prep-temp', prompt: 'Record prep cooler temp °F', type: 'measurement', stripe: '#C1E1C5', inds: [], allowNA: true, measType: 'temperature', measUnit: 'F', measMethods: ['Manual Input'], measRanges: [{ id: 'r1', min: '32', max: '40' }] },
-  { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', inds: ['ti-filter'], allowNA: false, dcParentId: 'prep-temp', dcCondition: { type: 'measurement', op: '>=', value: 41 } },
-  { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', inds: [], allowNA: false },
-  { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', inds: [], allowNA: false, scoreYes: 1, scoreNo: 0 },
-  { id: 'gloves-worn', prompt: 'All food handlers wearing gloves?', type: 'yn', stripe: '#FFF176', inds: [], allowNA: false, points: 5, infoInline: true, labelIds: ['l6'], scoreYes: 1, scoreNo: 0 },
-  { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', inds: [], allowNA: false, choices: [
-    { id: 'c1', label: 'Sysco', color: '#4CAF50', icon: null },
-    { id: 'c2', label: 'US Foods', color: '#2196F3', icon: null },
-    { id: 'c3', label: 'Performance Food Group', color: '#FF9800', icon: null },
-  ]},
-  { id: 'mc-blank', prompt: 'New multiple choice item', type: 'mc', stripe: '', inds: [], allowNA: false, choices: [] },
-  { id: 'section-read-only', prompt: 'Read Only', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'temp-guidelines', prompt: 'Temperature Guidelines', type: 'subtitle', stripe: '', inds: [], allowNA: false },
-  { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', inds: [], allowNA: false, ratingMin: 1, ratingMax: 5 },
-  { id: 'text-info', prompt: 'Read the food safety guidelines before proceeding', type: 'text', stripe: '', inds: [], allowNA: false },
-  { id: 'free-notes', prompt: 'Enter any additional notes', type: 'free', stripe: '', inds: [], allowNA: false },
-  { id: 'employee-select', prompt: 'Select responsible employee', type: 'employee', stripe: '', inds: [], allowNA: false },
-  { id: 'qr-scan', prompt: 'Scan equipment QR code', type: 'qr', stripe: '', inds: [], allowNA: false, qrTarget: 'EQ-140CD22' },
-  { id: 'barcode-scan', prompt: 'Scan product barcode', type: 'barcode', stripe: '', inds: [], allowNA: false, barcodeTarget: 'PROD-A4F9B1' },
-  { id: 'date-item', prompt: 'Enter inspection date', type: 'date', stripe: '', inds: [], allowNA: false },
-  { id: 'time-item', prompt: 'Enter inspection time', type: 'time', stripe: '', inds: [], allowNA: false },
-  { id: 'datetime-item', prompt: 'Enter inspection date and time', type: 'datetime', stripe: '', inds: [], allowNA: false },
-  { id: 'stopwatch-item', prompt: 'Time the handwashing procedure', type: 'stopwatch', stripe: '', inds: [], allowNA: false },
-  { id: 'sublist-item', prompt: 'Complete equipment maintenance checklist', type: 'sublist', stripe: '', inds: [], allowNA: false },
-  { id: 'number-item', prompt: 'Enter unit count', type: 'number', stripe: '', inds: [], allowNA: false },
-  { id: 'formula-item', prompt: 'Average cooler temp', type: 'formula', stripe: '', inds: [], allowNA: false, formulaType: 'number', formulaVars: [{ name: 'A', itemId: '' }], formulaExpr: '' },
-  { id: 'asset-item', prompt: 'Select asset to inspect', type: 'asset', stripe: '', inds: [], allowNA: false, assetType: 'Inspection Type' },
-  { id: 'email-item', prompt: 'Send inspection report', type: 'email', stripe: '', inds: [], allowNA: false },
+  { id: 'item-checkmark',  prompt: 'Checkmark item',          type: 'checkmark',   stripe: '', inds: [], allowNA: false },
+  { id: 'item-text',       prompt: 'Text item',               type: 'text',        stripe: '', inds: [], allowNA: false },
+  { id: 'item-mc',         prompt: 'Multiple choice item',    type: 'mc',          stripe: '', inds: [], allowNA: false, choices: [] },
+  { id: 'item-free',       prompt: 'Free entry item',         type: 'free',        stripe: '', inds: [], allowNA: false },
+  { id: 'item-yn',         prompt: 'Yes/No item',             type: 'yn',          stripe: '', inds: [], allowNA: false },
+  { id: 'item-employee',   prompt: 'Employee item',           type: 'employee',    stripe: '', inds: [], allowNA: false },
+  { id: 'item-email',      prompt: 'Email item',              type: 'email',       stripe: '', inds: [], allowNA: false },
+  { id: 'item-photo',      prompt: 'Photo item',              type: 'photo',       stripe: '', inds: [], allowNA: false },
+  { id: 'item-qr',         prompt: 'QR code item',            type: 'qr',          stripe: '', inds: [], allowNA: false },
+  { id: 'item-barcode',    prompt: 'Barcode item',            type: 'barcode',     stripe: '', inds: [], allowNA: false },
+  { id: 'item-subtitle',   prompt: 'Subtitle item',           type: 'subtitle',    stripe: '', inds: [], allowNA: false },
+  { id: 'item-measurement',prompt: 'Measurement item',        type: 'measurement', stripe: '', inds: [], allowNA: false },
+  { id: 'item-sublist',    prompt: 'Sublist item',            type: 'sublist',     stripe: '', inds: [], allowNA: false },
+  { id: 'item-rating',     prompt: 'Rating item',             type: 'rating',      stripe: '', inds: [], allowNA: false },
+  { id: 'item-asset',      prompt: 'Asset item',              type: 'asset',       stripe: '', inds: [], allowNA: false },
+  { id: 'item-number',     prompt: 'Number item',             type: 'number',      stripe: '', inds: [], allowNA: false },
+  { id: 'item-formula',    prompt: 'Formula item',            type: 'formula',     stripe: '', inds: [], allowNA: false },
+  { id: 'item-date',       prompt: 'Date item',               type: 'date',        stripe: '', inds: [], allowNA: false },
+  { id: 'item-time',       prompt: 'Time item',               type: 'time',        stripe: '', inds: [], allowNA: false },
+  { id: 'item-datetime',   prompt: 'Date/Time item',          type: 'datetime',    stripe: '', inds: [], allowNA: false },
+  { id: 'item-stopwatch',  prompt: 'Stopwatch item',          type: 'stopwatch',   stripe: '', inds: [], allowNA: false },
+  { id: 'item-signature',  prompt: 'Signature item',          type: 'signature',   stripe: '', inds: [], allowNA: false },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1180,7 +1169,8 @@ function FollowUpPanel({ c, onUpdate }: { c: MCChoice; onUpdate?: (id: string, u
   );
 }
 
-function MCChoiceRow({ c, idx, locked, flags, onUpdate, onRemove, focusId, onFocused }: {
+function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, focusId, onFocused }: {
+  scoringOn: boolean;
   c: MCChoice; idx: number; locked: boolean; flags: Flag[];
   onUpdate?: (id: string, u: Partial<MCChoice>) => void;
   onRemove?: (id: string) => void;
@@ -1239,7 +1229,7 @@ function MCChoiceRow({ c, idx, locked, flags, onUpdate, onRemove, focusId, onFoc
       {(!locked || (c.score !== undefined && c.score !== '') || hasFlag || hasCa) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 38px', borderTop: `0.5px solid ${T.border}` }}>
           {/* Score */}
-          {(!locked || (c.score !== undefined && c.score !== '')) && (
+          {scoringOn && (!locked || (c.score !== undefined && c.score !== '')) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ fontSize: 11, color: T.textMuted }}>Score</span>
               {locked
@@ -1346,8 +1336,8 @@ function MCChoiceRow({ c, idx, locked, flags, onUpdate, onRemove, focusId, onFoc
   );
 }
 
-function MCChoiceList({ choices, locked, flags, onUpdate, onRemove, focusId, onFocused }: {
-  choices: MCChoice[]; locked: boolean; flags: Flag[];
+function MCChoiceList({ choices, locked, scoringOn, flags, onUpdate, onRemove, focusId, onFocused }: {
+  choices: MCChoice[]; locked: boolean; scoringOn: boolean; flags: Flag[];
   onUpdate?: (id: string, u: Partial<MCChoice>) => void;
   onRemove?: (id: string) => void;
   focusId?: string; onFocused?: () => void
@@ -1355,7 +1345,7 @@ function MCChoiceList({ choices, locked, flags, onUpdate, onRemove, focusId, onF
   return (
     <div>
       {choices.map((c, idx) => (
-        <MCChoiceRow key={c.id} c={c} idx={idx} locked={locked} flags={flags}
+        <MCChoiceRow key={c.id} c={c} idx={idx} locked={locked} scoringOn={scoringOn} flags={flags}
           onUpdate={onUpdate} onRemove={onRemove} focusId={focusId} onFocused={onFocused} />
       ))}
     </div>
@@ -1376,7 +1366,7 @@ function TemplateRow({ tpl, onUse, onCopy }: { tpl: { id: string; name: string; 
   );
 }
 
-function MCChoicesSection({ item, onUpdate, flags }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void; flags: Flag[] }) {
+function MCChoicesSection({ item, onUpdate, scoringOn, flags }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void; scoringOn: boolean; flags: Flag[] }) {
   const usingTemplate = !!item.mcTemplateId;
   const template = usingTemplate ? MC_TEMPLATES.find(t => t.id === item.mcTemplateId) : null;
   const choices = item.choices ?? [];
@@ -1479,7 +1469,7 @@ function MCChoicesSection({ item, onUpdate, flags }: { item: ListItem; onUpdate:
       {/* Choices */}
       <div style={{ padding: 12, background: T.surface1, borderRadius: 8, border: `0.5px solid ${T.border}` }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: choices.length > 0 ? 10 : 0 }}>Choices</div>
-        <MCChoiceList choices={choices} locked={usingTemplate} flags={flags} onUpdate={updateChoice} onRemove={removeChoice} focusId={newChoiceId ?? undefined} onFocused={() => setNewChoiceId(null)} />
+        <MCChoiceList choices={choices} locked={usingTemplate} scoringOn={scoringOn} flags={flags} onUpdate={updateChoice} onRemove={removeChoice} focusId={newChoiceId ?? undefined} onFocused={() => setNewChoiceId(null)} />
         {!usingTemplate && (
           <button onClick={addChoice} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: choices.length > 0 ? 8 : 8 }}>
             <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add choice
@@ -2201,7 +2191,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           </SsSection>
         )}
         {/* Type-specific sections */}
-        {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} flags={flags} />}
+        {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} scoringOn={scoringOn} flags={flags} />}
         {item.type === 'mc' && <MCCASection item={item} onUpdate={upd} markAs={markAs} />}
         {item.type === 'rating' && <RatingSection item={item} onUpdate={upd} scoringOn={scoringOn} />}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
@@ -3420,7 +3410,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
 // ── Main editor ────────────────────────────────────────────────────────────
 export default function JoltListEditorPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
-  const [scoringOn, setScoringOn] = useState(true);
+  const [scoringOn, setScoringOn] = useState(false);
   const [flags, setFlags] = useState<Flag[]>(INITIAL_FLAGS);
   const handleCreateFlag = (flag: Flag) => setFlags(prev => [...prev, flag]);
   const [caToastId, setCaToastId] = useState<string | null>(null);
