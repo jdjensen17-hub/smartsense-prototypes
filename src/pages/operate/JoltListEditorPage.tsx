@@ -2907,15 +2907,49 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
 
   const derivedInds: { icon: string; title: string }[] = [
     ...(() => {
+      const toName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; };
       const yesIds = item.flagsForYes ?? [];
       const noIds = item.flagsForNo ?? [];
-      if (yesIds.length === 0 && noIds.length === 0) return [];
-      const toName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; };
-      const lines = [...(yesIds.length > 0 ? [`Yes: ${yesIds.map(toName).join(', ')}`] : []), ...(noIds.length > 0 ? [`No: ${noIds.map(toName).join(', ')}`] : [])];
+      const measRules = (item.measFlagRules ?? []).filter(r => !!r.flagId);
+      if (yesIds.length === 0 && noIds.length === 0 && measRules.length === 0) return [];
+      const lines = [
+        ...(yesIds.length > 0 ? [`Yes: ${yesIds.map(toName).join(', ')}`] : []),
+        ...(noIds.length > 0 ? [`No: ${noIds.map(toName).join(', ')}`] : []),
+        ...measRules.map(r => {
+          const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
+          const range = item.measRanges?.[rangeIdx];
+          const label = range ? `R${rangeIdx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : `R?`;
+          return `${label}: ${toName(r.flagId)}`;
+        }),
+      ];
       return [{ icon: 'ti-flag', title: lines.join('\n') }];
     })(),
     ...((item.infoInline || item.infoFile) ? [{ icon: 'ti-info-circle', title: item.infoFile ?? 'Info Library configured' }] : []),
-    ...((item.caForYNRules?.length ?? 0) > 0 || item.caForNA ? [{ icon: 'ti-alert-triangle', title: 'Corrective Action configured' }] : []),
+    ...(() => {
+      const caLines: string[] = [];
+      // N/A CA — shared across all types
+      if (item.caForNA) {
+        caLines.push(`N/A — ${item.caForNAAdHoc ? 'Ad hoc corrective action' : (item.caForNAList || 'Ad hoc corrective action')}`);
+      }
+      // Y/N result CA
+      for (const r of item.caForYNRules ?? []) {
+        caLines.push(`${r.condition} — ${r.adHoc ? 'Ad hoc corrective action' : (r.caList || 'Ad hoc corrective action')}`);
+      }
+      // Measurement range CA
+      for (const r of item.caForRangeRules ?? []) {
+        const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
+        const range = item.measRanges?.[rangeIdx];
+        const rangeLabel = range ? `R${rangeIdx + 1} (${range.min || 'Min'} – ${range.max || 'Max'}) ${r.condition ?? ''}` : `Result`;
+        caLines.push(`${rangeLabel} — ${r.adHoc ? 'Ad hoc corrective action' : (r.caList || 'Ad hoc corrective action')}`);
+      }
+      // MC result CA
+      for (const r of item.caForMCRules ?? []) {
+        const choice = (item.choices ?? []).find(c => c.id === r.condition);
+        const choiceLabel = choice ? choice.label : 'Result';
+        caLines.push(`${choiceLabel} — ${r.adHoc ? 'Ad hoc corrective action' : (r.caList || 'Ad hoc corrective action')}`);
+      }
+      return caLines.length > 0 ? [{ icon: 'ti-alert-triangle', title: caLines.join('\n') }] : [];
+    })(),
     ...(!!item.dcParentId || items.some(x => x.dcParentId === item.id) ? [{ icon: 'ti-filter', title: 'Display Criteria configured' }] : []),
   ];
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
@@ -2979,8 +3013,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         </div>
       </td>
       {/* Config indicators */}
-      <td style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, height: 44 }}>
+      <td style={{ width: 88, padding: '0 8px', borderLeft: `0.5px solid ${T.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 44 }}>
           {derivedInds.map(ind => (
             <Tooltip key={ind.icon} text={ind.title}>
               <i className={`ti ${ind.icon}`} style={{ fontSize: 13, color: indColor(ind.icon) }} />
@@ -3937,7 +3971,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
                   <div style={{ position: 'absolute', top: 0, right: 0, width: 1, height: '100%', background: T.borderStrong, zIndex: 1 }} />
                 </th>
                 <th style={{ ...stickyHead(S.type, { width: 32, padding: 0, borderLeft: `0.5px solid ${T.borderStrong}`, borderBottom: `0.5px solid ${T.borderStrong}` }) }} />
-                <th style={{ width: 100, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
+                <th style={{ width: 88, padding: 0, borderBottom: `0.5px solid ${T.borderStrong}` }} />
                 {segments.map((seg, i) => {
                   const bg = i % 2 === 0 ? T.surface1 : T.surface0;
                   return (
@@ -3974,7 +4008,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }} />
             </th>
             <th style={stickyHead(S.type, { width: 32, borderLeft: `0.5px solid ${T.borderStrong}` })} />
-            <th style={{ width: 100, padding: '5px 8px', borderLeft: `0.5px solid ${T.border}`, borderTop: `0.5px solid ${T.border}`, fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', verticalAlign: 'middle' }}>Config</th>
+            <th style={{ width: 88, padding: '5px 8px', borderLeft: `0.5px solid ${T.border}`, borderTop: `0.5px solid ${T.border}`, fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', verticalAlign: 'middle' }}>Config</th>
             {activeCols.map(col => (
               <th key={col.key} style={{
                 width: 100, padding: '5px 8px',
