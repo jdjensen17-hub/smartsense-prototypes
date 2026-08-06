@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Barcode from 'react-barcode';
 
@@ -226,22 +227,27 @@ function indColor(ind: string) {
 }
 
 function Tooltip({ children, text }: { children: React.ReactNode; text: string }) {
-  const [visible, setVisible] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const ref = useRef<HTMLSpanElement>(null);
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+    <span ref={ref} style={{ display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setRect(ref.current?.getBoundingClientRect() ?? null)}
+      onMouseLeave={() => setRect(null)}
     >
       {children}
-      {visible && (
+      {rect && ReactDOM.createPortal(
         <span style={{
-          position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed',
+          top: rect.top - 6,
+          left: rect.left + rect.width / 2,
+          transform: 'translate(-50%, -100%)',
           background: '#1C1C1E', color: '#fff', fontSize: 11, fontWeight: 500, lineHeight: 1.5,
           padding: '5px 9px', borderRadius: 6, whiteSpace: 'pre', zIndex: 9999,
           pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
         }}>
           {text}
-        </span>
+        </span>,
+        document.body
       )}
     </span>
   );
@@ -2761,19 +2767,20 @@ function LocationTagCell({ tags }: { tags: string[] }) {
   if (tags.length === 1) {
     return (
       <td ref={ref} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
-        <span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }} title={tags[0]}>{tags[0]}</span>
+        <Tooltip text={tags[0]}><span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>{tags[0]}</span></Tooltip>
       </td>
     );
   }
   return (
     <td ref={ref} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', position: 'relative' }}>
-      <span
-        onClick={() => setOpen(v => !v)}
-        title={tags.join(', ')}
-        style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, cursor: 'pointer' }}
-      >
-        {tags.length}
-      </span>
+      <Tooltip text={tags.join('\n')}>
+        <span
+          onClick={() => setOpen(v => !v)}
+          style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, cursor: 'pointer' }}
+        >
+          {tags.length}
+        </span>
+      </Tooltip>
       {open && (
         <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, minWidth: 180, maxWidth: 260, padding: '6px 0' }}>
           {tags.map(tag => (
@@ -3246,16 +3253,19 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'all-print-label') {
-          const count = item.labelIds?.length ?? 0;
+          const ids = item.labelIds ?? [];
+          const names = ids.map(id => LABEL_TEMPLATES.find(t => t.id === id)?.name ?? id);
+          const pill = (content: React.ReactNode) => (
+            <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{content}</span>
+          );
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              {count > 0 ? (
-                <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
-                  {count}
-                </span>
-              ) : (
-                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
-              )}
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              {names.length === 0
+                ? <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+                : names.length === 1
+                  ? <Tooltip text={names[0]}>{pill(names[0])}</Tooltip>
+                  : <Tooltip text={names.join('\n')}>{pill(`${names.length} labels`)}</Tooltip>
+              }
             </td>
           );
         }
@@ -3267,9 +3277,9 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
               {item.scoreGroup ? (
-                <span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }} title={item.scoreGroup}>
+                <Tooltip text={item.scoreGroup}><span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>
                   {item.scoreGroup}
-                </span>
+                </span></Tooltip>
               ) : (
                 <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
               )}
@@ -3286,9 +3296,9 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               {s ? (
-                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color }}>
+                <Tooltip text={item.importance!}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color, whiteSpace: 'nowrap' }}>
                   {item.importance}
-                </span>
+                </span></Tooltip>
               ) : (
                 <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
               )}
@@ -3308,7 +3318,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const label = MEAS_LABELS[item.measType ?? ''] ?? item.measType ?? '';
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              {label ? <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>{label}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+              {label ? <Tooltip text={label}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{label}</span></Tooltip> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
             </td>
           );
         }
@@ -3316,7 +3326,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const u = item.measUnit ?? '';
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              {u ? <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>{u}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+              {u ? <Tooltip text={u}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{u}</span></Tooltip> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
             </td>
           );
         }
@@ -3428,11 +3438,11 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'employee-roles') {
           const roles = item.employeeRoles ?? [];
           if (roles.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const label = roles.length === 1 ? roles[0] : `${roles.length} roles`;
+          const tip = roles.length > 1 ? roles.join('\n') : roles[0];
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
-                {roles.length === 1 ? roles[0] : `${roles.length} roles`}
-              </span>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              <Tooltip text={tip}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{label}</span></Tooltip>
             </td>
           );
         }
@@ -3452,7 +3462,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const label = t === 'number' ? 'Number' : t === 'date' ? 'Date' : 'Text';
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary, whiteSpace: 'nowrap' }}>
                 {label}
               </span>
             </td>
@@ -3461,10 +3471,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'asset-type') {
           const t = item.assetType ?? 'Inspection Type';
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary }}>
-                {t}
-              </span>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
+              <Tooltip text={t}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{t}</span></Tooltip>
             </td>
           );
         }
@@ -3606,13 +3614,12 @@ export default function JoltListEditorPage() {
     const current = items.find(it => it.id === id);
     if (!current) return;
     const merged = { ...current, ...updates };
-    const updatedItems = items.map(it => it.id === id ? merged : it);
+    // Auto-on only — columns are never auto-removed on update, only on item delete
     setShownCols(prev => {
       const next = new Set(prev);
       for (const col of ALL_COLS) {
         if (col.defaultOn) continue;
         if (!next.has(col.key) && col.detect(merged)) next.add(col.key);
-        if (next.has(col.key) && !updatedItems.some(it => col.detect(it))) next.delete(col.key);
       }
       return next;
     });
