@@ -940,8 +940,10 @@ function CASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (upda
 
   return (
     <SsSection label="Corrective Action" defaultOpen={!!(item.caForNA || (item.caForYNRules?.length ?? 0) > 0 || item.caForRanges)}>
-      {/* For N/A / OOO — only shown when markAs is set */}
-      {markAs && (
+      {/* For Yes/No or ranges — shown first for Y/N, after N/A for measurement */}
+      {!isMeas && <></>}
+      {/* For N/A / OOO — only shown when markAs is set; shown first for measurement */}
+      {isMeas && markAs && (
         <>
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
@@ -973,11 +975,10 @@ function CASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (upda
           <div style={{ borderTop: `0.5px solid ${T.border}`, marginBottom: 12 }} />
         </>
       )}
-      {/* For Yes/No or ranges */}
-      {markAs && <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: forNA ? 12 : 0 }} />}
+      {isMeas && markAs && <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: forNA ? 12 : 0 }} />}
       <div style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (isMeas ? forRanges : ynRules.length > 0) ? 10 : 0 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>{isMeas ? 'For ranges' : 'For Yes/No'}</span>
+          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>{isMeas ? 'For ranges' : 'Turn on for Yes/No'}</span>
           <Toggle on={isMeas ? forRanges : ynRules.length > 0} onChange={v => { if (isMeas) { setForRanges(v); if (v && rangeRules.length === 0) onUpdate({ caForRanges: true, caForRangeRules: [{ id: mkid(), rangeId: item.measRanges?.[0]?.id ?? '', condition: 'Inside', caList: '', adHoc: false, nextStep: 'repeat-item' }] }); else if (!v) onUpdate({ caForRanges: false, caForRangeRules: [] }); } else { if (v && ynRules.length === 0) addYNRule(); else if (!v) onUpdate({ caForYNRules: [] }); } }} />
         </div>
         {!isMeas && ynRules.map((rule, idx) => (
@@ -1018,6 +1019,39 @@ function CASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (upda
           <button onClick={addYNRule} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 16 }}>
             <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add Condition
           </button>
+        )}
+        {/* For N/A — shown after For Yes/No on Y/N items */}
+        {!isMeas && markAs && (
+          <>
+            <div style={{ borderTop: `0.5px solid ${T.border}`, margin: '12px 0' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
+                <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>Turn on for {markAs}</span>
+                <Toggle on={forNA} onChange={setForNA} />
+              </div>
+              {forNA && (
+                <div style={{ paddingTop: 10, marginTop: 8 }}>
+                  {!item.caForNAAdHoc && (
+                    <>
+                      <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>CA list</div>
+                      <div style={{ marginBottom: 8 }}><CAListPicker value={item.caForNAList ?? ''} onChange={v => onUpdate({ caForNAList: v })} /></div>
+                    </>
+                  )}
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Next step</div>
+                  <Select value={item.caForNANextStep ?? 'repeat-item'} onChange={v => onUpdate({ caForNANextStep: v })} options={[{ value: 'repeat-item', label: 'Repeat this item' }, { value: 'repeat-list', label: 'Repeat this list' }, { value: 'no-repeat', label: 'Do not repeat' }]} style={{ width: '100%', marginBottom: 12 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <span style={{ fontSize: 13, color: T.textPrimary }}>Corrective action is optional</span>
+                    <Toggle on={!!item.caForNAOptional} onChange={v => onUpdate({ caForNAOptional: v })} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, color: T.textPrimary }}>Ad hoc</span>
+                    <Toggle on={!!item.caForNAAdHoc} onChange={v => onUpdate({ caForNAAdHoc: v, ...(v ? { caForNAList: '' } : {}) })} />
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>Corrective action list is created on the app.</div>
+                </div>
+              )}
+            </div>
+          </>
         )}
         {isMeas && forRanges && (() => {
           const measRanges = item.measRanges ?? [];
@@ -2612,14 +2646,14 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
   ]},
   { group: 'CA — Corrective Action', cols: [
     { key: 'ca-turn-on',       label: 'Turn on for Y/N', types: ['yn'],                    detect: i => (i.caForYNRules?.length ?? 0) > 0 },
+    { key: 'ca-trigger-yn',    label: 'Condition',                                          detect: i => i.caForYNRules?.some(r => !!r.condition) ?? false },
     { key: 'ca-list',          label: 'CA List',                                            detect: i => i.caForYNRules?.some(r => !!r.caList) ?? false },
+    { key: 'ca-planned',       label: 'Ad Hoc',                                             detect: i => (i.caForYNRules?.some(r => !!r.adHoc) ?? false) || !!i.caForNAAdHoc },
+    { key: 'ca-optional',      label: 'Optional',                                           detect: i => (i.caForYNRules?.some(r => !!r.optional) ?? false) || (i.caForRangeRules?.some(r => !!r.optional) ?? false) || !!i.caForNAOptional },
+    { key: 'ca-repeat',        label: 'Repeat',                                             detect: i => (i.caForYNRules?.length ?? 0) > 0 || !!i.caForNA },
+    { key: 'ca-trigger-ranges',label: 'Trigger Ranges',  types: ['measurement'],            detect: i => (i.caForRangeRules?.length ?? 0) > 0 },
     { key: 'ca-turn-on-na',    label: 'Turn on for N/A', types: ['yn', 'measurement'],      detect: i => !!i.caForNA },
     { key: 'ca-list-na',       label: 'List for NA',                                        detect: i => !!i.caForNAList },
-    { key: 'ca-trigger-yn',    label: 'Condition',                                          detect: i => i.caForYNRules?.some(r => !!r.condition) ?? false },
-    { key: 'ca-trigger-ranges',label: 'Trigger Ranges',  types: ['measurement'],            detect: i => (i.caForRangeRules?.length ?? 0) > 0 },
-    { key: 'ca-planned',       label: 'Ad Hoc',                                             detect: i => (i.caForYNRules?.some(r => !!r.adHoc) ?? false) || !!i.caForNAAdHoc },
-    { key: 'ca-optional',      label: 'Optional',                                           detect: i => (i.caForYNRules?.some(r => !!r.optional) ?? false) || !!i.caForNAOptional },
-    { key: 'ca-repeat',        label: 'Repeat',                                             detect: i => (i.caForYNRules?.length ?? 0) > 0 || !!i.caForNA },
   ]},
   { group: 'Rating', cols: [
     { key: 'rating-range', label: 'Range', types: ['rating'], detect: i => i.ratingMin != null || i.ratingMax != null },
@@ -2976,6 +3010,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       background: rowBg,
       opacity: isCut ? 0.4 : isTypeDimmed ? 0.28 : 1,
       position: 'relative',
+      cursor: 'default',
     }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -3132,45 +3167,82 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'ca-repeat') {
-          const ynStep = item.caForYNRules?.[0]?.nextStep ?? 'repeat-item';
-          const naStep = item.caForNA ? (item.caForNANextStep ?? 'repeat-item') : null;
-          const ynOn = (item.caForYNRules?.length ?? 0) > 0;
-          const pillStyle = (bg: string, color: string) => ({ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: bg, color } as React.CSSProperties);
-          const stepLabel = (s: string) => s === 'repeat-item' ? 'Item' : s === 'repeat-list' ? 'List' : null;
-          const ynLabel = ynOn ? stepLabel(ynStep) : null;
-          const naLabel = naStep ? stepLabel(naStep) : null;
-          if (!ynLabel && !naLabel) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const stepLabel = (s: string | undefined) => s === 'repeat-item' ? 'Item' : s === 'repeat-list' ? 'List' : null;
+          const repeatPills: { label: string; tip: string; na: boolean }[] = [];
+          for (const r of item.caForYNRules ?? []) {
+            const label = stepLabel(r.nextStep);
+            if (label) repeatPills.push({ label, tip: `Repeat ${label.toLowerCase()} for ${r.condition ?? 'Result'}`, na: false });
+          }
+          if (item.caForNA) {
+            const label = stepLabel(item.caForNANextStep ?? 'repeat-item');
+            if (label) repeatPills.push({ label, tip: `Repeat ${label.toLowerCase()} for N/A`, na: true });
+          }
+          if (repeatPills.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                {ynLabel && <span style={pillStyle(pillBg, T.textAccent)}>{ynLabel}</span>}
-                {naLabel && <span style={pillStyle(T.surface1, T.textSecondary)}>{naLabel}</span>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                {repeatPills.map((p, i) => (
+                  <Tooltip key={i} text={p.tip}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.na ? T.surface1 : pillBg, color: p.na ? T.textSecondary : T.textAccent, whiteSpace: 'nowrap' }}>{p.label}</span>
+                  </Tooltip>
+                ))}
               </div>
             </td>
           );
         }
         if (col.key === 'ca-optional') {
-          const ynOptional = item.caForYNRules?.some(r => r.optional) ?? false;
-          const naOptional = !!item.caForNAOptional;
-          if (!ynOptional && !naOptional) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const isMeas = item.type === 'measurement';
+          const optPills: { label: string; tip: string }[] = [];
+          // Y/N per-rule conditions
+          for (const r of item.caForYNRules ?? []) {
+            if (r.optional) optPills.push({ label: r.condition ?? 'Result', tip: `Optional for ${r.condition ?? 'Result'}` });
+          }
+          // Measurement per-range-rule conditions
+          for (const r of item.caForRangeRules ?? []) {
+            if (r.optional) {
+              const idx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
+              const range = item.measRanges?.[idx];
+              const label = idx >= 0 ? `R${idx + 1}` : 'Range';
+              const tip = range ? `Optional for R${idx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : `Optional for ${label}`;
+              optPills.push({ label, tip });
+            }
+          }
+          // N/A or OOO — use the actual markAs value so OOO items show "OOO"
+          if (item.caForNAOptional) {
+            const markAsVal = (colValues[item.id] ?? {})['all-mark-as'] ?? 'N/A';
+            const label = markAsVal || 'N/A';
+            const tip = isMeas ? `Optional for ${label} (Measurement)` : `Optional for ${label}`;
+            optPills.push({ label, tip });
+          }
+          if (optPills.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                {ynOptional && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent }}>Y/N</span>}
-                {naOptional && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface1, color: T.textSecondary }}>N/A</span>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                {optPills.map(p => (
+                  <Tooltip key={p.label} text={p.tip}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: (p.label === 'N/A' || p.label === 'OOO') ? T.surface1 : pillBg, color: (p.label === 'N/A' || p.label === 'OOO') ? T.textSecondary : T.textAccent, whiteSpace: 'nowrap' }}>{p.label}</span>
+                  </Tooltip>
+                ))}
               </div>
             </td>
           );
         }
         if (col.key === 'ca-planned') {
-          const ynAdHoc = item.caForYNRules?.some(r => r.adHoc) ?? false;
-          const naAdHoc = !!item.caForNAAdHoc;
-          if (!ynAdHoc && !naAdHoc) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const markAsVal = (colValues[item.id] ?? {})['all-mark-as'] ?? 'N/A';
+          const adHocPills: { label: string; na: boolean }[] = [];
+          for (const r of item.caForYNRules ?? []) {
+            if (r.adHoc) adHocPills.push({ label: r.condition ?? 'Result', na: false });
+          }
+          if (item.caForNAAdHoc) adHocPills.push({ label: markAsVal || 'N/A', na: true });
+          if (adHocPills.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                {ynAdHoc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent }}>Y/N</span>}
-                {naAdHoc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface1, color: T.textSecondary }}>N/A</span>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                {adHocPills.map(p => (
+                  <Tooltip key={p.label} text={`Ad hoc for ${p.label}`}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.na ? T.surface1 : pillBg, color: p.na ? T.textSecondary : T.textAccent, whiteSpace: 'nowrap' }}>{p.label}</span>
+                  </Tooltip>
+                ))}
               </div>
             </td>
           );
@@ -3211,19 +3283,44 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'ca-list' || col.key === 'ca-list-na') {
-          const listId = col.key === 'ca-list'
-            ? (item.caForYNRules?.find(r => r.caList)?.caList ?? '')
-            : (item.caForNAList ?? '');
-          const listName = CA_LISTS.find(l => l.id === listId)?.title ?? '';
+          const pillSpan = (name: string, tip: string) => (
+            <Tooltip key={name} text={tip}>
+              <span style={{ display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: pillBg, color: T.textAccent, verticalAlign: 'middle' }}>{name}</span>
+            </Tooltip>
+          );
+          if (col.key === 'ca-list') {
+            // Include ad-hoc rules AND rules with a caList
+            const activeRules = (item.caForYNRules ?? []).filter(r => r.adHoc || !!r.caList);
+            const rawPills = activeRules.map(r => {
+              const name = r.adHoc ? 'Ad hoc' : (CA_LISTS.find(l => l.id === r.caList)?.title ?? r.caList ?? '');
+              const tipLine = r.adHoc ? `Ad hoc for ${r.condition ?? 'Result'}` : `CA list for ${r.condition ?? 'Result'} — ${name}`;
+              return { name, tipLine };
+            });
+            // Group by display name, merging tooltip lines
+            const grouped = new Map<string, string[]>();
+            for (const p of rawPills) { if (!grouped.has(p.name)) grouped.set(p.name, []); grouped.get(p.name)!.push(p.tipLine); }
+            const unique = Array.from(grouped.entries()).map(([name, lines]) => ({ name, tip: lines.join('\n') }));
+            return (
+              <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+                {unique.length === 0 ? (
+                  <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+                ) : unique.length === 1 ? (
+                  pillSpan(unique[0].name, unique[0].tip)
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+                    {unique.map(p => pillSpan(p.name, p.tip))}
+                  </div>
+                )}
+              </td>
+            );
+          }
+          // ca-list-na
+          if (!item.caForNA) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const naName = item.caForNAAdHoc ? 'Ad hoc' : (CA_LISTS.find(l => l.id === item.caForNAList)?.title ?? '');
+          const naTip = item.caForNAAdHoc ? 'Ad hoc for N/A' : naName;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              {listName ? (
-                <span title={listName} style={{ display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: pillBg, color: T.textAccent, verticalAlign: 'middle' }}>
-                  {listName}
-                </span>
-              ) : (
-                <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
-              )}
+              {naName ? pillSpan(naName, naTip) : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
             </td>
           );
         }
