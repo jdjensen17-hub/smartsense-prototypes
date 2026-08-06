@@ -566,7 +566,7 @@ function FlagSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; 
   );
 }
 
-function TagPicker({ options, selected, onChange, placeholder }: { options: string[]; selected: string[]; onChange: (tags: string[]) => void; placeholder: string }) {
+function TagPicker({ options, selected, onChange, placeholder, closeOnSelect = false }: { options: string[]; selected: string[]; onChange: (tags: string[]) => void; placeholder: string; closeOnSelect?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -581,7 +581,7 @@ function TagPicker({ options, selected, onChange, placeholder }: { options: stri
   }, [open]);
 
   const filtered = options.filter(t => t.toLowerCase().includes(q.toLowerCase()));
-  const toggle = (tag: string) => onChange(selected.includes(tag) ? selected.filter(t => t !== tag) : [...selected, tag]);
+  const toggle = (tag: string) => { onChange(selected.includes(tag) ? selected.filter(t => t !== tag) : [...selected, tag]); if (closeOnSelect) setOpen(false); };
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -638,7 +638,7 @@ function TagPicker({ options, selected, onChange, placeholder }: { options: stri
 }
 
 function LocationTagPicker({ selected, onChange }: { selected: string[]; onChange: (tags: string[]) => void }) {
-  return <TagPicker options={LOCATION_TAGS} selected={selected} onChange={onChange} placeholder="Add location tag…" />;
+  return <TagPicker options={LOCATION_TAGS} selected={selected} onChange={onChange} placeholder="Add location tag…" closeOnSelect />;
 }
 
 function CAListPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
@@ -1744,6 +1744,7 @@ function LabelSelector({ item, onUpdate }: { item: ListItem; onUpdate: (u: Parti
   const toggle = (id: string) => {
     const next = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
     onUpdate({ labelIds: next });
+    setOpen(false);
   };
   useEffect(() => {
     if (!open) return;
@@ -2750,7 +2751,7 @@ function ColumnPicker({ shownCols, onChange, scoringOn }: { shownCols: Set<strin
 }
 
 // ── Points cell ───────────────────────────────────────────────────────────
-function LocationTagCell({ tags }: { tags: string[] }) {
+function LocationTagCell({ tags, isActive }: { tags: string[]; isActive?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLTableCellElement>(null);
 
@@ -2767,7 +2768,7 @@ function LocationTagCell({ tags }: { tags: string[] }) {
   if (tags.length === 1) {
     return (
       <td ref={ref} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
-        <Tooltip text={tags[0]}><span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>{tags[0]}</span></Tooltip>
+        <Tooltip text={tags[0]}><span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: isActive ? 'rgba(255,255,255,0.75)' : T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>{tags[0]}</span></Tooltip>
       </td>
     );
   }
@@ -2776,7 +2777,7 @@ function LocationTagCell({ tags }: { tags: string[] }) {
       <Tooltip text={tags.join('\n')}>
         <span
           onClick={() => setOpen(v => !v)}
-          style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, cursor: 'pointer' }}
+          style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, minWidth: 20, padding: '2px 7px', borderRadius: 10, background: isActive ? 'rgba(255,255,255,0.75)' : T.bgAccent, color: T.textAccent, cursor: 'pointer' }}
         >
           {tags.length}
         </span>
@@ -2962,6 +2963,9 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const rowBg = isActive || isLinkingChild ? T.bgAccent : hovered ? T.surface1 : T.surface2;
   const stickyBg = rowBg;
+  // On an active (blue) row, accent pills need a contrasting background so they don't dissolve into the row color
+  const pillBg = (isActive || isLinkingChild) ? 'rgba(255,255,255,0.75)' : T.bgAccent;
+  const pillColor = (isActive || isLinkingChild) ? T.textAccent : T.textAccent;
   const sticky = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
     position: 'sticky', left, zIndex: 1, background: stickyBg, ...extra,
   });
@@ -3139,7 +3143,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                {ynLabel && <span style={pillStyle(T.bgAccent, T.textAccent)}>{ynLabel}</span>}
+                {ynLabel && <span style={pillStyle(pillBg, T.textAccent)}>{ynLabel}</span>}
                 {naLabel && <span style={pillStyle(T.surface1, T.textSecondary)}>{naLabel}</span>}
               </div>
             </td>
@@ -3152,7 +3156,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                {ynOptional && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>Y/N</span>}
+                {ynOptional && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent }}>Y/N</span>}
                 {naOptional && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface1, color: T.textSecondary }}>N/A</span>}
               </div>
             </td>
@@ -3165,7 +3169,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                {ynAdHoc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>Y/N</span>}
+                {ynAdHoc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent }}>Y/N</span>}
                 {naAdHoc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface1, color: T.textSecondary }}>N/A</span>}
               </div>
             </td>
@@ -3214,7 +3218,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               {listName ? (
-                <span title={listName} style={{ display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, verticalAlign: 'middle' }}>
+                <span title={listName} style={{ display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: pillBg, color: T.textAccent, verticalAlign: 'middle' }}>
                   {listName}
                 </span>
               ) : (
@@ -3246,8 +3250,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
               {names.length === 0
                 ? <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
                 : names.length === 1
-                  ? <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }} title={names[0]}>{names[0]}</span>
-                  : <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, cursor: 'default' }} title={names.join('\n')}>{names.length} flags</span>
+                  ? <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }} title={names[0]}>{names[0]}</span>
+                  : <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, cursor: 'default' }} title={names.join('\n')}>{names.length} flags</span>
               }
             </td>
           );
@@ -3256,7 +3260,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const ids = item.labelIds ?? [];
           const names = ids.map(id => LABEL_TEMPLATES.find(t => t.id === id)?.name ?? id);
           const pill = (content: React.ReactNode) => (
-            <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{content}</span>
+            <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{content}</span>
           );
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
@@ -3271,13 +3275,13 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         }
         if (col.key === 'all-tag-location') {
           const tags = item.locationTags ?? [];
-          return <LocationTagCell key={col.key} tags={tags} />;
+          return <LocationTagCell key={col.key} tags={tags} isActive={isActive} />;
         }
         if (col.key === 'all-tag-scoring') {
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
               {item.scoreGroup ? (
-                <Tooltip text={item.scoreGroup}><span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: T.bgAccent, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>
+                <Tooltip text={item.scoreGroup}><span style={{ fontSize: 11, fontWeight: 500, color: T.textAccent, background: pillBg, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>
                   {item.scoreGroup}
                 </span></Tooltip>
               ) : (
@@ -3292,7 +3296,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
             Major:    { bg: '#FFF3E0', color: '#E65100' },
             Minor:    { bg: '#F3F8FF', color: T.textAccent },
           };
-          const s = item.importance ? (IMP_COLORS[item.importance] ?? { bg: T.bgAccent, color: T.textAccent }) : null;
+          const s = item.importance ? (IMP_COLORS[item.importance] ?? { bg: pillBg, color: T.textAccent }) : null;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               {s ? (
@@ -3385,7 +3389,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
               return (
                 <td key={col.key} style={{ width: 120, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
                   {name
-                    ? <Tooltip text={`${name}\n${rangeLabel}`}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{name}</span></Tooltip>
+                    ? <Tooltip text={`${name}\n${rangeLabel}`}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{name}</span></Tooltip>
                     : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
                 </td>
               );
@@ -3424,7 +3428,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const max = item.ratingMax ?? 5;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent }}>
                 {min} – {max}
               </span>
             </td>
@@ -3446,7 +3450,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const tip = roles.length > 1 ? roles.join('\n') : roles[0];
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
-              <Tooltip text={tip}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{label}</span></Tooltip>
+              <Tooltip text={tip}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{label}</span></Tooltip>
             </td>
           );
         }
@@ -3492,9 +3496,9 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           if (!listName) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
-              <span title={listName} style={{ fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: T.bgAccent, color: T.textAccent, display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+              <Tooltip text={listName}><span style={{ fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: pillBg, color: T.textAccent, display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                 {listName}
-              </span>
+              </span></Tooltip>
             </td>
           );
         }
