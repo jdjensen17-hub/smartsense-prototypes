@@ -189,8 +189,9 @@ function mkCodeTarget() { return Math.random().toString(36).slice(2, 10).toUpper
 
 // ── Initial sample data ───────────────────────────────────────────────────
 const INITIAL_ITEMS: ListItem[] = [
-  { id: 'item-checkmark',  prompt: 'Checkmark item',          type: 'checkmark',   stripe: '', inds: [], allowNA: false },
+  { id: 'item-subtitle',   prompt: 'Subtitle item',           type: 'subtitle',    stripe: '', inds: [], allowNA: false },
   { id: 'item-text',       prompt: 'Text item',               type: 'text',        stripe: '', inds: [], allowNA: false },
+  { id: 'item-checkmark',  prompt: 'Checkmark item',          type: 'checkmark',   stripe: '', inds: [], allowNA: false },
   { id: 'item-mc',         prompt: 'Multiple choice item',    type: 'mc',          stripe: '', inds: [], allowNA: false, choices: [] },
   { id: 'item-free',       prompt: 'Free entry item',         type: 'free',        stripe: '', inds: [], allowNA: false },
   { id: 'item-yn',         prompt: 'Yes/No item',             type: 'yn',          stripe: '', inds: [], allowNA: false },
@@ -199,7 +200,6 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'item-photo',      prompt: 'Photo item',              type: 'photo',       stripe: '', inds: [], allowNA: false },
   { id: 'item-qr',         prompt: 'QR code item',            type: 'qr',          stripe: '', inds: [], allowNA: false },
   { id: 'item-barcode',    prompt: 'Barcode item',            type: 'barcode',     stripe: '', inds: [], allowNA: false },
-  { id: 'item-subtitle',   prompt: 'Subtitle item',           type: 'subtitle',    stripe: '', inds: [], allowNA: false },
   { id: 'item-measurement',prompt: 'Measurement item',        type: 'measurement', stripe: '', inds: [], allowNA: false },
   { id: 'item-sublist',    prompt: 'Sublist item',            type: 'sublist',     stripe: '', inds: [], allowNA: false },
   { id: 'item-rating',     prompt: 'Rating item',             type: 'rating',      stripe: '', inds: [], allowNA: false },
@@ -2121,7 +2121,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
         </SsSection>
         {/* General options */}
         <SsSection label="General Options" defaultOpen={true}>
-          {item.type !== 'text' && (
+          {item.type !== 'text' && item.type !== 'subtitle' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -2142,14 +2142,14 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
               </div>
             </div>
           )}
-          {item.type !== 'text' && (
+          {item.type !== 'text' && item.type !== 'subtitle' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Points</div>
               <input type="number" min={0} value={item.points ?? ''} onChange={e => upd({ points: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0" style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: 80, marginBottom: 6 }} />
               <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Employees get points by completing items or half points if late.</div>
             </div>
           )}
-          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 10 }}>
+          <div style={{ borderTop: item.type !== 'subtitle' && item.type !== 'text' ? `0.5px solid ${T.border}` : 'none', paddingTop: item.type !== 'subtitle' && item.type !== 'text' ? 12 : 0, marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>Background Color</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {STRIPE_COLORS.map(sc => (
@@ -3308,7 +3308,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'm-saved-value') {
           const on = !!item.savedValue;
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); onUpdate(item.id, { savedValue: !on }); }}>
               <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
@@ -3403,7 +3404,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'mc-multi-select') {
           const on = !!item.mcMultiSelect;
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); onUpdate(item.id, { mcMultiSelect: !on }); }}>
               <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
@@ -3411,7 +3413,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'mc-show-inline') {
           const on = !!item.mcShowInline;
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); onUpdate(item.id, { mcShowInline: !on }); }}>
               <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
@@ -3430,7 +3433,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'photo-allow-upload') {
           const on = !!item.photoAllowUpload;
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); onUpdate(item.id, { photoAllowUpload: !on }); }}>
               <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
@@ -3451,9 +3455,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           if (!val) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
-              <span title={val} style={{ fontSize: 11, fontWeight: 500, color: T.textSecondary, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
-                {val}
-              </span>
+              <Tooltip text={val}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{val}</span></Tooltip>
             </td>
           );
         }
@@ -3479,7 +3481,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'asset-filter-user') {
           const on = !!item.assetFilterByUser;
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); onUpdate(item.id, { assetFilterByUser: !on }); }}>
               <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
@@ -3542,6 +3545,7 @@ export default function JoltListEditorPage() {
   const [items, setItems] = useState<ListItem[]>(INITIAL_ITEMS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [lastActiveItemId, setLastActiveItemId] = useState<string | null>(null);
   const [cutIds, setCutIds] = useState<Set<string>>(new Set());
   const [dcMode, setDcMode] = useState(false);
   const [dcLinkingId, setDcLinkingId] = useState<string | null>(null);
@@ -3838,9 +3842,9 @@ export default function JoltListEditorPage() {
               {dcConditionState && conditionParentItem && conditionChildItem ? (
                 <div style={{ display: 'flex', height: '100%' }}>
                   <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
+                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} lastActiveItemId={lastActiveItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                       onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
-                      onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
+                      onRowClick={id => { setLastActiveItemId(null); setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                       onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
                       onKebabClose={() => setKebabOpenId(null)}
                       onKebabAction={handleKebabAction}
@@ -3853,9 +3857,9 @@ export default function JoltListEditorPage() {
                   <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onCancel={() => setDcConditionState(null)} />
                 </div>
               ) : (
-                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
+                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} lastActiveItemId={lastActiveItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                   onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
-                  onRowClick={id => { setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
+                  onRowClick={id => { setLastActiveItemId(null); setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                   onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
                   onKebabClose={() => setKebabOpenId(null)}
                   onKebabAction={handleKebabAction}
@@ -3871,7 +3875,7 @@ export default function JoltListEditorPage() {
           {/* Side sheet */}
           {activeItemId && !dcMode && (() => {
             const item = findItem(items, activeItemId);
-            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => setActiveItemId(null)} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} flags={flags} onCreateFlag={handleCreateFlag} /> : null;
+            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => { setLastActiveItemId(activeItemId); setActiveItemId(null); }} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} flags={flags} onCreateFlag={handleCreateFlag} /> : null;
           })()}
         </div>
       )}
@@ -3885,6 +3889,7 @@ interface ItemsTableProps {
   items: ListItem[];
   selectedIds: Set<string>;
   activeItemId: string | null;
+  lastActiveItemId: string | null;
   cutIds: Set<string>;
   dcMode: boolean;
   dcLinkingId: string | null;
@@ -3910,7 +3915,7 @@ interface ItemsTableProps {
   onCaToast: (key: string | null) => void;
 }
 
-function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, flags, caToastId, onCaToast }: ItemsTableProps) {
+function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, flags, caToastId, onCaToast }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
   const [promptWidth, setPromptWidth] = useState(300);
@@ -4055,7 +4060,7 @@ function ItemsTable({ items, selectedIds, activeItemId, cutIds, dcMode, dcLinkin
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} flags={flags} caToastId={caToastId} onCaToast={onCaToast} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id || (!activeItemId && lastActiveItemId === item.id)} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} flags={flags} caToastId={caToastId} onCaToast={onCaToast} />
           )
         ))}
       </tbody>
