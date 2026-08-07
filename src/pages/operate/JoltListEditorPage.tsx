@@ -67,7 +67,7 @@ interface ListItem {
   measMethods?: string[];
   measSensorId?: string;
   measRanges?: { id: string; min: string; max: string }[];
-  measFlagRules?: { id: string; condition: string; rangeId: string; flagId: string; recordColor: string }[];
+  measFlagRules?: { id: string; condition: string; rangeId: string; flagId: string; flagIds?: string[]; recordColor: string }[];
   mcTemplateId?: string;
   mcMultiSelect?: boolean;
   mcShowInline?: boolean;
@@ -200,7 +200,7 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'item-photo',      prompt: 'Photo item',              type: 'photo',       stripe: '', inds: [], allowNA: false },
   { id: 'item-qr',         prompt: 'QR code item',            type: 'qr',          stripe: '', inds: [], allowNA: false },
   { id: 'item-barcode',    prompt: 'Barcode item',            type: 'barcode',     stripe: '', inds: [], allowNA: false },
-  { id: 'item-measurement',prompt: 'Measurement item',        type: 'measurement', stripe: '', inds: [], allowNA: false },
+  { id: 'item-measurement',prompt: 'Measurement item',        type: 'measurement', stripe: '', inds: [], allowNA: false, measType: 'temperature', measUnit: 'F', measMethods: ['Manual Input'] },
   { id: 'item-sublist',    prompt: 'Sublist item',            type: 'sublist',     stripe: '', inds: [], allowNA: false },
   { id: 'item-rating',     prompt: 'Rating item',             type: 'rating',      stripe: '', inds: [], allowNA: false },
   { id: 'item-asset',      prompt: 'Asset item',              type: 'asset',       stripe: '', inds: [], allowNA: false },
@@ -469,7 +469,7 @@ function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { o
   );
 }
 
-function FlagPicker({ answer, selectedIds, flags, onToggle, onCreateFlag, restrictedFlagId }: { answer: 'Yes' | 'No'; selectedIds: string[]; flags: Flag[]; onToggle: (flagId: string) => void; onCreateFlag: (flag: Flag) => void; restrictedFlagId?: string }) {
+function FlagPicker({ answer = 'Yes', selectedIds, flags, onToggle, onCreateFlag, restrictedFlagId }: { answer?: 'Yes' | 'No'; selectedIds: string[]; flags: Flag[]; onToggle: (flagId: string) => void; onCreateFlag: (flag: Flag) => void; restrictedFlagId?: string }) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -721,8 +721,7 @@ const RECORD_COLORS = [
 function MeasurementFlagSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
   const ranges = item.measRanges ?? [];
   const rules = item.measFlagRules ?? [];
-  const [creatingForRuleId, setCreatingForRuleId] = useState<string | null>(null);
-  const [flagDropdownOpenId, setFlagDropdownOpenId] = useState<string | null>(null);
+
 
   const rangeLabel = (r: { id: string; min: string; max: string }, idx: number) =>
     `Range ${idx + 1}${r.min || r.max ? ` (${r.min || 'Min'} – ${r.max || 'Max'})` : ''}`;
@@ -758,42 +757,17 @@ function MeasurementFlagSection({ item, onUpdate, flags, onCreateFlag }: { item:
           <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Range</div>
           <Select value={rule.rangeId} onChange={v => updateRule(rule.id, { rangeId: v })} options={rangeOptions} style={{ width: '100%', marginBottom: 8 }} />
           <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Flag</div>
-          <div style={{ position: 'relative', marginBottom: 8 }}>
-            <div onClick={() => { setFlagDropdownOpenId(flagDropdownOpenId === rule.id ? null : rule.id); setCreatingForRuleId(null); }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', background: T.surface2, fontSize: 13, color: rule.flagId ? T.textPrimary : T.textMuted }}>
-              <span>{rule.flagId ? (() => { const f = flags.find(x => x.id === rule.flagId); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : '— none —'; })() : '— none —'}</span>
-              <i className="ti ti-chevron-down" style={{ fontSize: 11, color: T.textMuted }} />
-            </div>
-            {flagDropdownOpenId === rule.id && !creatingForRuleId && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden' }}>
-                <div onClick={() => { setCreatingForRuleId(rule.id); setFlagDropdownOpenId(null); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', borderBottom: `0.5px solid ${T.border}`, fontSize: 13, color: T.textAccent, fontWeight: 500 }}
-                  onMouseEnter={e => (e.currentTarget.style.background = T.surface1)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <i className="ti ti-plus" style={{ fontSize: 12 }} /> Create new flag…
-                </div>
-                <div onClick={() => { updateRule(rule.id, { flagId: '' }); setFlagDropdownOpenId(null); }}
-                  style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = T.surface1)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  — none —
-                </div>
-                {flags.map(f => (
-                  <div key={f.id} onClick={() => { updateRule(rule.id, { flagId: f.id }); setFlagDropdownOpenId(null); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: T.textPrimary, background: rule.flagId === f.id ? T.surface1 : 'transparent' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = T.surface0)} onMouseLeave={e => (e.currentTarget.style.background = rule.flagId === f.id ? T.surface1 : 'transparent')}>
-                    {rule.flagId === f.id && <i className="ti ti-check" style={{ fontSize: 12, color: T.textAccent, flexShrink: 0 }} />}
-                    {f.emoji && <span>{f.emoji}</span>}<span>{f.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {creatingForRuleId === rule.id && (
-              <FlagCreateForm
-                onCreateFlag={flag => { onCreateFlag(flag); updateRule(rule.id, { flagId: flag.id }); }}
-                onCancel={() => setCreatingForRuleId(null)}
-                pendingAnswer="Yes"
-                onSelect={() => setCreatingForRuleId(null)}
-              />
-            )}
+          <div style={{ marginBottom: 8 }}>
+            <FlagPicker
+              selectedIds={rule.flagIds ?? (rule.flagId ? [rule.flagId] : [])}
+              flags={flags}
+              onToggle={flagId => {
+                const current = rule.flagIds ?? (rule.flagId ? [rule.flagId] : []);
+                const next = current.includes(flagId) ? current.filter(id => id !== flagId) : [...current, flagId];
+                updateRule(rule.id, { flagIds: next, flagId: next[0] ?? '' });
+              }}
+              onCreateFlag={flag => { onCreateFlag(flag); const current = rule.flagIds ?? (rule.flagId ? [rule.flagId] : []); updateRule(rule.id, { flagIds: [...current, flag.id], flagId: flag.id }); }}
+            />
           </div>
           <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>Record Color</div>
           <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>Change device screen color when flag triggers</div>
@@ -824,7 +798,11 @@ function MCCASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (up
   const mcRules = item.caForMCRules ?? [];
   const choices = item.choices ?? [];
 
-  const addRule = () => onUpdate({ caForMCRules: [...mcRules, { id: mkid(), condition: choices[0]?.id ?? '', caList: '', adHoc: false, nextStep: 'repeat-item' }] });
+  const addRule = () => {
+    const usedIds = new Set(mcRules.map(r => r.condition));
+    const nextChoice = choices.find(c => !usedIds.has(c.id));
+    onUpdate({ caForMCRules: [...mcRules, { id: mkid(), condition: nextChoice?.id ?? '', caList: '', adHoc: false, nextStep: 'repeat-item' }] });
+  };
   const removeRule = (id: string) => onUpdate({ caForMCRules: mcRules.filter(r => r.id !== id) });
   const updateRule = (id: string, updates: Partial<CARule>) => onUpdate({ caForMCRules: mcRules.map(r => r.id === id ? { ...r, ...updates } : r) });
 
@@ -837,7 +815,7 @@ function MCCASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (up
         <>
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
-              <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For {markAs}</span>
+              <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>Turn on for {markAs}</span>
               <Toggle on={forNA} onChange={v => onUpdate({ caForNA: v })} />
             </div>
             {forNA && (
@@ -866,10 +844,10 @@ function MCCASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (up
         </>
       )}
 
-      {/* For choices */}
+      {/* Turn on for choices */}
       <div style={{ paddingTop: markAs ? 0 : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: mcRules.length > 0 ? 10 : 0 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For choices</span>
+          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>Turn on for choices</span>
           <Toggle on={mcRules.length > 0} onChange={v => { if (v && mcRules.length === 0) addRule(); else if (!v) onUpdate({ caForMCRules: [] }); }} />
         </div>
         {mcRules.length > 0 && choices.length === 0 && (
@@ -947,7 +925,7 @@ function CASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (upda
         <>
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: forNA ? 10 : 0 }}>
-              <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>For {markAs}</span>
+              <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>Turn on for {markAs}</span>
               <Toggle on={forNA} onChange={setForNA} />
             </div>
             {forNA && (
@@ -978,7 +956,7 @@ function CASection({ item, onUpdate, markAs }: { item: ListItem; onUpdate: (upda
       {isMeas && markAs && <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: forNA ? 12 : 0 }} />}
       <div style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (isMeas ? forRanges : ynRules.length > 0) ? 10 : 0 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>{isMeas ? 'For ranges' : 'Turn on for Yes/No'}</span>
+          <span style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>{isMeas ? 'Turn on for ranges' : 'Turn on for Yes/No'}</span>
           <Toggle on={isMeas ? forRanges : ynRules.length > 0} onChange={v => { if (isMeas) { setForRanges(v); if (v && rangeRules.length === 0) onUpdate({ caForRanges: true, caForRangeRules: [{ id: mkid(), rangeId: item.measRanges?.[0]?.id ?? '', condition: 'Inside', caList: '', adHoc: false, nextStep: 'repeat-item' }] }); else if (!v) onUpdate({ caForRanges: false, caForRangeRules: [] }); } else { if (v && ynRules.length === 0) addYNRule(); else if (!v) onUpdate({ caForYNRules: [] }); } }} />
         </div>
         {!isMeas && ynRules.map((rule, idx) => (
@@ -1417,11 +1395,11 @@ function MCChoiceList({ choices, locked, scoringOn, flags, onUpdate, onRemove, f
 function TemplateRow({ tpl, onUse, onCopy }: { tpl: { id: string; name: string; choices: MCChoice[] }; onUse: () => void; onCopy: () => void }) {
   const [hovered, setHovered] = useState(false);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', borderBottom: `0.5px solid ${T.border}`, background: hovered ? T.surface1 : 'transparent' }}
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', borderBottom: `0.5px solid ${T.border}`, background: hovered ? T.surface1 : 'transparent', cursor: 'pointer' }}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={onUse}>
       <span style={{ fontSize: 13, color: T.textPrimary }}>{tpl.name}</span>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', opacity: hovered ? 1 : 0, transition: 'opacity 0.1s' }}>
-        <button onMouseDown={e => { e.preventDefault(); onCopy(); }} style={{ fontFamily: T.font, fontSize: 12, padding: '3px 10px', borderRadius: 4, border: `0.5px solid ${T.borderStrong}`, background: T.surface0, color: T.textSecondary, cursor: 'pointer' }}>Copy</button>
+        <button onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onCopy(); }} onClick={e => e.stopPropagation()} style={{ fontFamily: T.font, fontSize: 12, padding: '3px 10px', borderRadius: 4, border: `0.5px solid ${T.borderStrong}`, background: T.surface0, color: T.textSecondary, cursor: 'pointer' }}>Copy</button>
         <button onMouseDown={e => { e.preventDefault(); onUse(); }} style={{ fontFamily: T.font, fontSize: 12, padding: '3px 10px', borderRadius: 4, border: 'none', background: T.fillAccent, color: 'white', cursor: 'pointer' }}>Use</button>
       </div>
     </div>
@@ -2624,20 +2602,20 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
   { group: 'M — Measurement', cols: [
     { key: 'm-saved-value', label: 'Saved Value', types: ['measurement'], detect: i => !!i.savedValue },
     { key: 'm-type',        label: 'Type',        types: ['measurement'], detect: i => !!i.measType },
-    { key: 'm-method',      label: 'Method',      types: ['measurement'], detect: i => (i.measMethods?.length ?? 0) > 0 },
     { key: 'm-unit',        label: 'Unit',        types: ['measurement'], detect: i => !!i.measUnit },
+    { key: 'm-method',      label: 'Method',      types: ['measurement'], detect: i => (i.measMethods?.length ?? 0) > 0 },
+    { key: 'm-sensor-name', label: 'Sensor name', types: ['measurement'], detect: i => !!i.measSensorId },
     { key: 'm-range1-min',  label: 'Range 1 Min', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 },
     { key: 'm-range1-max',  label: 'Range 1 Max', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 },
     { key: 'm-range2-min',  label: 'Range 2 Min', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 },
     { key: 'm-range2-max',  label: 'Range 2 Max', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 },
     { key: 'm-range3-min',  label: 'Range 3 Min', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 },
     { key: 'm-range3-max',  label: 'Range 3 Max', types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 },
-    { key: 'm-sensor-name', label: 'Sensor name', types: ['measurement'], detect: i => !!i.measSensorId },
-    { key: 'm-flag-r1',    label: 'Flag - R1',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[0]?.id) ?? false) },
+    { key: 'm-flag-r1',    label: 'Flag - R1',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[0]?.id && ((r.flagIds?.length ?? 0) > 0 || !!r.flagId)) ?? false) },
     { key: 'm-color-r1',   label: 'Color - R1',  types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 1 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[0]?.id) ?? false) },
-    { key: 'm-flag-r2',    label: 'Flag - R2',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[1]?.id) ?? false) },
+    { key: 'm-flag-r2',    label: 'Flag - R2',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[1]?.id && ((r.flagIds?.length ?? 0) > 0 || !!r.flagId)) ?? false) },
     { key: 'm-color-r2',   label: 'Color - R2',  types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 2 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[1]?.id) ?? false) },
-    { key: 'm-flag-r3',    label: 'Flag - R3',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[2]?.id) ?? false) },
+    { key: 'm-flag-r3',    label: 'Flag - R3',   types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[2]?.id && ((r.flagIds?.length ?? 0) > 0 || !!r.flagId)) ?? false) },
     { key: 'm-color-r3',   label: 'Color - R3',  types: ['measurement'], detect: i => (i.measRanges?.length ?? 0) >= 3 && (i.measFlagRules?.some(r => r.rangeId === i.measRanges?.[2]?.id) ?? false) },
   ]},
   { group: 'MC — Multiple Choice', cols: [
@@ -2645,12 +2623,12 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
     { key: 'mc-show-inline',  label: 'Show inline',  types: ['mc'], detect: i => !!i.mcShowInline },
   ]},
   { group: 'CA — Corrective Action', cols: [
-    { key: 'ca-turn-on',       label: 'Turn on for Y/N', types: ['yn'],                    detect: i => (i.caForYNRules?.length ?? 0) > 0 },
-    { key: 'ca-trigger-yn',    label: 'Condition',                                          detect: i => i.caForYNRules?.some(r => !!r.condition) ?? false },
-    { key: 'ca-list',          label: 'CA List',                                            detect: i => i.caForYNRules?.some(r => !!r.caList) ?? false },
+    { key: 'ca-turn-on',       label: 'Turn on for results', types: ['yn', 'measurement', 'mc'], detect: i => (i.caForYNRules?.length ?? 0) > 0 || !!i.caForRanges || (i.caForMCRules?.length ?? 0) > 0 },
+    { key: 'ca-trigger-yn',    label: 'Condition',                                          detect: i => (i.caForYNRules?.some(r => !!r.condition) ?? false) || (i.caForMCRules?.some(r => !!r.condition) ?? false) },
+    { key: 'ca-list',          label: 'CA List',                                            detect: i => (i.caForYNRules?.some(r => r.adHoc || !!r.caList) ?? false) || (i.caForRangeRules?.some(r => r.adHoc || !!r.caList) ?? false) || (i.caForMCRules?.some(r => r.adHoc || !!r.caList) ?? false) },
+    { key: 'ca-repeat',        label: 'Next Step',                                          detect: i => (i.caForYNRules?.length ?? 0) > 0 || (i.caForRangeRules?.length ?? 0) > 0 || (i.caForMCRules?.length ?? 0) > 0 || !!i.caForNA },
     { key: 'ca-planned',       label: 'Ad Hoc',                                             detect: i => (i.caForYNRules?.some(r => !!r.adHoc) ?? false) || !!i.caForNAAdHoc },
     { key: 'ca-optional',      label: 'Optional',                                           detect: i => (i.caForYNRules?.some(r => !!r.optional) ?? false) || (i.caForRangeRules?.some(r => !!r.optional) ?? false) || !!i.caForNAOptional },
-    { key: 'ca-repeat',        label: 'Repeat',                                             detect: i => (i.caForYNRules?.length ?? 0) > 0 || !!i.caForNA },
     { key: 'ca-trigger-ranges',label: 'Trigger Ranges',  types: ['measurement'],            detect: i => (i.caForRangeRules?.length ?? 0) > 0 },
     { key: 'ca-turn-on-na',    label: 'Turn on for N/A', types: ['yn', 'measurement'],      detect: i => !!i.caForNA },
     { key: 'ca-list-na',       label: 'List for NA',                                        detect: i => !!i.caForNAList },
@@ -2952,7 +2930,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       const toName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; };
       const yesIds = item.flagsForYes ?? [];
       const noIds = item.flagsForNo ?? [];
-      const measRules = (item.measFlagRules ?? []).filter(r => !!r.flagId);
+      const measRules = (item.measFlagRules ?? []).filter(r => (r.flagIds?.length ?? 0) > 0 || !!r.flagId);
       if (yesIds.length === 0 && noIds.length === 0 && measRules.length === 0) return [];
       const lines = [
         ...(yesIds.length > 0 ? [`Yes: ${yesIds.map(toName).join(', ')}`] : []),
@@ -2961,7 +2939,8 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
           const range = item.measRanges?.[rangeIdx];
           const label = range ? `R${rangeIdx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : `R?`;
-          return `${label}: ${toName(r.flagId)}`;
+          const ids = r.flagIds ?? (r.flagId ? [r.flagId] : []);
+          return `${label}: ${ids.map(toName).join(', ')}`;
         }),
       ];
       return [{ icon: 'ti-flag', title: lines.join('\n') }];
@@ -3139,21 +3118,25 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'ca-turn-on') {
-          const on = (item.caForYNRules?.length ?? 0) > 0;
-          const unconfigured = isYNCaUnconfigured(item);
+          const on = item.type === 'measurement' ? !!item.caForRanges
+            : item.type === 'mc' ? (item.caForMCRules?.length ?? 0) > 0
+            : (item.caForYNRules?.length ?? 0) > 0;
+          const unconfigured = item.type === 'yn' && isYNCaUnconfigured(item);
           const toastKey = `${item.id}:ca-turn-on`;
           const showToast = caToastId === toastKey;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer', position: 'relative', outline: unconfigured ? `1.5px solid #EF5350` : 'none', outlineOffset: -1 }}
               onClick={e => {
                 e.stopPropagation();
-                if (!on) {
-                  onUpdate(item.id, { caForYNRules: [{ id: mkid(), condition: 'No', caList: '', adHoc: false, nextStep: 'repeat-item' }] });
-                  onCaToast(toastKey);
-                  setTimeout(() => onCaToast(null), 3000);
+                if (item.type === 'measurement') {
+                  if (!on) { onUpdate(item.id, { caForRanges: true, caForRangeRules: [{ id: mkid(), rangeId: item.measRanges?.[0]?.id ?? '', condition: 'Inside', caList: '', adHoc: false, nextStep: 'repeat-item' }] }); onCaToast(toastKey); setTimeout(() => onCaToast(null), 3000); }
+                  else onUpdate(item.id, { caForRanges: false, caForRangeRules: [] });
+                } else if (item.type === 'mc') {
+                  if (!on) { onUpdate(item.id, { caForMCRules: [{ id: mkid(), condition: '', caList: '', adHoc: false, nextStep: 'repeat-item' }] }); onCaToast(toastKey); setTimeout(() => onCaToast(null), 3000); }
+                  else onUpdate(item.id, { caForMCRules: [] });
                 } else {
-                  onUpdate(item.id, { caForYNRules: [] });
-                  onCaToast(null);
+                  if (!on) { onUpdate(item.id, { caForYNRules: [{ id: mkid(), condition: 'No', caList: '', adHoc: false, nextStep: 'repeat-item' }] }); onCaToast(toastKey); setTimeout(() => onCaToast(null), 3000); }
+                  else { onUpdate(item.id, { caForYNRules: [] }); onCaToast(null); }
                 }
               }}>
               <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: unconfigured ? '#EF5350' : on ? T.textAccent : T.textMuted }} />
@@ -3168,25 +3151,47 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         }
         if (col.key === 'ca-repeat') {
           const stepLabel = (s: string | undefined) => s === 'repeat-item' ? 'Item' : s === 'repeat-list' ? 'List' : null;
+          const truncChoice = (label: string) => { const w = label.trim().split(/\s+/); return w.length <= 3 ? label : w.slice(0, 3).join(' ') + '…'; };
           const repeatPills: { label: string; tip: string; na: boolean }[] = [];
           for (const r of item.caForYNRules ?? []) {
             const label = stepLabel(r.nextStep);
             if (label) repeatPills.push({ label, tip: `Repeat ${label.toLowerCase()} for ${r.condition ?? 'Result'}`, na: false });
           }
+          for (const r of item.caForRangeRules ?? []) {
+            const label = stepLabel(r.nextStep);
+            if (label) {
+              const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
+              const range = item.measRanges?.[rangeIdx];
+              const rangeLabel = range ? `R${rangeIdx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : `R${rangeIdx + 1}`;
+              repeatPills.push({ label, tip: `Repeat ${label.toLowerCase()} for ${rangeLabel}`, na: false });
+            }
+          }
+          for (const r of item.caForMCRules ?? []) {
+            const label = stepLabel(r.nextStep);
+            if (label) {
+              const choice = (item.choices ?? []).find(c => c.id === r.condition);
+              const choiceLabel = choice?.label || r.condition || 'Choice';
+              repeatPills.push({ label, tip: `Repeat ${label.toLowerCase()} for ${choiceLabel}`, na: false });
+            }
+          }
           if (item.caForNA) {
+            const markAsVal = (colValues[item.id] ?? {})['all-mark-as'] ?? 'N/A';
             const label = stepLabel(item.caForNANextStep ?? 'repeat-item');
-            if (label) repeatPills.push({ label, tip: `Repeat ${label.toLowerCase()} for N/A`, na: true });
+            if (label) repeatPills.push({ label, tip: `Repeat ${label.toLowerCase()} for ${markAsVal || 'N/A'}`, na: true });
           }
           if (repeatPills.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const combinedTip = repeatPills.map(p => p.tip).join('\n');
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                {repeatPills.map((p, i) => (
-                  <Tooltip key={i} text={p.tip}>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.na ? T.surface1 : pillBg, color: p.na ? T.textSecondary : T.textAccent, whiteSpace: 'nowrap' }}>{p.label}</span>
-                  </Tooltip>
-                ))}
-              </div>
+              {repeatPills.length === 1 ? (
+                <Tooltip text={repeatPills[0].tip}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: repeatPills[0].na ? T.surface1 : pillBg, color: repeatPills[0].na ? T.textSecondary : T.textAccent, whiteSpace: 'nowrap' }}>{repeatPills[0].label}</span>
+                </Tooltip>
+              ) : (
+                <Tooltip text={combinedTip}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap' }}>{repeatPills.length} steps</span>
+                </Tooltip>
+              )}
             </td>
           );
         }
@@ -3215,15 +3220,18 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
             optPills.push({ label, tip });
           }
           if (optPills.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const optTip = optPills.map(p => p.tip).join('\n');
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                {optPills.map(p => (
-                  <Tooltip key={p.label} text={p.tip}>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: (p.label === 'N/A' || p.label === 'OOO') ? T.surface1 : pillBg, color: (p.label === 'N/A' || p.label === 'OOO') ? T.textSecondary : T.textAccent, whiteSpace: 'nowrap' }}>{p.label}</span>
-                  </Tooltip>
-                ))}
-              </div>
+              {optPills.length === 1 ? (
+                <Tooltip text={optPills[0].tip}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: (optPills[0].label === 'N/A' || optPills[0].label === 'OOO') ? T.surface1 : pillBg, color: (optPills[0].label === 'N/A' || optPills[0].label === 'OOO') ? T.textSecondary : T.textAccent, whiteSpace: 'nowrap' }}>{optPills[0].label}</span>
+                </Tooltip>
+              ) : (
+                <Tooltip text={optTip}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap' }}>{optPills.length} rules</span>
+                </Tooltip>
+              )}
             </td>
           );
         }
@@ -3248,6 +3256,30 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           );
         }
         if (col.key === 'ca-trigger-yn') {
+          if (item.type === 'mc') {
+            const mcRules = (item.caForMCRules ?? []).filter(r => !!r.condition);
+            if (mcRules.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+            const truncate = (label: string) => { const words = label.trim().split(/\s+/); return words.length <= 3 ? label : words.slice(0, 3).join(' ') + '…'; };
+            const mcPills = mcRules.map(r => {
+              const choice = (item.choices ?? []).find(c => c.id === r.condition);
+              const fullName = choice?.label || r.condition || '(unnamed)';
+              return { short: truncate(fullName), full: fullName };
+            });
+            const combinedTip = mcPills.map(p => p.full).join('\n');
+            return (
+              <td key={col.key} style={{ width: 120, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
+                {mcPills.length === 1 ? (
+                  <Tooltip text={mcPills[0].full}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{mcPills[0].short}</span>
+                  </Tooltip>
+                ) : (
+                  <Tooltip text={combinedTip}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap' }}>{mcPills.length} choices</span>
+                  </Tooltip>
+                )}
+              </td>
+            );
+          }
           const rules = item.caForYNRules ?? [];
           if (rules.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
           return (
@@ -3265,20 +3297,27 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'ca-trigger-ranges') {
           const rules = item.caForRangeRules ?? [];
           if (rules.length === 0) return <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}><span style={{ color: T.textMuted, fontSize: 12 }}>—</span></td>;
+          const rangePills = rules.map(r => {
+            const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
+            const range = item.measRanges?.[rangeIdx];
+            const label = `R${rangeIdx + 1} ${r.condition ?? ''}`;
+            const rangeDesc = range ? `Range ${rangeIdx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : `Range ${rangeIdx + 1}`;
+            const tip = `${r.condition ?? ''}: ${rangeDesc}`;
+            const isInside = r.condition === 'Inside';
+            return { label, tip, isInside };
+          });
+          const combinedTip = rangePills.map(p => p.tip).join('\n');
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                {rules.map(r => {
-                  const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
-                  const label = `R${rangeIdx + 1} ${r.condition ?? ''}`;
-                  const isInside = r.condition === 'Inside';
-                  return (
-                    <span key={r.id} style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: isInside ? '#E8F5E9' : '#FFF3E0', color: isInside ? '#388E3C' : '#E65100' }}>
-                      {label}
-                    </span>
-                  );
-                })}
-              </div>
+              {rangePills.length === 1 ? (
+                <Tooltip text={rangePills[0].tip}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: rangePills[0].isInside ? '#E8F5E9' : '#FFF3E0', color: rangePills[0].isInside ? '#388E3C' : '#E65100' }}>{rangePills[0].label}</span>
+                </Tooltip>
+              ) : (
+                <Tooltip text={combinedTip}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap' }}>{rangePills.length} ranges</span>
+                </Tooltip>
+              )}
             </td>
           );
         }
@@ -3289,13 +3328,31 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
             </Tooltip>
           );
           if (col.key === 'ca-list') {
-            // Include ad-hoc rules AND rules with a caList
-            const activeRules = (item.caForYNRules ?? []).filter(r => r.adHoc || !!r.caList);
-            const rawPills = activeRules.map(r => {
-              const name = r.adHoc ? 'Ad hoc' : (CA_LISTS.find(l => l.id === r.caList)?.title ?? r.caList ?? '');
-              const tipLine = r.adHoc ? `Ad hoc for ${r.condition ?? 'Result'}` : `CA list for ${r.condition ?? 'Result'} — ${name}`;
-              return { name, tipLine };
-            });
+            const activeYNRules = (item.caForYNRules ?? []).filter(r => r.adHoc || !!r.caList);
+            const activeRangeRules = (item.caForRangeRules ?? []).filter(r => r.adHoc || !!r.caList);
+            const activeMCRules = (item.caForMCRules ?? []).filter(r => r.adHoc || !!r.caList);
+            const rawPills: { name: string; tipLine: string }[] = [
+              ...activeYNRules.map(r => {
+                const name = r.adHoc ? 'Ad hoc' : (CA_LISTS.find(l => l.id === r.caList)?.title ?? r.caList ?? '');
+                const tipLine = r.adHoc ? `Ad hoc for ${r.condition ?? 'Result'}` : `CA list for ${r.condition ?? 'Result'} — ${name}`;
+                return { name, tipLine };
+              }),
+              ...activeRangeRules.map(r => {
+                const name = r.adHoc ? 'Ad hoc' : (CA_LISTS.find(l => l.id === r.caList)?.title ?? r.caList ?? '');
+                const rangeIdx = (item.measRanges ?? []).findIndex(x => x.id === r.rangeId);
+                const range = item.measRanges?.[rangeIdx];
+                const rangeLabel = range ? `R${rangeIdx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : `R${rangeIdx + 1}`;
+                const tipLine = r.adHoc ? `Ad hoc for ${rangeLabel}` : `CA list for ${rangeLabel} — ${name}`;
+                return { name, tipLine };
+              }),
+              ...activeMCRules.map(r => {
+                const name = r.adHoc ? 'Ad hoc' : (CA_LISTS.find(l => l.id === r.caList)?.title ?? r.caList ?? '');
+                const choice = (item.choices ?? []).find(c => c.id === r.condition);
+                const choiceLabel = choice?.label || r.condition || 'Choice';
+                const tipLine = r.adHoc ? `Ad hoc for ${choiceLabel}` : `CA list for ${choiceLabel} — ${name}`;
+                return { name, tipLine };
+              }),
+            ];
             // Group by display name, merging tooltip lines
             const grouped = new Map<string, string[]>();
             for (const p of rawPills) { if (!grouped.has(p.name)) grouped.set(p.name, []); grouped.get(p.name)!.push(p.tipLine); }
@@ -3307,9 +3364,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
                 ) : unique.length === 1 ? (
                   pillSpan(unique[0].name, unique[0].tip)
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-                    {unique.map(p => pillSpan(p.name, p.tip))}
-                  </div>
+                  pillSpan(`${unique.length} lists`, unique.map(p => p.tip).join('\n'))
                 )}
               </td>
             );
@@ -3438,9 +3493,9 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const label = methods.length === 1 ? methods[0] : `${methods.length} methods`;
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
-              <span title={methods.join(', ')} style={{ fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: T.surface0, color: T.textSecondary, display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+              <Tooltip text={methods.join(', ')}><span style={{ fontSize: 11, fontWeight: 500, padding: '2px 6px', borderRadius: 10, background: T.surface0, color: T.textSecondary, display: 'inline-block', maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                 {label}
-              </span>
+              </span></Tooltip>
             </td>
           );
         }
@@ -3448,7 +3503,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
           const sensor = MOCK_SENSORS.find(s => s.id === item.measSensorId);
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', overflow: 'hidden' }}>
-              {sensor ? <span title={sensor.name} style={{ fontSize: 11, fontWeight: 500, color: T.textSecondary, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sensor.name}</span> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+              {sensor ? <Tooltip text={sensor.name}><span style={{ fontSize: 11, fontWeight: 500, color: T.textSecondary, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sensor.name}</span></Tooltip> : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
             </td>
           );
         }
@@ -3481,22 +3536,51 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
             const rule = range ? (item.measFlagRules ?? []).find(r => r.rangeId === range.id) : undefined;
             const rangeLabel = range ? `R${idx + 1} (${range.min || 'Min'} – ${range.max || 'Max'})` : '';
             if (kind === 'flag') {
-              const f = rule?.flagId ? flags.find(x => x.id === rule.flagId) : undefined;
-              const name = f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : '';
+              // All rules for this range (there can be multiple, each with a condition and multiple flags)
+              const rangeRules = range ? (item.measFlagRules ?? []).filter(r => r.rangeId === range.id) : [];
+              const toFlagName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; };
+              // Build flat list of all flags across all rules, with their condition for tooltip
+              const allEntries: { name: string; condition: string }[] = [];
+              for (const r of rangeRules) {
+                const ids = r.flagIds ?? (r.flagId ? [r.flagId] : []);
+                for (const id of ids) allEntries.push({ name: toFlagName(id), condition: r.condition });
+              }
+              // Tooltip: group by condition — "Inside: Flag A, Flag B\nOutside: Flag C"
+              const byCondition = new Map<string, string[]>();
+              for (const e of allEntries) { if (!byCondition.has(e.condition)) byCondition.set(e.condition, []); byCondition.get(e.condition)!.push(e.name); }
+              const tip = Array.from(byCondition.entries()).map(([cond, names]) => `${cond}: ${names.join(', ')}`).join('\n');
+              const totalCount = allEntries.length;
               return (
                 <td key={col.key} style={{ width: 120, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-                  {name
-                    ? <Tooltip text={`${name}\n${rangeLabel}`}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{name}</span></Tooltip>
-                    : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+                  {totalCount === 0 ? (
+                    <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+                  ) : totalCount === 1 ? (
+                    <Tooltip text={tip}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>{allEntries[0].name}</span></Tooltip>
+                  ) : (
+                    <Tooltip text={tip}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent, whiteSpace: 'nowrap' }}>{totalCount} flags</span></Tooltip>
+                  )}
                 </td>
               );
             } else {
-              const color = rule?.recordColor;
+              // All rules for this range — collect distinct colors with their condition
+              const colorRules = range ? (item.measFlagRules ?? []).filter(r => r.rangeId === range.id && !!r.recordColor) : [];
+              const colorEntries = colorRules.map(r => ({ color: r.recordColor, condition: r.condition }));
+              const colorTip = colorEntries.map(e => `${e.condition}: ${e.color}`).join('\n');
               return (
                 <td key={col.key} style={{ width: 80, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-                  {color
-                    ? <Tooltip text={rangeLabel}><span style={{ display: 'inline-block', width: 18, height: 18, borderRadius: 4, background: color, border: `0.5px solid ${T.borderStrong}`, verticalAlign: 'middle' }} /></Tooltip>
-                    : <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>}
+                  {colorEntries.length === 0 ? (
+                    <span style={{ color: T.textMuted, fontSize: 12 }}>—</span>
+                  ) : colorEntries.length === 1 ? (
+                    <Tooltip text={`${colorEntries[0].condition}: ${colorEntries[0].color}`}><span style={{ display: 'inline-block', width: 18, height: 18, borderRadius: 4, background: colorEntries[0].color, border: `0.5px solid ${T.borderStrong}`, verticalAlign: 'middle' }} /></Tooltip>
+                  ) : (
+                    <Tooltip text={colorTip}>
+                      <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
+                        {colorEntries.map((e, i) => (
+                          <span key={i} style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 3, background: e.color, border: `0.5px solid ${T.borderStrong}` }} />
+                        ))}
+                      </span>
+                    </Tooltip>
+                  )}
                 </td>
               );
             }
