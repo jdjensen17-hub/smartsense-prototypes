@@ -3647,11 +3647,15 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
         if (col.key === 'formula-type') {
           const t = item.formulaType ?? 'number';
           const label = t === 'number' ? 'Number' : t === 'date' ? 'Date' : 'Text';
+          const expr = item.formulaExpr ?? '';
+          const tip = expr ? `Formula: ${expr}` : 'No formula defined';
           return (
             <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary, whiteSpace: 'nowrap' }}>
-                {label}
-              </span>
+              <Tooltip text={tip}>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: T.surface0, color: T.textSecondary, whiteSpace: 'nowrap' }}>
+                  {label}
+                </span>
+              </Tooltip>
             </td>
           );
         }
