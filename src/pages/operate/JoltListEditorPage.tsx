@@ -276,6 +276,30 @@ function daysInMonth(month: number) {
   return [31,28,29,30,31,30,31,31,30,31,30,31][month];
 }
 
+const UNIT_MINUTES: Record<string, number> = { minutes: 1, hours: 60, days: 1440, weeks: 10080 };
+
+function dtToMinutes(dt: DisplayTime): number {
+  const h12 = dt.hour % 12;
+  return (dt.ampm === 'PM' ? h12 + 12 : h12) * 60 + dt.minute;
+}
+
+function dtConflicts(dts: DisplayTime[]): Map<string, 'due' | 'exp'> {
+  const result = new Map<string, 'due' | 'exp'>();
+  for (let i = 0; i < dts.length; i++) {
+    const a = dts[i];
+    const aStart = dtToMinutes(a);
+    const aDue = aStart + a.dueAmt * (UNIT_MINUTES[a.dueUnit] ?? 1);
+    const aExp = aDue + a.expAmt * (UNIT_MINUTES[a.expUnit] ?? 1);
+    for (let j = i + 1; j < dts.length; j++) {
+      const b = dts[j];
+      const bStart = dtToMinutes(b);
+      if (bStart < aDue) { if (!result.has(a.id)) result.set(a.id, 'due'); }
+      else if (bStart < aExp) { if (!result.has(a.id)) result.set(a.id, 'exp'); }
+    }
+  }
+  return result;
+}
+
 function schedSummary(dts: DisplayTime[]): string {
   if (dts.length === 0) return '';
   const times = dts.map(dt => {
@@ -347,10 +371,9 @@ function ScheduleOptions({ bumpLists, setBumpLists, reDisplay, setReDisplay, ign
 
 function ListScheduleSection() {
   const [displayTimes, setDisplayTimes] = useState<DisplayTime[]>([]);
-  const [applyPanelId, setApplyPanelId] = useState<string | null>(null);
 
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('daily');
-  const [weekDays, setWeekDays] = useState<number[]>([1,2,3,4,5]);
+  const [weekDays, setWeekDays] = useState<number[]>([0,1,2,3,4,5,6]);
   const [occurrences, setOccurrences] = useState<number[]>([1,2,3,4,5]);
   const [monthDays, setMonthDays] = useState<number[]>([]);
   const [intervalAmt, setIntervalAmt] = useState(10);
@@ -370,22 +393,11 @@ function ListScheduleSection() {
     setDisplayTimes(prev => [...prev, dt]);
   };
 
-  const updateDT = (id: string, patch: Partial<DisplayTime>, field?: 'offset') => {
+  const updateDT = (id: string, patch: Partial<DisplayTime>) => {
     setDisplayTimes(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
-    if (field === 'offset' && displayTimes.length > 1) setApplyPanelId(id);
   };
 
-  const removeDT = (id: string) => {
-    setDisplayTimes(prev => prev.filter(d => d.id !== id));
-    if (applyPanelId === id) setApplyPanelId(null);
-  };
-
-  const applyToAll = (id: string) => {
-    const src = displayTimes.find(d => d.id === id);
-    if (!src) return;
-    setDisplayTimes(prev => prev.map(d => ({ ...d, dueAmt: src.dueAmt, dueUnit: src.dueUnit, expAmt: src.expAmt, expUnit: src.expUnit })));
-    setApplyPanelId(null);
-  };
+  const removeDT = (id: string) => setDisplayTimes(prev => prev.filter(d => d.id !== id));
 
   const toggleWeekDay = (d: number) => setWeekDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
   const toggleOccurrence = (o: number) => setOccurrences(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o]);
@@ -398,6 +410,7 @@ function ListScheduleSection() {
 
   const hasSchedule = displayTimes.length > 0;
   const summary = hasSchedule ? schedSummary(displayTimes) : 'No schedule configured';
+  const conflicts = bumpLists ? dtConflicts(displayTimes) : new Map<string, 'due' | 'exp'>();
 
   const segBtn = (label: string, mode: RepeatMode) => (
     <div key={label} onClick={() => setRepeatMode(mode)}
@@ -445,12 +458,11 @@ function ListScheduleSection() {
       <div style={{ marginBottom: 16 }}>
         {secLabel('Display times')}
         {displayTimes.length === 0 && (
-          <div style={{ fontSize: 12, color: T.textMuted, fontStyle: 'italic', marginBottom: 8 }}>No display times set — add at least one to activate this schedule</div>
+          <div style={{ fontSize: 12, color: T.textMuted, fontStyle: 'italic', marginBottom: 8 }}>No display times set</div>
         )}
         {displayTimes.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
             {displayTimes.map(dt => {
-              const isApply = applyPanelId === dt.id;
               const offsetSel = (val: number, onChange: (v: number) => void) => (
                 <input type="number" value={val} min={1} onChange={e => onChange(Number(e.target.value))}
                   style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 4, padding: '3px 6px', width: 44, textAlign: 'center', background: T.surface2, color: T.textPrimary }} />
@@ -461,51 +473,54 @@ function ListScheduleSection() {
                   {OFFSET_UNITS.map(u => <option key={u}>{u}</option>)}
                 </select>
               );
+              const conflict = conflicts.get(dt.id);
+              const conflictMsg = conflict === 'due'
+                ? 'The list scheduled at this display time will be replaced before it is due by the list on a later display time. Reduce the due interval or turn off Bump Lists in List schedule options to have both lists available to work on.'
+                : conflict === 'exp'
+                ? 'The list scheduled at this display time will be replaced before it expires by the list on a later display time. Reduce the expiration interval or turn off Bump Lists in List schedule options to have both lists available to work on.'
+                : null;
               return (
-                <div key={dt.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: T.surface1, border: `0.5px solid ${T.border}`, borderRadius: isApply ? '8px 8px 0 0' : 8, borderBottom: isApply ? 'none' : undefined, overflow: 'hidden' }}>
-                    {/* Time */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRight: `0.5px solid ${T.border}` }}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time</div>
-                      <select value={dt.hour} onChange={e => updateDT(dt.id, { hour: Number(e.target.value) })}
-                        style={{ fontFamily: T.font, fontSize: 13, fontWeight: 500, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textPrimary }}>
-                        {Array.from({length:12},(_,i)=>i+1).map(h => <option key={h}>{h}</option>)}
-                      </select>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: T.textMuted }}>:</span>
-                      <select value={dt.minute.toString().padStart(2,'0')} onChange={e => updateDT(dt.id, { minute: Number(e.target.value) })}
-                        style={{ fontFamily: T.font, fontSize: 13, fontWeight: 500, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textPrimary }}>
-                        {['00','15','30','45'].map(m => <option key={m}>{m}</option>)}
-                      </select>
-                      <select value={dt.ampm} onChange={e => updateDT(dt.id, { ampm: e.target.value as 'AM'|'PM' })}
-                        style={{ fontFamily: T.font, fontSize: 12, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textSecondary }}>
-                        <option>AM</option><option>PM</option>
-                      </select>
-                    </div>
-                    {/* Due after */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRight: `0.5px solid ${T.border}` }}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due after</div>
-                      {offsetSel(dt.dueAmt, v => updateDT(dt.id, { dueAmt: v }, 'offset'))}
-                      {unitSel(dt.dueUnit, v => updateDT(dt.id, { dueUnit: v }, 'offset'))}
-                    </div>
-                    {/* Expires after */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Expires after</div>
-                      {offsetSel(dt.expAmt, v => updateDT(dt.id, { expAmt: v }, 'offset'))}
-                      {unitSel(dt.expUnit, v => updateDT(dt.id, { expUnit: v }, 'offset'))}
-                    </div>
-                    <button onClick={() => removeDT(dt.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 15, padding: '8px 12px', flexShrink: 0 }}>
-                      <i className="ti ti-x" />
-                    </button>
+                <div key={dt.id} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: T.surface1, border: `0.5px solid ${conflict ? '#EF5350' : T.border}`, borderRadius: conflictMsg ? '8px 8px 0 0' : 8, overflow: 'hidden' }}>
+                  {/* Time */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRight: `0.5px solid ${T.border}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time</div>
+                    <select value={dt.hour} onChange={e => updateDT(dt.id, { hour: Number(e.target.value) })}
+                      style={{ fontFamily: T.font, fontSize: 13, fontWeight: 500, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textPrimary }}>
+                      {Array.from({length:12},(_,i)=>i+1).map(h => <option key={h}>{h}</option>)}
+                    </select>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: T.textMuted }}>:</span>
+                    <select value={dt.minute.toString().padStart(2,'0')} onChange={e => updateDT(dt.id, { minute: Number(e.target.value) })}
+                      style={{ fontFamily: T.font, fontSize: 13, fontWeight: 500, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textPrimary }}>
+                      {['00','15','30','45'].map(m => <option key={m}>{m}</option>)}
+                    </select>
+                    <select value={dt.ampm} onChange={e => updateDT(dt.id, { ampm: e.target.value as 'AM'|'PM' })}
+                      style={{ fontFamily: T.font, fontSize: 12, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textSecondary }}>
+                      <option>AM</option><option>PM</option>
+                    </select>
                   </div>
-                  {isApply && (
-                    <div style={{ background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 11, color: T.textAccent }}>Apply this change to all display times?</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => applyToAll(dt.id)} style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', background: T.fillAccent, color: T.onAccent, border: 'none' }}>Update all display times</button>
-                        <button onClick={() => setApplyPanelId(null)} style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', background: T.surface2, color: T.textSecondary, border: `0.5px solid ${T.borderStrong}` }}>Update this time only</button>
-                      </div>
-                    </div>
-                  )}
+                  {/* Due after */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRight: `0.5px solid ${T.border}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due after</div>
+                    {offsetSel(dt.dueAmt, v => updateDT(dt.id, { dueAmt: v }))}
+                    {unitSel(dt.dueUnit, v => updateDT(dt.id, { dueUnit: v }))}
+                  </div>
+                  {/* Expires after */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Expires after</div>
+                    {offsetSel(dt.expAmt, v => updateDT(dt.id, { expAmt: v }))}
+                    {unitSel(dt.expUnit, v => updateDT(dt.id, { expUnit: v }))}
+                  </div>
+                  <button onClick={() => removeDT(dt.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 15, padding: '8px 12px', flexShrink: 0 }}>
+                    <i className="ti ti-x" />
+                  </button>
+                </div>
+                {conflictMsg && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', background: 'rgba(239,83,80,0.08)', border: '0.5px solid #EF5350', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                    <i className="ti ti-alert-circle" style={{ fontSize: 14, color: '#EF5350', flexShrink: 0, marginTop: 1 }} />
+                    <span style={{ fontSize: 12, color: '#EF5350', lineHeight: 1.4 }}>{conflictMsg}</span>
+                  </div>
+                )}
                 </div>
               );
             })}
@@ -519,7 +534,7 @@ function ListScheduleSection() {
       {/* ── Repeats ── */}
       {hasSchedule && <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 4 }}>Repeats</div>
-        {repeatMode !== 'daily' && (
+        {false && (
           <div style={{ fontSize: 12, color: T.textAccent, marginBottom: 10 }}>
             {repeatSummary(repeatMode, weekDays, occurrences, monthDays, intervalAmt, intervalUnit, intervalStart)}
           </div>
@@ -586,8 +601,7 @@ function ListScheduleSection() {
 
       {/* ── Active Months ── */}
       {hasSchedule && <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 4 }}>Displays during these months</div>
-        <div style={{ fontSize: 12, color: T.textAccent, marginBottom: 10 }}>{monthSummary(monthMode, activeMonths, monthRanges)}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 10 }}>Displays during these months</div>
         {/* Mode toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
           {(['specific','ranges'] as MonthMode[]).map((m, i) => (
@@ -694,7 +708,7 @@ function SectionHeader({ label, helpTip, summary, right, children, defaultOpen =
           <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 14, color: T.textMuted }} />
         </div>
       </div>
-      {open && children && <div style={{ borderTop: `0.5px solid ${T.border}`, padding: '16px' }}>{children}</div>}
+      {children && <div style={{ borderTop: `0.5px solid ${T.border}`, padding: '16px', display: open ? undefined : 'none' }}>{children}</div>}
     </div>
   );
 }
