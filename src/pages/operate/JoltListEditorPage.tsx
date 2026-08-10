@@ -2956,7 +2956,7 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
   const [submission, setSubmission] = useState('items-anytime');
   const [submissionAccess, setSubmissionAccess] = useState('anyone-anytime');
   const [listScoreVisible, setListScoreVisible] = useState(true);
-  const [itemScoreVisible, setItemScoreVisible] = useState(false);
+  const [itemScoreVisible, setItemScoreVisible] = useState(true);
   const [rbacAnyone, setRbacAnyone] = useState(false);
   interface RbacRole { id: string; name: string; assigned: boolean; manage: boolean; }
   const [rbacRoles, setRbacRoles] = useState<RbacRole[]>([]);
@@ -2986,19 +2986,25 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
       </SectionHeader>
 
       {/* Scoring */}
-      <SectionHeader label="Scoring" helpTip="Turn on scoring to allow multiple choice, yes/no, and rating items to be used to calculate a score for this list." summary={scoringOn ? 'Score enabled' : 'Score off'} right={<Toggle on={scoringOn} onChange={setScoringOn} />} defaultOpen={scoringOn}>
-        {scoringOn && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>People assigned to this list can see the score on the device <HelpTip text="Helpful tip: For quizzes and tests, uncheck this box to hide the score for employees." /></span>
-              <Toggle on={listScoreVisible} onChange={setListScoreVisible} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>People managing this list can see the score on the device <HelpTip text="" /></span>
-              <Toggle on={itemScoreVisible} onChange={setItemScoreVisible} />
-            </div>
+      <SectionHeader label="Scoring" helpTip="Turn on scoring to allow multiple choice, yes/no, and rating items to be used to calculate a score for this list." summary={scoringOn ? 'Score enabled' : 'Score off'} defaultOpen={false}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: scoringOn ? 10 : 0, marginBottom: scoringOn ? 0 : 0, borderBottom: scoringOn ? `0.5px solid ${T.border}` : 'none' }}>
+            <span style={{ fontSize: 13, color: T.textPrimary }}>Enable scoring</span>
+            <Toggle on={scoringOn} onChange={setScoringOn} />
           </div>
-        )}
+          {scoringOn && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>People assigned to this list can see the score on the device <HelpTip text="Helpful tip: For quizzes and tests, uncheck this box to hide the score for employees." /></span>
+                <Toggle on={listScoreVisible} onChange={setListScoreVisible} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>People managing this list can see the score on the device <HelpTip text="" /></span>
+                <Toggle on={itemScoreVisible} onChange={setItemScoreVisible} />
+              </div>
+            </>
+          )}
+        </div>
       </SectionHeader>
 
       {/* List schedule */}
