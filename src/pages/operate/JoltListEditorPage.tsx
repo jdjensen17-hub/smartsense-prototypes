@@ -1121,7 +1121,7 @@ function TagPicker({ options, selected, onChange, placeholder, closeOnSelect = f
 }
 
 function LocationTagPicker({ selected, onChange }: { selected: string[]; onChange: (tags: string[]) => void }) {
-  return <TagPicker options={LOCATION_TAGS} selected={selected} onChange={onChange} placeholder="Add location tag…" closeOnSelect />;
+  return <TagPicker options={LOCATION_TAGS} selected={selected} onChange={onChange} placeholder="Add location tag…" closeOnSelect portalDropdown />;
 }
 
 function CAListPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
@@ -2963,13 +2963,14 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
   const [rbacPickerOpen, setRbacPickerOpen] = useState(false);
   const rbacBtnRef = useRef<HTMLButtonElement>(null);
   const [allowCreate, setAllowCreate] = useState(true);
+  const [listLocationTags, setListLocationTags] = useState<string[]>([]);
   const [allowGeo, setAllowGeo] = useState(true);
   const [allowMultiCopy, setAllowMultiCopy] = useState(false);
 
   return (
     <div style={{ padding: '16px 16px', maxWidth: 720 }}>
       {/* List submission */}
-      <SectionHeader label="List submission" summary={submission === 'items-anytime' ? 'Items can be submitted when complete' : 'List must be fully complete to submit'}>
+      <SectionHeader label="List submission" helpTip="Decide whether this list should be completed like a form (everything at once) or allow items to be submitted as completed." summary={submission === 'items-anytime' ? 'Items can be submitted when complete' : 'List must be fully complete to submit'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             { value: 'items-anytime', label: 'List items can be submitted when complete', tip: '' },
@@ -3072,6 +3073,12 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
       {/* Notifications */}
       <SectionHeader label="Notifications" helpTip="Configure email, text, or push notifications that are triggered by different events." summary="No events configured" defaultOpen={false}>
         <NotificationSection />
+      </SectionHeader>
+
+      {/* Location Tags */}
+      <SectionHeader label="Location tags" helpTip="This list will only generate for locations with ANY of the selected tags. Location tags are assigned to locations on the Locations Settings page." summary={listLocationTags.length ? `${listLocationTags.length} tag${listLocationTags.length > 1 ? 's' : ''} selected` : 'All locations'} defaultOpen={false}>
+        <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 10, lineHeight: 1.4 }}>Only generate for locations with these tags — empty means all locations</div>
+        <LocationTagPicker selected={listLocationTags} onChange={setListLocationTags} />
       </SectionHeader>
 
     </div>
