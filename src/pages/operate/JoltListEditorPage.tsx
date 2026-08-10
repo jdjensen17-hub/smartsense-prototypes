@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Barcode from 'react-barcode';
+import { ROLE_DEFS } from '../../data/roles';
 
 // ── Design tokens ───────────────────────────────────────────────────────────
 const T = {
@@ -242,7 +243,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
           left: rect.left + rect.width / 2,
           transform: 'translate(-50%, -100%)',
           background: '#1C1C1E', color: '#fff', fontSize: 11, fontWeight: 500, lineHeight: 1.5,
-          padding: '5px 9px', borderRadius: 6, whiteSpace: 'pre', zIndex: 9999,
+          padding: '5px 9px', borderRadius: 6, whiteSpace: 'pre-wrap', maxWidth: 280, zIndex: 9999,
           pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
         }}>
           {text}
@@ -395,6 +396,42 @@ function ScheduleOptions({ bumpLists, setBumpLists, reDisplay, setReDisplay, ign
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CreateSettingsSubsection({ allowCreate, setAllowCreate, allowGeo, setAllowGeo, allowMultiCopy, setAllowMultiCopy }: { allowCreate: boolean; setAllowCreate: (v: boolean) => void; allowGeo: boolean; setAllowGeo: (v: boolean) => void; allowMultiCopy: boolean; setAllowMultiCopy: (v: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  const rows = [
+    { label: 'Assigned people can generate an instance', sub: 'People in an Assigned role can create an ad hoc instance for themselves', tip: 'People in an assigned role assigned to this list can create copies of this list.', on: allowCreate, set: setAllowCreate },
+    { label: 'Managing people can generate an instance', sub: 'People in a Manage role can create an instance and assign it to others', tip: 'People in a manage role on this list can create copies of this list.', on: allowGeo, set: setAllowGeo },
+    { label: 'Create multiple copies', sub: 'Turn on multiple copies to generate a separate copy of the list for every person in authorized roles', tip: 'When this setting is off, users in authorized roles will share one copy of this list.', on: allowMultiCopy, set: setAllowMultiCopy },
+  ];
+  return (
+    <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: 4 }}>
+      <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', cursor: 'pointer', userSelect: 'none' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>Create settings</span>
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 13, color: T.textMuted }} />
+      </div>
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+          {rows.map((row, i) => (
+            <div key={row.label} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: i > 0 ? 10 : 0, marginTop: i > 0 ? 10 : 0, borderTop: i > 0 ? `0.5px solid ${T.border}` : 'none', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>{row.label} <HelpTip text={row.tip} /></div>
+                <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4, maxWidth: 420 }}>{row.sub}</div>
+              </div>
+              <Toggle on={row.on} onChange={row.set} />
+            </div>
+          ))}
+          {allowMultiCopy && (
+            <div style={{ marginTop: 10, background: T.bgWarning, border: `0.5px solid #FFD54F`, borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <i className="ti ti-alert-triangle" style={{ color: T.textWarning, fontSize: 14, marginTop: 1 }} />
+              <span style={{ fontSize: 12, color: T.textWarning, lineHeight: 1.5 }}>Turning on multiple copies creates separate list instances per person.</span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -2883,10 +2920,14 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
   const [submissionAccess, setSubmissionAccess] = useState('anyone-anytime');
   const [listScoreVisible, setListScoreVisible] = useState(true);
   const [itemScoreVisible, setItemScoreVisible] = useState(false);
-  const [rbacAnyone, setRbacAnyone] = useState(true);
-  const [allowCreate, setAllowCreate] = useState(false);
-  const [allowGeo, setAllowGeo] = useState(false);
-  const [sharedIndividual, setSharedIndividual] = useState(false);
+  const [rbacAnyone, setRbacAnyone] = useState(false);
+  interface RbacRole { id: string; name: string; assigned: boolean; manage: boolean; }
+  const [rbacRoles, setRbacRoles] = useState<RbacRole[]>([]);
+  const [rbacPickerOpen, setRbacPickerOpen] = useState(false);
+  const rbacBtnRef = useRef<HTMLButtonElement>(null);
+  const [allowCreate, setAllowCreate] = useState(true);
+  const [allowGeo, setAllowGeo] = useState(true);
+  const [allowMultiCopy, setAllowMultiCopy] = useState(false);
 
   return (
     <div style={{ padding: '16px 16px', maxWidth: 720 }}>
@@ -2928,31 +2969,67 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
       </SectionHeader>
 
       {/* Role-based access */}
-      <SectionHeader label="Role-based access" summary={rbacAnyone ? 'Anyone with access can complete' : 'Restricted to roles'} defaultOpen={false}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Anyone <HelpTip text="" /></span>
+      <SectionHeader label="Role-based access" helpTip='List will be available to users according to the settings below. When a role has "assigned" access, users in that role can view and complete this list on mobile devices. When a role has "manage" access, users in that role can view and complete the list or assign the list to a user in an authorized role.' summary={rbacAnyone ? rbacRoles.length ? `${rbacRoles.length} role${rbacRoles.length > 1 ? 's' : ''} configured` : 'No roles added' : 'Anyone with access can complete'} defaultOpen={false}>
+        {/* Restrict by role toggle */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingBottom: rbacAnyone ? 12 : 0, marginBottom: rbacAnyone ? 12 : 0, borderBottom: rbacAnyone ? `0.5px solid ${T.border}` : 'none', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Restrict access by role <HelpTip text="When this option is toggled on, you need to select which roles you want to have access to this list. When role-based access is on, only employees that belong to the roles you add below will be able to view and complete the list." /></div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>Anyone with access can complete this list</div>
+          </div>
           <Toggle on={rbacAnyone} onChange={setRbacAnyone} />
         </div>
-        {!rbacAnyone && (
-          <>
-            <Btn><i className="ti ti-plus" /> Add role</Btn>
-          </>
-        )}
-        <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: 12, paddingTop: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Who can submit</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
-              { value: 'anyone-anytime', label: 'Anyone can submit the list at any time', tip: '' },
-              { value: 'assigned-only', label: 'Only the assigned person can submit', tip: '' },
-            ].map(opt => (
-              <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input type="radio" name="submissionAccess" value={opt.value} checked={submissionAccess === opt.value} onChange={() => setSubmissionAccess(opt.value)} style={{ accentColor: T.fillAccent, width: 14, height: 14 }} />
-                <span style={{ fontSize: 13, color: T.textPrimary }}>{opt.label}</span>
-                <HelpTip text={opt.tip} />
-              </label>
+        {/* Role cards */}
+        {rbacAnyone && rbacRoles.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            {rbacRoles.map(r => (
+              <div key={r.id} style={{ background: T.surface0, border: `0.5px solid ${T.border}`, borderRadius: 6, padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: T.textPrimary, flex: 1 }}>{r.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  {(['assigned', 'manage'] as const).map(key => (
+                    <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{key === 'assigned' ? 'Assigned' : 'Manage'}</span>
+                      <Toggle on={r[key]} onChange={v => setRbacRoles(prev => prev.map(x => x.id === r.id ? { ...x, [key]: v } : x))} />
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setRbacRoles(prev => prev.filter(x => x.id !== r.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 15, padding: 2 }}>
+                  <i className="ti ti-x" />
+                </button>
+              </div>
             ))}
           </div>
-        </div>
+        ) : rbacAnyone ? (
+          <div style={{ fontSize: 12, color: T.textMuted, fontStyle: 'italic', marginBottom: 10 }}>No roles added</div>
+        ) : null}
+        {/* Add role picker */}
+        {rbacAnyone && <div style={{ marginBottom: 12 }}>
+          <button ref={rbacBtnRef} onClick={() => setRbacPickerOpen(v => !v)} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, color: T.textAccent, background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 5, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <i className="ti ti-plus" /> Add role
+          </button>
+          {rbacPickerOpen && (() => {
+            const added = new Set(rbacRoles.map(r => r.name));
+            const available = ROLE_DEFS.map(r => r.name).filter(n => !added.has(n));
+            if (available.length === 0) return null;
+            const rect = rbacBtnRef.current?.getBoundingClientRect();
+            if (!rect) return null;
+            return ReactDOM.createPortal(
+              <div style={{ position: 'fixed', top: rect.bottom + 4, left: rect.left, background: T.surface1, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', zIndex: 9999, minWidth: 220, overflow: 'hidden' }}>
+                {available.map(name => (
+                  <div key={name} onClick={() => { setRbacRoles(prev => [...prev, { id: mkid(), name, assigned: true, manage: false }]); setRbacPickerOpen(false); }}
+                    style={{ padding: '9px 14px', fontSize: 13, color: T.textPrimary, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = T.surface2)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    {name}
+                  </div>
+                ))}
+              </div>,
+              document.body
+            );
+          })()}
+        </div>}
+
+        {/* Create settings subsection */}
+        <CreateSettingsSubsection allowCreate={allowCreate} setAllowCreate={setAllowCreate} allowGeo={allowGeo} setAllowGeo={setAllowGeo} allowMultiCopy={allowMultiCopy} setAllowMultiCopy={setAllowMultiCopy} />
       </SectionHeader>
 
       {/* Notifications */}
@@ -2960,39 +3037,6 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
         <NotificationSection />
       </SectionHeader>
 
-      {/* Create settings */}
-      <SectionHeader label="Create settings" summary="Default create settings" defaultOpen={false}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Allow employees to create lists <HelpTip text="" /></div>
-              <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>Allow employees to start a new instance of this list at any time</div>
-            </div>
-            <Toggle on={allowCreate} onChange={setAllowCreate} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Require location confirmation <HelpTip text="" /></div>
-              <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>GPS-verify the user is at the correct location</div>
-            </div>
-            <Toggle on={allowGeo} onChange={setAllowGeo} />
-          </div>
-        </div>
-      </SectionHeader>
-
-      {/* Shared or individual */}
-      <SectionHeader label="Shared or individual" summary={sharedIndividual ? 'Individual — each person gets their own copy' : 'Shared — one list per location'} defaultOpen={false}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sharedIndividual ? 12 : 0 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Individual lists <HelpTip text="" /></span>
-          <Toggle on={sharedIndividual} onChange={setSharedIndividual} />
-        </div>
-        {sharedIndividual && (
-          <div style={{ background: T.bgWarning, border: `0.5px solid #FFD54F`, borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <i className="ti ti-alert-triangle" style={{ color: T.textWarning, fontSize: 14, marginTop: 1 }} />
-            <span style={{ fontSize: 12, color: T.textWarning, lineHeight: 1.5 }}>Changing to individual will create separate list instances per person. Existing shared data will not be affected.</span>
-          </div>
-        )}
-      </SectionHeader>
     </div>
   );
 }
