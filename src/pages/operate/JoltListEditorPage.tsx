@@ -339,13 +339,23 @@ function monthSummary(mode: MonthMode, activeMonths: number[], ranges: MonthRang
   return ranges.map(r => `${MONTHS_SHORT[r.fromMonth]} ${r.fromDay} – ${MONTHS_SHORT[r.toMonth]} ${r.toDay}`).join(' and ');
 }
 
-function ScheduleOptions({ bumpLists, setBumpLists, reDisplay, setReDisplay, ignoreBlackouts, setIgnoreBlackouts }: { bumpLists: boolean; setBumpLists: (v: boolean) => void; reDisplay: boolean; setReDisplay: (v: boolean) => void; ignoreBlackouts: boolean; setIgnoreBlackouts: (v: boolean) => void }) {
+function ScheduleOptions({ bumpLists, setBumpLists, reDisplay, setReDisplay, ignoreBlackouts, setIgnoreBlackouts, adHocDueAmt, setAdHocDueAmt, adHocDueUnit, setAdHocDueUnit, adHocExpAmt, setAdHocExpAmt, adHocExpUnit, setAdHocExpUnit }: { bumpLists: boolean; setBumpLists: (v: boolean) => void; reDisplay: boolean; setReDisplay: (v: boolean) => void; ignoreBlackouts: boolean; setIgnoreBlackouts: (v: boolean) => void; adHocDueAmt: number; setAdHocDueAmt: (v: number) => void; adHocDueUnit: string; setAdHocDueUnit: (v: string) => void; adHocExpAmt: number; setAdHocExpAmt: (v: number) => void; adHocExpUnit: string; setAdHocExpUnit: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const rows = [
     { label: 'Bump lists', sub: 'Replace incomplete instances when a new schedule instance generates', on: bumpLists, set: setBumpLists },
     { label: 'Offer to re-display after submission', sub: 'Prompt to immediately generate another instance when this list is submitted', on: reDisplay, set: setReDisplay },
     { label: 'Ignore blackouts', sub: 'Display this list even on company-wide blackout dates', on: ignoreBlackouts, set: setIgnoreBlackouts },
   ];
+  const numInput = (val: number, onChange: (v: number) => void) => (
+    <input type="number" value={val} min={1} onChange={e => onChange(Number(e.target.value))}
+      style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 4, padding: '4px 6px', width: 52, textAlign: 'center', background: T.surface2, color: T.textPrimary }} />
+  );
+  const unitSel = (val: string, onChange: (v: string) => void) => (
+    <select value={val} onChange={e => onChange(e.target.value)}
+      style={{ fontFamily: T.font, fontSize: 13, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 4, padding: '4px 8px', cursor: 'pointer' }}>
+      {OFFSET_UNITS.map(u => <option key={u}>{u}</option>)}
+    </select>
+  );
   return (
     <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: 4 }}>
       <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', cursor: 'pointer', userSelect: 'none' }}>
@@ -354,15 +364,37 @@ function ScheduleOptions({ bumpLists, setBumpLists, reDisplay, setReDisplay, ign
       </div>
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
-          {rows.map((row, i) => (
-            <div key={row.label} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: i > 0 ? 10 : 0, marginTop: i > 0 ? 10 : 0, borderTop: i > 0 ? `0.5px solid ${T.border}` : 'none', gap: 16 }}>
+          {/* Ad hoc list defaults */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Ad hoc list defaults</div>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: 13, color: T.textPrimary }}>{row.label}</div>
-                <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4, maxWidth: 420 }}>{row.sub}</div>
+                <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>List is due after <HelpTip text="If you add this list to the Jolt app outside its normal schedule, the default due time can be set here. It can be changed on the fly for the added list on the app." /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {numInput(adHocDueAmt, setAdHocDueAmt)}
+                  {unitSel(adHocDueUnit, setAdHocDueUnit)}
+                </div>
               </div>
-              <Toggle on={row.on} onChange={row.set} />
+              <div>
+                <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>Once due, List expires after <HelpTip text="If you add this list to the Jolt app outside its normal schedule, the default expiration time can be set here. It can be changed on the fly for the added list on the app." /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {numInput(adHocExpAmt, setAdHocExpAmt)}
+                  {unitSel(adHocExpUnit, setAdHocExpUnit)}
+                </div>
+              </div>
             </div>
-          ))}
+          </div>
+          <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 10 }}>
+            {rows.map((row, i) => (
+              <div key={row.label} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: i > 0 ? 10 : 0, marginTop: i > 0 ? 10 : 0, borderTop: i > 0 ? `0.5px solid ${T.border}` : 'none', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 13, color: T.textPrimary }}>{row.label}</div>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4, maxWidth: 420 }}>{row.sub}</div>
+                </div>
+                <Toggle on={row.on} onChange={row.set} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -387,6 +419,10 @@ function ListScheduleSection() {
   const [bumpLists, setBumpLists] = useState(true);
   const [reDisplay, setReDisplay] = useState(false);
   const [ignoreBlackouts, setIgnoreBlackouts] = useState(false);
+  const [adHocDueAmt, setAdHocDueAmt] = useState(8);
+  const [adHocDueUnit, setAdHocDueUnit] = useState('hours');
+  const [adHocExpAmt, setAdHocExpAmt] = useState(1);
+  const [adHocExpUnit, setAdHocExpUnit] = useState('hours');
 
   const addDisplayTime = () => {
     const dt: DisplayTime = { id: mkid(), hour: 8, minute: 0, ampm: 'AM', dueAmt: 8, dueUnit: 'hours', expAmt: 1, expUnit: 'hours' };
@@ -655,7 +691,7 @@ function ListScheduleSection() {
       </div>}
 
       {/* ── List schedule options ── */}
-      <ScheduleOptions bumpLists={bumpLists} setBumpLists={setBumpLists} reDisplay={reDisplay} setReDisplay={setReDisplay} ignoreBlackouts={ignoreBlackouts} setIgnoreBlackouts={setIgnoreBlackouts} />
+      <ScheduleOptions bumpLists={bumpLists} setBumpLists={setBumpLists} reDisplay={reDisplay} setReDisplay={setReDisplay} ignoreBlackouts={ignoreBlackouts} setIgnoreBlackouts={setIgnoreBlackouts} adHocDueAmt={adHocDueAmt} setAdHocDueAmt={setAdHocDueAmt} adHocDueUnit={adHocDueUnit} setAdHocDueUnit={setAdHocDueUnit} adHocExpAmt={adHocExpAmt} setAdHocExpAmt={setAdHocExpAmt} adHocExpUnit={adHocExpUnit} setAdHocExpUnit={setAdHocExpUnit} />
 
     </div>
   );
@@ -2891,11 +2927,6 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
         <ListScheduleSection />
       </SectionHeader>
 
-      {/* Notifications */}
-      <SectionHeader label="Notifications" summary="5 events configured" defaultOpen={false}>
-        <NotificationSection />
-      </SectionHeader>
-
       {/* Role-based access */}
       <SectionHeader label="Role-based access" summary={rbacAnyone ? 'Anyone with access can complete' : 'Restricted to roles'} defaultOpen={false}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -2922,6 +2953,11 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
             ))}
           </div>
         </div>
+      </SectionHeader>
+
+      {/* Notifications */}
+      <SectionHeader label="Notifications" summary="5 events configured" defaultOpen={false}>
+        <NotificationSection />
       </SectionHeader>
 
       {/* Create settings */}
