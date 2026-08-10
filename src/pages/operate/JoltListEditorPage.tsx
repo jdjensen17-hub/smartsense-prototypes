@@ -260,6 +260,393 @@ function dcCondLabel(cond?: DCCondition) {
 }
 
 // ── Mini reusable components ──────────────────────────────────────────────
+// ── List Schedule ─────────────────────────────────────────────────────────
+
+interface DisplayTime { id: string; hour: number; minute: number; ampm: 'AM' | 'PM'; dueAmt: number; dueUnit: string; expAmt: number; expUnit: string; }
+interface MonthRange { id: string; fromMonth: number; fromDay: number; toMonth: number; toDay: number; }
+
+type RepeatMode = 'daily' | 'weekly' | 'monthly' | 'custom';
+type MonthMode = 'specific' | 'ranges';
+
+const OFFSET_UNITS = ['minutes', 'hours', 'days', 'weeks'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function daysInMonth(month: number) {
+  return [31,28,29,30,31,30,31,31,30,31,30,31][month];
+}
+
+function schedSummary(dts: DisplayTime[]): string {
+  if (dts.length === 0) return '';
+  const times = dts.map(dt => {
+    const h = dt.hour; const m = dt.minute.toString().padStart(2,'0');
+    return `${h}:${m} ${dt.ampm}`;
+  }).join(' and ');
+  const first = dts[0];
+  const sameOffsets = dts.every(d => d.dueAmt === first.dueAmt && d.dueUnit === first.dueUnit && d.expAmt === first.expAmt && d.expUnit === first.expUnit);
+  const offStr = sameOffsets ? ` · due ${first.dueAmt} ${first.dueUnit} after display · expires ${first.expAmt} ${first.expUnit} after due` : ' · offsets differ';
+  return times + offStr;
+}
+
+function repeatSummary(mode: RepeatMode, weekDays: number[], occurrences: number[], monthDays: number[], intervalAmt: number, intervalUnit: string, intervalStart: string): string {
+  if (mode === 'daily') return 'Every day';
+  if (mode === 'weekly') {
+    const dNames = weekDays.map(d => DAYS_SHORT[d]).join(', ');
+    const occStr = occurrences.length === 5 ? 'every week' : occurrences.map(o => ['1st','2nd','3rd','4th','5th'][o-1]).join(', ');
+    return dNames ? `${dNames} · ${occStr}` : 'No days selected';
+  }
+  if (mode === 'monthly') {
+    const sel = monthDays.slice().sort((a,b)=>a-b);
+    return sel.length ? `Days ${sel.join(', ')} of each month` : 'No days selected';
+  }
+  if (mode === 'custom') {
+    const d = intervalStart ? new Date(intervalStart + 'T12:00:00') : null;
+    const dateStr = d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    return `Every ${intervalAmt} ${intervalUnit} starting ${dateStr}`;
+  }
+  return '';
+}
+
+function monthSummary(mode: MonthMode, activeMonths: number[], ranges: MonthRange[]): string {
+  if (mode === 'specific') {
+    if (activeMonths.length === 12) return 'All months';
+    return activeMonths.map(m => MONTHS_SHORT[m]).join(', ');
+  }
+  return ranges.map(r => `${MONTHS_SHORT[r.fromMonth]} ${r.fromDay} – ${MONTHS_SHORT[r.toMonth]} ${r.toDay}`).join(' and ');
+}
+
+function ScheduleOptions({ bumpLists, setBumpLists, reDisplay, setReDisplay, ignoreBlackouts, setIgnoreBlackouts }: { bumpLists: boolean; setBumpLists: (v: boolean) => void; reDisplay: boolean; setReDisplay: (v: boolean) => void; ignoreBlackouts: boolean; setIgnoreBlackouts: (v: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  const rows = [
+    { label: 'Bump lists', sub: 'Replace incomplete instances when a new schedule instance generates', on: bumpLists, set: setBumpLists },
+    { label: 'Offer to re-display after submission', sub: 'Prompt to immediately generate another instance when this list is submitted', on: reDisplay, set: setReDisplay },
+    { label: 'Ignore blackouts', sub: 'Display this list even on company-wide blackout dates', on: ignoreBlackouts, set: setIgnoreBlackouts },
+  ];
+  return (
+    <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: 4 }}>
+      <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', cursor: 'pointer', userSelect: 'none' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>List schedule options</span>
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 13, color: T.textMuted }} />
+      </div>
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+          {rows.map((row, i) => (
+            <div key={row.label} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: i > 0 ? 10 : 0, marginTop: i > 0 ? 10 : 0, borderTop: i > 0 ? `0.5px solid ${T.border}` : 'none', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 13, color: T.textPrimary }}>{row.label}</div>
+                <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.4, maxWidth: 420 }}>{row.sub}</div>
+              </div>
+              <Toggle on={row.on} onChange={row.set} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListScheduleSection() {
+  const [displayTimes, setDisplayTimes] = useState<DisplayTime[]>([]);
+  const [applyPanelId, setApplyPanelId] = useState<string | null>(null);
+
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('daily');
+  const [weekDays, setWeekDays] = useState<number[]>([1,2,3,4,5]);
+  const [occurrences, setOccurrences] = useState<number[]>([1,2,3,4,5]);
+  const [monthDays, setMonthDays] = useState<number[]>([]);
+  const [intervalAmt, setIntervalAmt] = useState(10);
+  const [intervalUnit, setIntervalUnit] = useState('days');
+  const [intervalStart, setIntervalStart] = useState('');
+
+  const [monthMode, setMonthMode] = useState<MonthMode>('specific');
+  const [activeMonths, setActiveMonths] = useState<number[]>([0,1,2,3,4,5,6,7,8,9,10,11]);
+  const [monthRanges, setMonthRanges] = useState<MonthRange[]>([{ id: mkid(), fromMonth: 0, fromDay: 1, toMonth: 2, toDay: 31 }]);
+
+  const [bumpLists, setBumpLists] = useState(true);
+  const [reDisplay, setReDisplay] = useState(false);
+  const [ignoreBlackouts, setIgnoreBlackouts] = useState(false);
+
+  const addDisplayTime = () => {
+    const dt: DisplayTime = { id: mkid(), hour: 8, minute: 0, ampm: 'AM', dueAmt: 8, dueUnit: 'hours', expAmt: 1, expUnit: 'hours' };
+    setDisplayTimes(prev => [...prev, dt]);
+  };
+
+  const updateDT = (id: string, patch: Partial<DisplayTime>, field?: 'offset') => {
+    setDisplayTimes(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
+    if (field === 'offset' && displayTimes.length > 1) setApplyPanelId(id);
+  };
+
+  const removeDT = (id: string) => {
+    setDisplayTimes(prev => prev.filter(d => d.id !== id));
+    if (applyPanelId === id) setApplyPanelId(null);
+  };
+
+  const applyToAll = (id: string) => {
+    const src = displayTimes.find(d => d.id === id);
+    if (!src) return;
+    setDisplayTimes(prev => prev.map(d => ({ ...d, dueAmt: src.dueAmt, dueUnit: src.dueUnit, expAmt: src.expAmt, expUnit: src.expUnit })));
+    setApplyPanelId(null);
+  };
+
+  const toggleWeekDay = (d: number) => setWeekDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+  const toggleOccurrence = (o: number) => setOccurrences(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o]);
+  const toggleMonthDay = (d: number) => setMonthDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+  const toggleMonth = (m: number) => setActiveMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+
+  const addRange = () => setMonthRanges(prev => [...prev, { id: mkid(), fromMonth: 0, fromDay: 1, toMonth: 11, toDay: 31 }]);
+  const removeRange = (id: string) => setMonthRanges(prev => prev.filter(r => r.id !== id));
+  const updateRange = (id: string, patch: Partial<MonthRange>) => setMonthRanges(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+
+  const hasSchedule = displayTimes.length > 0;
+  const summary = hasSchedule ? schedSummary(displayTimes) : 'No schedule configured';
+
+  const segBtn = (label: string, mode: RepeatMode) => (
+    <div key={label} onClick={() => setRepeatMode(mode)}
+      style={{ flex: 1, padding: '7px 4px', textAlign: 'center', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: 6,
+        color: repeatMode === mode ? T.textAccent : T.textMuted,
+        background: repeatMode === mode ? T.surface2 : 'transparent',
+        boxShadow: repeatMode === mode ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>
+      {label}
+    </div>
+  );
+
+  const chip = (label: string, on: boolean, onClick: () => void, muted?: boolean) => (
+    <div onClick={onClick} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+      border: `0.5px solid ${on ? T.fillAccent : T.borderStrong}`,
+      background: on ? T.fillAccent : T.surface2,
+      color: on ? T.onAccent : muted ? T.textMuted : T.textSecondary }}>
+      {label}
+    </div>
+  );
+
+  const numChip = (label: string, on: boolean, onClick: () => void, muted?: boolean) => (
+    <div onClick={onClick} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, minWidth: 34, textAlign: 'center', padding: '5px 4px', borderRadius: 6, cursor: 'pointer',
+      border: `0.5px solid ${on ? T.fillAccent : T.borderStrong}`,
+      background: on ? T.fillAccent : T.surface2,
+      color: on ? T.onAccent : muted ? T.textMuted : T.textSecondary }}>
+      {label}
+    </div>
+  );
+
+  const secLabel = (text: string) => (
+    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{text}</div>
+  );
+
+  const selectAllRow = (checked: boolean, onChange: (v: boolean) => void, label = 'Select all') => (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: T.textSecondary, marginBottom: 6, cursor: 'pointer' }}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ accentColor: T.fillAccent, width: 13, height: 13 }} />
+      {label}
+    </label>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+      {/* ── Display Times ── */}
+      <div style={{ marginBottom: 16 }}>
+        {secLabel('Display times')}
+        {displayTimes.length === 0 && (
+          <div style={{ fontSize: 12, color: T.textMuted, fontStyle: 'italic', marginBottom: 8 }}>No display times set — add at least one to activate this schedule</div>
+        )}
+        {displayTimes.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+            {displayTimes.map(dt => {
+              const isApply = applyPanelId === dt.id;
+              const offsetSel = (val: number, onChange: (v: number) => void) => (
+                <input type="number" value={val} min={1} onChange={e => onChange(Number(e.target.value))}
+                  style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 4, padding: '3px 6px', width: 44, textAlign: 'center', background: T.surface2, color: T.textPrimary }} />
+              );
+              const unitSel = (val: string, onChange: (v: string) => void) => (
+                <select value={val} onChange={e => onChange(e.target.value)}
+                  style={{ fontFamily: T.font, fontSize: 12, color: T.textSecondary, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', padding: '0 2px' }}>
+                  {OFFSET_UNITS.map(u => <option key={u}>{u}</option>)}
+                </select>
+              );
+              return (
+                <div key={dt.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: T.surface1, border: `0.5px solid ${T.border}`, borderRadius: isApply ? '8px 8px 0 0' : 8, borderBottom: isApply ? 'none' : undefined, overflow: 'hidden' }}>
+                    {/* Time */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRight: `0.5px solid ${T.border}` }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time</div>
+                      <select value={dt.hour} onChange={e => updateDT(dt.id, { hour: Number(e.target.value) })}
+                        style={{ fontFamily: T.font, fontSize: 13, fontWeight: 500, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textPrimary }}>
+                        {Array.from({length:12},(_,i)=>i+1).map(h => <option key={h}>{h}</option>)}
+                      </select>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: T.textMuted }}>:</span>
+                      <select value={dt.minute.toString().padStart(2,'0')} onChange={e => updateDT(dt.id, { minute: Number(e.target.value) })}
+                        style={{ fontFamily: T.font, fontSize: 13, fontWeight: 500, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textPrimary }}>
+                        {['00','15','30','45'].map(m => <option key={m}>{m}</option>)}
+                      </select>
+                      <select value={dt.ampm} onChange={e => updateDT(dt.id, { ampm: e.target.value as 'AM'|'PM' })}
+                        style={{ fontFamily: T.font, fontSize: 12, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', color: T.textSecondary }}>
+                        <option>AM</option><option>PM</option>
+                      </select>
+                    </div>
+                    {/* Due after */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRight: `0.5px solid ${T.border}` }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due after</div>
+                      {offsetSel(dt.dueAmt, v => updateDT(dt.id, { dueAmt: v }, 'offset'))}
+                      {unitSel(dt.dueUnit, v => updateDT(dt.id, { dueUnit: v }, 'offset'))}
+                    </div>
+                    {/* Expires after */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Expires after</div>
+                      {offsetSel(dt.expAmt, v => updateDT(dt.id, { expAmt: v }, 'offset'))}
+                      {unitSel(dt.expUnit, v => updateDT(dt.id, { expUnit: v }, 'offset'))}
+                    </div>
+                    <button onClick={() => removeDT(dt.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 15, padding: '8px 12px', flexShrink: 0 }}>
+                      <i className="ti ti-x" />
+                    </button>
+                  </div>
+                  {isApply && (
+                    <div style={{ background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 11, color: T.textAccent }}>Apply this change to all display times?</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => applyToAll(dt.id)} style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', background: T.fillAccent, color: T.onAccent, border: 'none' }}>Update all display times</button>
+                        <button onClick={() => setApplyPanelId(null)} style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', background: T.surface2, color: T.textSecondary, border: `0.5px solid ${T.borderStrong}` }}>Update this time only</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <button onClick={addDisplayTime} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, color: T.textAccent, background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 5, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <i className="ti ti-plus" /> Add display time
+        </button>
+      </div>
+
+      {/* ── Repeats ── */}
+      {hasSchedule && <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 4 }}>Repeats</div>
+        {repeatMode !== 'daily' && (
+          <div style={{ fontSize: 12, color: T.textAccent, marginBottom: 10 }}>
+            {repeatSummary(repeatMode, weekDays, occurrences, monthDays, intervalAmt, intervalUnit, intervalStart)}
+          </div>
+        )}
+        {/* Segmented control */}
+        <div style={{ display: 'flex', background: T.surface0, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
+          {segBtn('Daily','daily')}{segBtn('Weekly','weekly')}{segBtn('Monthly','monthly')}{segBtn('Custom','custom')}
+        </div>
+
+        {repeatMode === 'daily' && (
+          <div style={{ fontSize: 12, color: T.textMuted, fontStyle: 'italic' }}>Repeats every day — no further configuration needed</div>
+        )}
+
+        {repeatMode === 'weekly' && (
+          <div>
+            {selectAllRow(weekDays.length === 7, v => setWeekDays(v ? [0,1,2,3,4,5,6] : []))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {DAYS_SHORT.map((d,i) => chip(d, weekDays.includes(i), () => toggleWeekDay(i)))}
+            </div>
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `0.5px solid ${T.border}` }}>
+              {secLabel('Occurrence in month')}
+              {selectAllRow(occurrences.length === 5, v => setOccurrences(v ? [1,2,3,4,5] : []), 'Every week')}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {[1,2,3,4,5].map(o => numChip(String(o), occurrences.includes(o), () => toggleOccurrence(o)))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {repeatMode === 'monthly' && (
+          <div>
+            {selectAllRow(monthDays.length === 31, v => setMonthDays(v ? Array.from({length:31},(_,i)=>i+1) : []))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {Array.from({length:31},(_,i)=>i+1).map(d => {
+                const warn = d >= 29;
+                return numChip(`${d}${warn?'*':''}`, monthDays.includes(d), () => toggleMonthDay(d), warn && !monthDays.includes(d));
+              })}
+            </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 6, fontStyle: 'italic' }}>* These dates do not exist in every month — the list will not display in months where the date doesn't occur</div>
+          </div>
+        )}
+
+        {repeatMode === 'custom' && (
+          <div>
+            <div style={{ marginBottom: 10 }}>
+              {secLabel('Start date')}
+              <input type="date" value={intervalStart} onChange={e => setIntervalStart(e.target.value)}
+                style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 8px', color: T.textPrimary }} />
+            </div>
+            <div>
+              {secLabel('Repeat every')}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" value={intervalAmt} min={1} onChange={e => setIntervalAmt(Number(e.target.value))}
+                  style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 8px', width: 64, textAlign: 'center', color: T.textPrimary }} />
+                <select value={intervalUnit} onChange={e => setIntervalUnit(e.target.value)}
+                  style={{ fontFamily: T.font, fontSize: 13, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 12px', cursor: 'pointer' }}>
+                  <option>days</option><option>weeks</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>}
+
+      {/* ── Active Months ── */}
+      {hasSchedule && <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 4 }}>Displays during these months</div>
+        <div style={{ fontSize: 12, color: T.textAccent, marginBottom: 10 }}>{monthSummary(monthMode, activeMonths, monthRanges)}</div>
+        {/* Mode toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+          {(['specific','ranges'] as MonthMode[]).map((m, i) => (
+            <button key={m} onClick={() => setMonthMode(m)}
+              style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
+                border: `0.5px solid ${monthMode === m ? T.fillAccent : T.borderStrong}`,
+                background: monthMode === m ? T.fillAccent : T.surface2,
+                color: monthMode === m ? T.onAccent : T.textMuted }}>
+              {i === 0 ? 'Specific months' : 'Date ranges'}
+            </button>
+          ))}
+        </div>
+
+        {monthMode === 'specific' && (
+          <div>
+            {selectAllRow(activeMonths.length === 12, v => setActiveMonths(v ? [0,1,2,3,4,5,6,7,8,9,10,11] : []), 'All months')}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {MONTHS_SHORT.map((m,i) => chip(m, activeMonths.includes(i), () => toggleMonth(i)))}
+            </div>
+          </div>
+        )}
+
+        {monthMode === 'ranges' && (
+          <div>
+            {monthRanges.map(r => {
+              const rangeSel = (val: number, opts: string[], onChange: (v: number) => void) => (
+                <select value={val} onChange={e => onChange(Number(e.target.value))}
+                  style={{ fontFamily: T.font, fontSize: 12, color: T.textPrimary, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '4px 8px', cursor: 'pointer' }}>
+                  {opts.map((o,i) => <option key={i} value={i}>{o}</option>)}
+                </select>
+              );
+              const dayOpts = Array.from({length: daysInMonth(r.fromMonth)}, (_,i) => String(i+1));
+              const dayOptsTo = Array.from({length: daysInMonth(r.toMonth)}, (_,i) => String(i+1));
+              return (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '8px 10px', background: T.surface1, border: `0.5px solid ${T.border}`, borderRadius: 6, marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: T.textSecondary, flexShrink: 0 }}>From</span>
+                  {rangeSel(r.fromMonth, MONTHS_SHORT, v => updateRange(r.id, { fromMonth: v, fromDay: Math.min(r.fromDay, daysInMonth(v)) }))}
+                  {rangeSel(r.fromDay - 1, dayOpts, v => updateRange(r.id, { fromDay: v + 1 }))}
+                  <span style={{ fontSize: 11, fontWeight: 500, color: T.textSecondary, flexShrink: 0 }}>to</span>
+                  {rangeSel(r.toMonth, MONTHS_SHORT, v => updateRange(r.id, { toMonth: v, toDay: Math.min(r.toDay, daysInMonth(v)) }))}
+                  {rangeSel(r.toDay - 1, dayOptsTo, v => updateRange(r.id, { toDay: v + 1 }))}
+                  <button onClick={() => removeRange(r.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14 }}><i className="ti ti-x" /></button>
+                </div>
+              );
+            })}
+            <button onClick={addRange} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, color: T.textAccent, background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 5, padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <i className="ti ti-plus" /> Add range
+            </button>
+          </div>
+        )}
+      </div>}
+
+      {/* ── List schedule options ── */}
+      <ScheduleOptions bumpLists={bumpLists} setBumpLists={setBumpLists} reDisplay={reDisplay} setReDisplay={setReDisplay} ignoreBlackouts={ignoreBlackouts} setIgnoreBlackouts={setIgnoreBlackouts} />
+
+    </div>
+  );
+}
+
 function HelpTip({ text }: { text: string }) {
   if (!text) return null;
   return (
@@ -2487,28 +2874,7 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
 
       {/* List schedule */}
       <SectionHeader label="List schedule" helpTip="Add a display time to the list schedule for the list to automatically display on mobile devices." summary="No schedule configured" defaultOpen={false}>
-        {/* Display times */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>Display times <HelpTip text="" /></div>
-          <Btn><i className="ti ti-plus" /> Add display time</Btn>
-        </div>
-        {/* Repeats */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Repeats</div>
-          <div style={{ display: 'flex', background: T.surface0, borderRadius: 6, padding: 2, border: `0.5px solid ${T.border}`, width: 'fit-content' }}>
-            {['Daily','Weekly','Monthly','Custom'].map(r => (
-              <div key={r} style={{ padding: '5px 14px', borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: 'pointer', color: r === 'Daily' ? T.onAccent : T.textSecondary, background: r === 'Daily' ? T.fillAccent : 'transparent' }}>{r}</div>
-            ))}
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[{ l: 'Bump lists', tip: '', on: true }, { l: 'Offer to re-display', tip: '', on: false }, { l: 'Ignore blackouts', tip: '', on: false }].map(row => (
-            <div key={row.l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>{row.l} <HelpTip text={row.tip} /></span>
-              <Toggle on={row.on} onChange={() => {}} />
-            </div>
-          ))}
-        </div>
+        <ListScheduleSection />
       </SectionHeader>
 
       {/* Notifications */}
