@@ -260,6 +260,15 @@ function dcCondLabel(cond?: DCCondition) {
 }
 
 // ── Mini reusable components ──────────────────────────────────────────────
+function HelpTip({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <Tooltip text={text}>
+      <i className="ti ti-help-circle" style={{ fontSize: 14, color: T.textMuted, cursor: 'default', verticalAlign: 'middle', flexShrink: 0 }} />
+    </Tooltip>
+  );
+}
+
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <div onClick={() => onChange(!on)} style={{ display: 'inline-block', width: 32, height: 18, background: on ? T.fillAccent : T.borderStrong, borderRadius: 9999, position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s' }}>
@@ -284,13 +293,13 @@ function Btn({ children, primary, danger, disabled, onClick, style }: { children
   );
 }
 
-function SectionHeader({ label, summary, right, children, defaultOpen = false }: { label: string; summary?: string; right?: React.ReactNode; children?: React.ReactNode; defaultOpen?: boolean }) {
+function SectionHeader({ label, helpTip, summary, right, children, defaultOpen = false }: { label: string; helpTip?: string; summary?: string; right?: React.ReactNode; children?: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ background: T.surface2, border: `0.5px solid ${T.border}`, borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
       <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer', userSelect: 'none' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: T.textPrimary }}>{label}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>{label}{helpTip && <span onClick={e => e.stopPropagation()}><HelpTip text={helpTip} /></span>}</div>
           {summary && <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>{summary}</div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2433,7 +2442,8 @@ function NotificationSection() {
 
 // ── Settings tab ──────────────────────────────────────────────────────────
 function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScoringOn: (v: boolean) => void }) {
-  const [submission, setSubmission] = useState('anyone-anytime');
+  const [submission, setSubmission] = useState('items-anytime');
+  const [submissionAccess, setSubmissionAccess] = useState('anyone-anytime');
   const [listScoreVisible, setListScoreVisible] = useState(true);
   const [itemScoreVisible, setItemScoreVisible] = useState(false);
   const [rbacAnyone, setRbacAnyone] = useState(true);
@@ -2444,56 +2454,42 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
   return (
     <div style={{ padding: '16px 16px', maxWidth: 720 }}>
       {/* List submission */}
-      <SectionHeader label="List submission" summary={submission === 'anyone-anytime' ? 'Anyone can submit at any time' : 'Restricted submission'}>
+      <SectionHeader label="List submission" summary={submission === 'items-anytime' ? 'Items can be submitted when complete' : 'List must be fully complete to submit'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
-            { value: 'anyone-anytime', label: 'Anyone can submit the list at any time' },
-            { value: 'assigned-only', label: 'Only the assigned person can submit' },
-            { value: 'any-complete', label: 'Any user with access can submit once all items are complete' },
+            { value: 'items-anytime', label: 'List items can be submitted when complete', tip: '' },
+            { value: 'all-complete', label: 'List can only be submitted after all items are complete', tip: '' },
           ].map(opt => (
             <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
               <input type="radio" name="submission" value={opt.value} checked={submission === opt.value} onChange={() => setSubmission(opt.value)} style={{ accentColor: T.fillAccent, width: 14, height: 14 }} />
               <span style={{ fontSize: 13, color: T.textPrimary }}>{opt.label}</span>
+              <HelpTip text={opt.tip} />
             </label>
           ))}
         </div>
       </SectionHeader>
 
       {/* Scoring */}
-      <SectionHeader label="Scoring" summary={scoringOn ? 'Score enabled' : 'Score off'} right={<Toggle on={scoringOn} onChange={setScoringOn} />} defaultOpen={scoringOn}>
+      <SectionHeader label="Scoring" helpTip="Turn on scoring to allow multiple choice, yes/no, and rating items to be used to calculate a score for this list." summary={scoringOn ? 'Score enabled' : 'Score off'} right={<Toggle on={scoringOn} onChange={setScoringOn} />} defaultOpen={scoringOn}>
         {scoringOn && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>List score visible</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>People assigned to this list can see the score on the device <HelpTip text="Helpful tip: For quizzes and tests, uncheck this box to hide the score for employees." /></span>
               <Toggle on={listScoreVisible} onChange={setListScoreVisible} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Item score visible</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>People managing this list can see the score on the device <HelpTip text="" /></span>
               <Toggle on={itemScoreVisible} onChange={setItemScoreVisible} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>Flagged item scores count</span>
-              <Toggle on={false} onChange={() => {}} />
             </div>
           </div>
         )}
       </SectionHeader>
 
       {/* List schedule */}
-      <SectionHeader label="List schedule" summary="No schedule configured" defaultOpen={false}>
-        <div style={{ background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 6, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <i className="ti ti-info-circle" style={{ color: T.textAccent, fontSize: 14 }} />
-          <span style={{ fontSize: 12, color: T.textAccent }}>Changes to the schedule will apply to all 11 locations.</span>
-        </div>
+      <SectionHeader label="List schedule" helpTip="Add a display time to the list schedule for the list to automatically display on mobile devices." summary="No schedule configured" defaultOpen={false}>
         {/* Display times */}
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Display times</div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: T.surface0, borderRadius: 6, padding: '8px 12px', marginBottom: 6, border: `0.5px solid ${T.border}` }}>
-            <span style={{ fontSize: 13, color: T.textPrimary, flex: 1 }}>6:00 AM</span>
-            <span style={{ fontSize: 12, color: T.textMuted }}>Due after 2h</span>
-            <span style={{ fontSize: 12, color: T.textMuted, marginLeft: 8 }}>Expires after 4h</span>
-            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, marginLeft: 8 }}><i className="ti ti-x" /></button>
-          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>Display times <HelpTip text="" /></div>
           <Btn><i className="ti ti-plus" /> Add display time</Btn>
         </div>
         {/* Repeats */}
@@ -2506,9 +2502,9 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[{ l: 'Bump lists', on: true }, { l: 'Offer to re-display', on: false }, { l: 'Ignore blackouts', on: false }].map(row => (
+          {[{ l: 'Bump lists', tip: '', on: true }, { l: 'Offer to re-display', tip: '', on: false }, { l: 'Ignore blackouts', tip: '', on: false }].map(row => (
             <div key={row.l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: T.textPrimary }}>{row.l}</span>
+              <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>{row.l} <HelpTip text={row.tip} /></span>
               <Toggle on={row.on} onChange={() => {}} />
             </div>
           ))}
@@ -2523,7 +2519,7 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
       {/* Role-based access */}
       <SectionHeader label="Role-based access" summary={rbacAnyone ? 'Anyone with access can complete' : 'Restricted to roles'} defaultOpen={false}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary }}>Anyone</span>
+          <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Anyone <HelpTip text="" /></span>
           <Toggle on={rbacAnyone} onChange={setRbacAnyone} />
         </div>
         {!rbacAnyone && (
@@ -2531,6 +2527,21 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
             <Btn><i className="ti ti-plus" /> Add role</Btn>
           </>
         )}
+        <div style={{ borderTop: `0.5px solid ${T.border}`, marginTop: 12, paddingTop: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Who can submit</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { value: 'anyone-anytime', label: 'Anyone can submit the list at any time', tip: '' },
+              { value: 'assigned-only', label: 'Only the assigned person can submit', tip: '' },
+            ].map(opt => (
+              <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input type="radio" name="submissionAccess" value={opt.value} checked={submissionAccess === opt.value} onChange={() => setSubmissionAccess(opt.value)} style={{ accentColor: T.fillAccent, width: 14, height: 14 }} />
+                <span style={{ fontSize: 13, color: T.textPrimary }}>{opt.label}</span>
+                <HelpTip text={opt.tip} />
+              </label>
+            ))}
+          </div>
+        </div>
       </SectionHeader>
 
       {/* Create settings */}
@@ -2538,14 +2549,14 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 13, color: T.textPrimary }}>Allow employees to create lists</div>
+              <div style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Allow employees to create lists <HelpTip text="" /></div>
               <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>Allow employees to start a new instance of this list at any time</div>
             </div>
             <Toggle on={allowCreate} onChange={setAllowCreate} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 13, color: T.textPrimary }}>Require location confirmation</div>
+              <div style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Require location confirmation <HelpTip text="" /></div>
               <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>GPS-verify the user is at the correct location</div>
             </div>
             <Toggle on={allowGeo} onChange={setAllowGeo} />
@@ -2556,7 +2567,7 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
       {/* Shared or individual */}
       <SectionHeader label="Shared or individual" summary={sharedIndividual ? 'Individual — each person gets their own copy' : 'Shared — one list per location'} defaultOpen={false}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sharedIndividual ? 12 : 0 }}>
-          <span style={{ fontSize: 13, color: T.textPrimary }}>Individual lists</span>
+          <span style={{ fontSize: 13, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>Individual lists <HelpTip text="" /></span>
           <Toggle on={sharedIndividual} onChange={setSharedIndividual} />
         </div>
         {sharedIndividual && (
