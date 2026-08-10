@@ -1049,16 +1049,22 @@ function FlagSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; 
   );
 }
 
-function TagPicker({ options, selected, onChange, placeholder, closeOnSelect = false }: { options: string[]; selected: string[]; onChange: (tags: string[]) => void; placeholder: string; closeOnSelect?: boolean }) {
+function TagPicker({ options, selected, onChange, placeholder, closeOnSelect = false, portalDropdown = false }: { options: string[]; selected: string[]; onChange: (tags: string[]) => void; placeholder: string; closeOnSelect?: boolean; portalDropdown?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setTimeout(() => inputRef.current?.focus(), 0);
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || dropdownRef.current?.contains(t)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
@@ -1066,56 +1072,50 @@ function TagPicker({ options, selected, onChange, placeholder, closeOnSelect = f
   const filtered = options.filter(t => t.toLowerCase().includes(q.toLowerCase()));
   const toggle = (tag: string) => { onChange(selected.includes(tag) ? selected.filter(t => t !== tag) : [...selected, tag]); if (closeOnSelect) setOpen(false); };
 
+  const dropdownContent = (rect?: DOMRect) => (
+    <div ref={dropdownRef} style={portalDropdown && rect ? { position: 'fixed', top: rect.bottom + 4, left: rect.left, width: rect.width, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 9999, overflow: 'hidden' } : { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden' }}>
+      <div style={{ padding: '8px 10px', borderBottom: `0.5px solid ${T.border}` }}>
+        <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Search…"
+          style={{ fontFamily: T.font, fontSize: 13, border: 'none', outline: 'none', width: '100%', background: 'transparent', color: T.textPrimary }} />
+      </div>
+      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+        {filtered.length === 0 && <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}>No results</div>}
+        {filtered.map(tag => {
+          const active = selected.includes(tag);
+          return (
+            <div key={tag} onClick={() => toggle(tag)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: active ? T.textAccent : T.textPrimary, background: active ? T.bgAccent : 'transparent' }}
+              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = T.surface1; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = active ? T.bgAccent : 'transparent'; }}>
+              <span>{tag}</span>
+              {active && <i className="ti ti-check" style={{ fontSize: 13, color: T.textAccent }} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const rect = open && portalDropdown ? btnRef.current?.getBoundingClientRect() : undefined;
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       {selected.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
           {selected.map(tag => (
-            <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: T.bgAccent, color: T.textAccent, fontSize: 12, fontWeight: 500, padding: '3px 8px', borderRadius: 12 }}>
+            <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, color: T.textAccent, fontSize: 12, fontWeight: 500, padding: '3px 8px', borderRadius: 12 }}>
               {tag}
               <i className="ti ti-x" style={{ fontSize: 10, cursor: 'pointer' }} onClick={() => toggle(tag)} />
             </span>
           ))}
         </div>
       )}
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{ fontFamily: T.font, fontSize: 13, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '6px 10px', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, cursor: 'pointer', color: T.textMuted }}
-      >
+      <button ref={btnRef} onClick={() => setOpen(v => !v)}
+        style={{ fontFamily: T.font, fontSize: 13, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '6px 10px', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, cursor: 'pointer', color: T.textMuted }}>
         <span>{placeholder}</span>
         <i className="ti ti-chevron-down" style={{ fontSize: 12, flexShrink: 0, color: T.textMuted }} />
       </button>
-      {open && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 300, overflow: 'hidden' }}>
-          <div style={{ padding: '8px 10px', borderBottom: `0.5px solid ${T.border}` }}>
-            <input
-              ref={inputRef}
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="Search…"
-              style={{ fontFamily: T.font, fontSize: 13, border: 'none', outline: 'none', width: '100%', background: 'transparent', color: T.textPrimary }}
-            />
-          </div>
-          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-            {filtered.length === 0 && (
-              <div style={{ padding: '10px 12px', fontSize: 13, color: T.textMuted, fontStyle: 'italic' }}>No results</div>
-            )}
-            {filtered.map(tag => {
-              const active = selected.includes(tag);
-              return (
-                <div key={tag} onClick={() => toggle(tag)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: active ? T.textAccent : T.textPrimary, background: active ? T.bgAccent : 'transparent' }}
-                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = T.surface1; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = active ? T.bgAccent : 'transparent'; }}
-                >
-                  <span>{tag}</span>
-                  {active && <i className="ti ti-check" style={{ fontSize: 13, color: T.textAccent }} />}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {open && (portalDropdown ? ReactDOM.createPortal(dropdownContent(rect), document.body) : dropdownContent())}
     </div>
   );
 }
@@ -2835,7 +2835,7 @@ function DCConditionPanel({ childItem, parentItem, onSave, onCancel }: { childIt
 }
 
 // ── Notification section helpers ──────────────────────────────────────────
-interface NotifRule { id: string; event: string; role: string; methods: string[]; offsetMin?: number; }
+interface NotifRule { id: string; event: string; roles: string[]; methods: string[]; offsetMin?: number; }
 
 function NotificationSection() {
   const EVENTS = [
@@ -2847,20 +2847,43 @@ function NotificationSection() {
   ];
   const [rules, setRules] = useState<NotifRule[]>([]);
   const [addingFor, setAddingFor] = useState<string | null>(null);
-  const [formRole, setFormRole] = useState('');
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [formRoles, setFormRoles] = useState<string[]>([]);
   const [formMethods, setFormMethods] = useState<string[]>([]);
   const [formOffset, setFormOffset] = useState(30);
 
+  const openAdd = (evId: string) => {
+    setEditingRuleId(null);
+    setFormRoles([]);
+    setFormMethods([]);
+    setFormOffset(30);
+    setAddingFor(evId);
+  };
+
+  const openEdit = (rule: NotifRule) => {
+    setAddingFor(rule.event);
+    setEditingRuleId(rule.id);
+    setFormRoles(rule.roles);
+    setFormMethods(rule.methods);
+    setFormOffset(rule.offsetMin ?? 30);
+  };
+
   const saveRule = (event: string) => {
-    if (!formRole || !formMethods.length) return;
-    setRules([...rules, { id: mkid(), event, role: formRole, methods: formMethods, offsetMin: event === 'before-due' ? formOffset : undefined }]);
+    if (!formRoles.length || !formMethods.length) return;
+    if (editingRuleId) {
+      setRules(prev => prev.map(r => r.id === editingRuleId ? { ...r, roles: formRoles, methods: formMethods, offsetMin: event === 'before-due' ? formOffset : undefined } : r));
+    } else {
+      setRules(prev => [...prev, { id: mkid(), event, roles: formRoles, methods: formMethods, offsetMin: event === 'before-due' ? formOffset : undefined }]);
+    }
     setAddingFor(null);
-    setFormRole('');
+    setEditingRuleId(null);
+    setFormRoles([]);
     setFormMethods([]);
   };
 
   return (
     <div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Events</div>
       {EVENTS.map(ev => (
         <div key={ev.id} style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -2868,43 +2891,57 @@ function NotificationSection() {
               <span style={{ fontSize: 13, fontWeight: 500, color: T.textPrimary }}>{ev.label}</span>
               {ev.note && <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 6 }}>({ev.note})</span>}
             </div>
-            <button onClick={() => setAddingFor(addingFor === ev.id ? null : ev.id)} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <button onClick={() => openAdd(ev.id)} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
               <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add
             </button>
           </div>
           {rules.filter(r => r.event === ev.id).map(r => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.surface0, border: `0.5px solid ${T.border}`, borderRadius: 5, padding: '7px 10px', marginBottom: 4 }}>
-              <div style={{ fontSize: 12, color: T.textPrimary }}>{r.role} · {r.methods.join(', ')}{r.offsetMin ? ` · ${r.offsetMin}min before` : ''}</div>
-              <button onClick={() => setRules(rules.filter(x => x.id !== r.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13 }}><i className="ti ti-trash" /></button>
+            editingRuleId === r.id ? null :
+            <div key={r.id} onClick={() => openEdit(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.surface0, border: `0.5px solid ${T.border}`, borderRadius: 5, padding: '7px 10px', marginBottom: 4, cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = T.borderStrong)}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = T.border)}>
+              <div style={{ fontSize: 12, color: T.textPrimary }}>{r.roles.join(', ')} · {r.methods.join(', ')}{r.offsetMin ? ` · ${r.offsetMin}min before` : ''}</div>
+              <button onClick={e => { e.stopPropagation(); setRules(rules.filter(x => x.id !== r.id)); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13 }}><i className="ti ti-trash" /></button>
             </div>
           ))}
           {addingFor === ev.id && (
-            <div style={{ background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 6, padding: 12, marginTop: 4 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, marginBottom: 8 }}>Role</div>
-              <select value={formRole} onChange={e => setFormRole(e.target.value)} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', marginBottom: 10 }}>
-                <option value="">Search roles…</option>
-                <option value="Manager">Manager</option>
-                <option value="Shift Lead">Shift Lead</option>
-                <option value="Employee">Employee</option>
-                <option value="Admin">Admin</option>
-              </select>
-              <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, marginBottom: 6 }}>Method</div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                {['Push','Text','Email'].map(m => (
-                  <div key={m} onClick={() => setFormMethods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `0.5px solid ${formMethods.includes(m) ? T.fillAccent : T.borderStrong}`, background: formMethods.includes(m) ? T.fillAccent : T.surface2, color: formMethods.includes(m) ? T.onAccent : T.textSecondary }}>
-                    {m}
-                  </div>
-                ))}
+            <div style={{ background: T.surface0, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Role</div>
+              <div style={{ marginBottom: 10 }}>
+                <TagPicker options={ROLE_DEFS.map(r => r.name)} selected={formRoles} onChange={setFormRoles} placeholder="Select roles…" portalDropdown />
               </div>
-              {ev.id === 'before-due' && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, marginBottom: 4 }}>Offset (minutes before due)</div>
-                  <input type="number" value={formOffset} onChange={e => setFormOffset(Number(e.target.value))} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%' }} />
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Method</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {['Push', 'Text', 'Email'].map(m => (
+                      <div key={m} onClick={() => setFormMethods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])}
+                        style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `0.5px solid ${formMethods.includes(m) ? T.fillAccent : T.borderStrong}`, background: formMethods.includes(m) ? T.fillAccent : T.surface2, color: formMethods.includes(m) ? T.onAccent : T.textSecondary }}>
+                        {m}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Btn primary disabled={!formRole || !formMethods.length} onClick={() => saveRule(ev.id)}>Save</Btn>
-                <button onClick={() => setAddingFor(null)} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+                {ev.id === 'before-due' && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Minutes before due</div>
+                    <select value={formOffset} onChange={e => setFormOffset(Number(e.target.value))}
+                      style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '4px 8px', background: T.surface2, color: T.textPrimary, cursor: 'pointer' }}>
+                      {[{label:'15 min',val:15},{label:'30 min',val:30},{label:'1 hour',val:60},{label:'90 min',val:90},{label:'2 hours',val:120},{label:'4 hours',val:240},{label:'6 hours',val:360}].map(o => (
+                        <option key={o.val} value={o.val}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div style={{ flex: 1 }} />
+                <button onClick={() => { setAddingFor(null); setEditingRuleId(null); }}
+                  style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 5, cursor: 'pointer', border: `0.5px solid ${T.borderStrong}`, background: T.surface2, color: T.textSecondary, alignSelf: 'flex-end' }}>
+                  Cancel
+                </button>
+                <button disabled={!formRoles.length || !formMethods.length} onClick={() => saveRule(ev.id)}
+                  style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 5, cursor: formRoles.length && formMethods.length ? 'pointer' : 'default', border: 'none', background: formRoles.length && formMethods.length ? T.fillAccent : T.borderStrong, color: formRoles.length && formMethods.length ? T.onAccent : T.textMuted, alignSelf: 'flex-end' }}>
+                  Done
+                </button>
               </div>
             </div>
           )}
@@ -3033,7 +3070,7 @@ function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScori
       </SectionHeader>
 
       {/* Notifications */}
-      <SectionHeader label="Notifications" summary="5 events configured" defaultOpen={false}>
+      <SectionHeader label="Notifications" helpTip="Configure email, text, or push notifications that are triggered by different events." summary="No events configured" defaultOpen={false}>
         <NotificationSection />
       </SectionHeader>
 
