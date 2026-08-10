@@ -137,7 +137,7 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
   { type: 'email',       aliases: ['email','external email','notify','send'] },
 ];
 
-const FLAG_COLORS = ['#1A1A1F','#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA'];
+const FLAG_COLORS = ['#1A1A1F','#EF5350','#FF7043','#FFB300','#66BB6A','#42A5F5','#7E57C2','#EC407A','#26C6DA','#FFFFFF'];
 const FLAG_EMOJIS = ['🚩','⚠️','🔴','🟠','🟡','🟢','🔵','🟣','⭐','❗','❌','✅','🔥','💧','🌿','🍽️','🔧','🏥','📋','🔑'];
 const LOCATION_TAGS = ['BOH', 'FOH', 'Bar', 'Kitchen', 'Drive-Thru', 'Prep', 'Storage', 'Receiving', 'Freezer', 'Dishwash', 'Catering', 'Patio', 'Lounge', 'Bakery', 'Deli', 'Produce', 'Dairy', 'Meat', 'Seafood', 'Checkout'];
 const SCORE_GROUPS = ['Food Safety', 'Equipment', 'Sanitation', 'Customer Experience', 'Opening', 'Closing'];
@@ -445,7 +445,7 @@ function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { o
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Color</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {FLAG_COLORS.map(c => <div key={c} onClick={() => setNewFlagColor(c)} style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: newFlagColor === c ? `${c === '#1A1A1F' ? '1.5px' : '2px'} solid ${c === '#1A1A1F' ? '#ffffff' : T.textPrimary}` : '2px solid transparent', outline: newFlagColor === c && c === '#1A1A1F' ? `1.5px solid ${T.borderStrong}` : 'none', outlineOffset: 1 }} />)}
+          {FLAG_COLORS.map(c => <div key={c} onClick={() => setNewFlagColor(c)} style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: newFlagColor === c ? `2px solid ${c === '#1A1A1F' ? '#ffffff' : c === '#FFFFFF' ? T.borderStrong : T.textPrimary}` : `1px solid ${c === '#FFFFFF' ? T.borderStrong : 'transparent'}`, outline: newFlagColor === c && c === '#1A1A1F' ? `1.5px solid ${T.borderStrong}` : 'none', outlineOffset: 1 }} />)}
         </div>
       </div>
       <div style={{ marginBottom: 10 }}>
@@ -1812,11 +1812,12 @@ function LabelSelector({ item, onUpdate }: { item: ListItem; onUpdate: (u: Parti
   );
 }
 
-function PromptEditor({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
+function PromptEditor({ item, onUpdate, autoFocus }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void; autoFocus?: boolean }) {
   const editorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (editorRef.current) {
       editorRef.current.innerHTML = item.promptHtml ?? item.prompt;
+      if (autoFocus) editorRef.current.focus();
     }
   }, [item.id]);
 
@@ -2130,7 +2131,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 320 }}>
         {/* Prompt */}
         <SsSection label="Prompt Text" defaultOpen>
-          <PromptEditor item={item} onUpdate={upd} />
+          <PromptEditor item={item} onUpdate={upd} autoFocus={!item.prompt} />
         </SsSection>
         {/* General options */}
         <SsSection label="General Options" defaultOpen={true}>
@@ -2884,6 +2885,7 @@ interface RowProps {
   item: ListItem;
   items: ListItem[];
   isSelected: boolean;
+  anySelected: boolean;
   isActive: boolean;
   isCut: boolean;
   dcMode: boolean;
@@ -2913,7 +2915,7 @@ const isYNCaUnconfigured = (item: ListItem) =>
 const isNACaUnconfigured = (item: ListItem) =>
   !!item.caForNA && !item.caForNAList && !item.caForNAAdHoc;
 
-function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, flags, caToastId, onCaToast }: RowProps) {
+function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, flags, caToastId, onCaToast }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
@@ -3002,7 +3004,7 @@ function ItemRow({ item, items, isSelected, isActive, isCut, dcMode, dcLinkingId
       </td>
       {/* Checkbox */}
       <td style={sticky(28, { width: 30, padding: '0 6px' })}>
-        <input type="checkbox" checked={isSelected} onChange={() => onCheckbox(item.id)} style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block', opacity: hovered || isSelected || isActive ? 1 : 0, cursor: 'pointer' }} />
+        <input type="checkbox" checked={isSelected} onChange={() => onCheckbox(item.id)} style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block', opacity: hovered || isSelected || isActive || anySelected ? 1 : 0, cursor: 'pointer' }} />
       </td>
       {/* Stripe */}
       <td style={sticky(58, { width: 4, padding: 0 })}>
@@ -3800,7 +3802,7 @@ export default function JoltListEditorPage() {
   }, [items]);
 
   const allItems = items;
-  const totalItems = items.filter(i => i.type !== 'subtitle').length;
+  const totalItems = items.length;
 
   function updateItem(id: string, updates: Partial<ListItem>) {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
@@ -3850,11 +3852,13 @@ export default function JoltListEditorPage() {
       ...(type === 'qr' ? { qrTarget: mkCodeTarget() } : {}),
       ...(type === 'barcode' ? { barcodeTarget: mkCodeTarget() } : {}),
       ...(type === 'formula' ? { formulaType: 'number' as const, formulaVars: [{ name: 'A', itemId: '' }], formulaExpr: '' } : {}),
+      ...(type === 'measurement' ? { measType: 'temperature', measUnit: 'F', measMethods: ['Manual Input'] } : {}),
     };
-    // Insert after active item, or at end of list
+    // Insert after active item, last active item, or at end of list
+    const insertAfterId = activeItemId ?? lastActiveItemId;
     setItems(prev => {
-      if (activeItemId) {
-        const idx = prev.findIndex(it => it.id === activeItemId);
+      if (insertAfterId) {
+        const idx = prev.findIndex(it => it.id === insertAfterId);
         if (idx !== -1) {
           const next = [...prev];
           next.splice(idx + 1, 0, newItem);
@@ -3863,9 +3867,8 @@ export default function JoltListEditorPage() {
       }
       return [...prev, newItem];
     });
-    setEditingRowId(newItem.id);
-    setEditingPrompt('');
     setShowAddPopover(false);
+    setLastActiveItemId(null);
     setActiveItemId(newItem.id);
   }
 
@@ -4249,7 +4252,7 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} isActive={activeItemId === item.id || (!activeItemId && lastActiveItemId === item.id)} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} flags={flags} caToastId={caToastId} onCaToast={onCaToast} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} anySelected={selectedIds.size > 0} isActive={activeItemId === item.id || (!activeItemId && lastActiveItemId === item.id)} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} flags={flags} caToastId={caToastId} onCaToast={onCaToast} />
           )
         ))}
       </tbody>
