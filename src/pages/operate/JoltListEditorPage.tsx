@@ -3517,22 +3517,18 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Drag handle */}
-      <td style={sticky(0, { width: 28, padding: 0 })}>
-        <div style={{ width: 28, height: 44, display: 'flex', alignItems: 'center', paddingLeft: 8, paddingRight: 3, color: T.textMuted, fontSize: 14, opacity: hovered || isActive ? 1 : 0 }}>
-          <i className="ti ti-grip-vertical" />
+      {/* Checkbox */}
+      <td style={sticky(0, { width: 30, padding: 0 })}>
+        <div style={{ width: 30, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <input type="checkbox" checked={isSelected} onChange={() => onCheckbox(item.id)} style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block', opacity: hovered || isSelected || isActive || anySelected ? 1 : 0, cursor: 'pointer' }} />
         </div>
       </td>
-      {/* Checkbox */}
-      <td style={sticky(28, { width: 30, padding: '0 6px' })}>
-        <input type="checkbox" checked={isSelected} onChange={() => onCheckbox(item.id)} style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block', opacity: hovered || isSelected || isActive || anySelected ? 1 : 0, cursor: 'pointer' }} />
-      </td>
       {/* Stripe */}
-      <td style={sticky(58, { width: 4, padding: 0 })}>
+      <td style={sticky(30, { width: 4, padding: 0 })}>
         <div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} />
       </td>
       {/* Prompt */}
-      <td style={sticky(62, { padding: 0, width: activeCols.length > 0 ? promptWidth : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
+      <td style={sticky(34, { padding: 0, width: activeCols.length > 0 ? promptWidth : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, background: T.borderStrong, zIndex: 2 }} />
         <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 6, cursor: dcMode ? 'pointer' : 'default', overflow: 'hidden', width: '100%' }}>
           {isChild && <span style={{ fontSize: 12, color: T.textMuted, flexShrink: 0 }}>↳</span>}
@@ -3555,7 +3551,7 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
         </div>
       </td>
       {/* Type icon — sticky just past the prompt */}
-      <td style={sticky(62 + promptWidth, { width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.borderStrong}`, textAlign: 'center' })}>
+      <td style={sticky(34 + promptWidth, { width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.borderStrong}`, textAlign: 'center' })}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 44 }}>
           <i className={`ti ${meta.icon}`} style={{ fontSize: 15, color: T.textMuted }} title={meta.label} />
         </div>
@@ -4630,10 +4626,10 @@ interface ItemsTableProps {
 
 function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, flags, caToastId, onCaToast }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
-  const totalCols = 7 + activeCols.length; // drag+checkbox+stripe+prompt+type+indicators+kebab + optional cols
+  const totalCols = 6 + activeCols.length; // checkbox+stripe+prompt+type+indicators+kebab + optional cols
   const [promptWidth, setPromptWidth] = useState(300);
-  // Cumulative left offsets for sticky columns: drag=0, checkbox=28, stripe=58, prompt=62, type=62+promptWidth
-  const S = { drag: 0, checkbox: 28, stripe: 58, prompt: 62, type: 62 + promptWidth };
+  // Cumulative left offsets for sticky columns: checkbox=0, stripe=30, prompt=34, type=34+promptWidth
+  const S = { checkbox: 0, stripe: 30, prompt: 34, type: 34 + promptWidth };
   const stickyHead = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
     position: 'sticky', left, zIndex: 12, background: T.surface1, ...extra,
   });
@@ -4660,7 +4656,6 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
   return (
     <table style={{ width: hasCols ? 'max-content' : '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
-        <col style={{ width: 28 }} />
         <col style={{ width: 30 }} />
         <col style={{ width: 4 }} />
         <col style={{ width: hasCols ? promptWidth : undefined }} />
@@ -4689,7 +4684,6 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
             };
             return (
               <tr style={{ background: T.surface1, height: 20 }}>
-                <th style={{ ...stickyHead(S.drag, { width: 28, padding: 0 }) }} />
                 <th style={{ ...stickyHead(S.checkbox, { width: 30, padding: 0 }) }} />
                 <th style={{ ...stickyHead(S.stripe, { width: 4, padding: 0 }) }} />
                 <th style={{ ...stickyHead(S.prompt, { padding: 0 }) }}>
@@ -4717,7 +4711,6 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
             );
           })()}
           <tr style={{ background: T.surface1, borderBottom: `0.5px solid ${T.borderStrong}`, height: 32 }}>
-            <th style={stickyHead(S.drag, { width: 28 })} />
             <th style={stickyHead(S.checkbox, { width: 30 })} />
             <th style={stickyHead(S.stripe, { width: 4 })} />
             <th style={stickyHead(S.prompt, { minWidth: 200, padding: 0 })}>
@@ -4730,7 +4723,9 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
               >
                 <div style={{ width: 2, height: 14, borderRadius: 1, background: T.borderStrong, opacity: 0, transition: 'opacity 0.15s' }} />
               </div>
-              <div style={{ height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }} />
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Item prompt text</span>
+              </div>
             </th>
             <th style={stickyHead(S.type, { width: 32, borderLeft: `0.5px solid ${T.borderStrong}` })} />
             <th style={{ width: 88, padding: '5px 8px', borderLeft: `0.5px solid ${T.border}`, borderTop: `0.5px solid ${T.border}`, fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', verticalAlign: 'middle' }}>Config</th>
@@ -4754,7 +4749,6 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
         {items.map(item => (
           editingRowId === item.id ? (
             <tr key={item.id} style={{ height: 44, borderBottom: `0.5px solid ${T.borderAccent}`, background: '#F0F7FF', borderLeft: `3px solid ${T.fillAccent}` }}>
-              <td style={{ width: 28, padding: 0 }}><div style={{ width: 28, height: 44, display: 'flex', alignItems: 'center', paddingLeft: 8, color: T.textMuted, fontSize: 14 }}><i className="ti ti-grip-vertical" /></div></td>
               <td style={{ width: 30, padding: '0 6px' }}><input type="checkbox" style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block' }} /></td>
               <td style={{ width: 4, padding: 0 }}><div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} /></td>
               <td style={{ padding: 0, overflow: 'hidden' }}>
