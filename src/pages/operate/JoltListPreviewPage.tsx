@@ -58,11 +58,11 @@ const FALLBACK_ITEMS: PreviewItem[] = [
     flagsForNo: ['f1'], points: 25 },
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', allowNA: true,
     dcParentId: 'cooler-ok', dcConditions: [{ type: 'yn', value: 'No' }] },
-  { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', allowNA: false },
+  { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', allowNA: false, infoFile: 'Opening Procedures.pdf' },
   { id: 'prep-temp', prompt: 'Record prep cooler temp', type: 'measurement', stripe: '#C1E1C5', allowNA: true, allowOOO: true, points: 25, measUnit: '°F' },
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', allowNA: false,
     dcParentId: 'prep-temp', dcConditions: [{ type: 'numeric', op: '>=', value: 41 }] },
-  { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false },
+  { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false, infoFile: 'Date Label Policy.pdf', infoInline: true },
   { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', allowNA: true, allowOOO: true, points: 10 },
   { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', allowNA: false, choices: [
     { id: 'c1', label: 'Sysco',                  color: '#4CAF50', icon: null },
@@ -177,7 +177,7 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onInfoOpen }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
@@ -193,6 +193,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   caSubmitted: Set<string>;
   sublistProgress?: { done: number; total: number };
   onSublistOpen?: (id: string) => void;
+  onInfoOpen?: (file: string) => void;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [measInput, setMeasInput] = useState('');
@@ -223,7 +224,24 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   if (item.type === 'subtitle' || item.type === 'text') {
     return (
       <div style={{ background: item.stripe || 'white', borderBottom: `1px solid ${BORDER}`, padding: '12px 16px' }}>
+        {item.infoFile && (
+          <div onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, cursor: 'pointer', flexShrink: 0 }}>
+            <i className="ti ti-info-circle" style={{ color: 'white', fontSize: 15 }} />
+          </div>
+        )}
         <div style={{ fontSize: 14, color: TEXT_SECONDARY, lineHeight: 1.5 }}>{item.prompt}</div>
+        {item.infoFile && item.infoInline && (
+          <div style={{ border: '1.5px solid #C8C8D0', borderRadius: 8, overflow: 'hidden', marginTop: 10 }}>
+            <div style={{ background: SURFACE_1, padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${BORDER}` }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY }}>{item.infoFile}</span>
+              <span onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ fontSize: 11, fontWeight: 600, color: APP_BLUE, letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'pointer' }}>Fullscreen</span>
+            </div>
+            <div style={{ background: '#F8F8F8', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_MUTED, fontSize: 12, gap: 6 }}>
+              <i className="ti ti-file-text" style={{ fontSize: 20 }} />
+              <span>Document preview placeholder</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -268,8 +286,8 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   return (
     <div style={{ background: item.stripe || (completed && !isNA && !isOOO && !showCA ? '#EBF5FF' : 'white'), borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
       {/* Info library badge */}
-      {(item.infoFile || item.infoInline) && (
-        <div style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+      {item.infoFile && (
+        <div onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, cursor: 'pointer', flexShrink: 0 }}>
           <i className="ti ti-info-circle" style={{ color: 'white', fontSize: 15 }} />
         </div>
       )}
@@ -289,6 +307,20 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
           )}
         </div>
       </div>
+
+      {/* Inline info library embed */}
+      {item.infoFile && item.infoInline && (
+        <div style={{ border: '1.5px solid #C8C8D0', borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
+          <div style={{ background: SURFACE_1, padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${BORDER}` }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY }}>{item.infoFile}</span>
+            <span onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ fontSize: 11, fontWeight: 600, color: APP_BLUE, letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'pointer' }}>Fullscreen</span>
+          </div>
+          <div style={{ background: '#F8F8F8', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_MUTED, fontSize: 12, gap: 6 }}>
+            <i className="ti ti-file-text" style={{ fontSize: 20 }} />
+            <span>Document preview placeholder</span>
+          </div>
+        </div>
+      )}
 
       {/* N/A state */}
       {isNA ? (
@@ -556,6 +588,7 @@ export default function JoltListPreviewPage() {
   const [sublistOpenId, setSublistOpenId] = useState<string | null>(null);
   const [subAnswers, setSubAnswers] = useState<Record<string, Record<string, ItemAnswer>>>({});
   const [subNaItems, setSubNaItems] = useState<Record<string, Set<string>>>({});
+  const [infoOpenFile, setInfoOpenFile] = useState<string | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem('jolt-preview-payload');
@@ -566,6 +599,20 @@ export default function JoltListPreviewPage() {
       setListName(payload.listName ?? 'Preview');
       setScoringOn(payload.scoringOn ?? false);
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key !== 'jolt-preview-payload' || !e.newValue) return;
+      try {
+        const payload = JSON.parse(e.newValue) as { listName: string; scoringOn: boolean; items: PreviewItem[] };
+        setItems(payload.items ?? FALLBACK_ITEMS);
+        setListName(payload.listName ?? 'Preview');
+        setScoringOn(payload.scoringOn ?? false);
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const setAnswer = (id: string, val: ItemAnswer) => {
@@ -684,6 +731,7 @@ export default function JoltListPreviewPage() {
                 caSubmitted={caSubmitted}
                 sublistProgress={item.type === 'sublist' ? getSublistProgress(item) : undefined}
                 onSublistOpen={id => setSublistOpenId(id)}
+                onInfoOpen={file => setInfoOpenFile(file)}
               />
             ))}
           </div>
@@ -717,6 +765,25 @@ export default function JoltListPreviewPage() {
       <div style={{ position: 'fixed', bottom: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 20, letterSpacing: '0.05em', pointerEvents: 'none', textTransform: 'uppercase' }}>
         Preview — {listName}
       </div>
+
+      {/* Info library modal — rendered outside the transformed column so position:fixed works correctly */}
+      {infoOpenFile && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setInfoOpenFile(null)}>
+          <div style={{ width: 420, height: 400, background: '#1A1A1F', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <button onClick={() => setInfoOpenFile(null)} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: 2, fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8, flexShrink: 0 }}>
+                <i className="ti ti-chevron-left" style={{ fontSize: 20 }} /> Back
+              </button>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{infoOpenFile}</div>
+              <div style={{ width: 56, flexShrink: 0 }} />
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: 'rgba(255,255,255,0.45)' }}>
+              <i className="ti ti-file-text" style={{ fontSize: 52 }} />
+              <div style={{ fontSize: 15, fontWeight: 500 }}>Info library document preview</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
