@@ -2591,7 +2591,7 @@ function FormulaSection({ item, items, onUpdate }: { item: ListItem; items: List
 }
 
 // ── Side sheet ────────────────────────────────────────────────────────────
-function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange, scoringOn, flags, onCreateFlag }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void; scoringOn: boolean; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
+function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkAsChange, scoringOn, flags, onCreateFlag, onEnterDCMode }: { item: ListItem; items: ListItem[]; onClose: () => void; onNavigate: (id: string) => void; onUpdate: (id: string, updates: Partial<ListItem>) => void; markAs: string | null; onMarkAsChange: (value: string | null) => void; scoringOn: boolean; flags: Flag[]; onCreateFlag: (flag: Flag) => void; onEnterDCMode: () => void }) {
   const upd = (updates: Partial<ListItem>) => onUpdate(item.id, updates);
   const meta = TYPE_META[item.type];
   const [bgColor, setBgColor] = useState(item.stripe ?? '');
@@ -2670,6 +2670,14 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>Info Library</div>
             <InfoLibrarySection item={item} onUpdate={upd} />
           </div>
+          {item.type !== 'subtitle' && (
+            <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>Display Criteria</div>
+              <button onClick={onEnterDCMode} style={{ fontFamily: T.font, fontSize: 13, color: T.textAccent, background: T.surface0, border: `0.5px solid ${T.borderAccent}`, borderRadius: 6, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'center' }}>
+                <i className="ti ti-filter" style={{ fontSize: 15 }} /> Set Display Criteria
+              </button>
+            </div>
+          )}
           <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12 }}>
             <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Labels</div>
             <LabelSelector item={item} onUpdate={upd} />
@@ -2875,8 +2883,8 @@ function DCConditionPanel({ childItem, parentItem, onSave, onUpdate, onRemoveLin
         </div>
         <button onClick={handleCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 16, display: 'flex', alignItems: 'center', padding: 4 }}><i className="ti ti-x" /></button>
       </div>
-      {/* Cards + form */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Cards + form — natural height so action row follows immediately */}
+      <div style={{ overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {cards.map((card, idx) => (
           <React.Fragment key={idx}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: T.surface1, borderRadius: 6, border: `0.5px solid ${T.border}` }}>
@@ -2894,16 +2902,15 @@ function DCConditionPanel({ childItem, parentItem, onSave, onUpdate, onRemoveLin
           </button>
         )}
       </div>
-      {/* Footer */}
-      <div style={{ borderTop: `0.5px solid ${T.border}`, padding: '12px 16px', display: 'flex', gap: 8 }}>
-        {cards.length === 0 ? (
-          <button onClick={onRemoveLink} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, color: T.textDanger, background: 'none', border: `0.5px solid rgba(163,45,45,0.4)`, borderRadius: 5, padding: '7px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Actions — right below content, never at panel bottom */}
+      <div style={{ borderTop: `0.5px solid ${T.border}`, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+        {existing.length > 0 && cards.length === 0 && (
+          <button onClick={onRemoveLink} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, color: T.textDanger, background: 'none', border: `0.5px solid rgba(163,45,45,0.4)`, borderRadius: 5, padding: '7px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginRight: 'auto' }}>
             <i className="ti ti-unlink" style={{ fontSize: 12 }} /> Remove link
           </button>
-        ) : (
-          <button onClick={() => onSave(cards)} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, background: T.fillAccent, color: T.onAccent, border: 'none', borderRadius: 5, padding: '7px 16px', cursor: 'pointer' }}>Done</button>
         )}
-        <button onClick={handleCancel} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+        <button onClick={handleCancel} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: `0.5px solid ${T.border}`, borderRadius: 5, padding: '7px 16px', cursor: 'pointer' }}>Cancel</button>
+        <button onClick={() => onSave(cards)} disabled={cards.length === 0} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, background: cards.length > 0 ? T.fillAccent : T.border, color: cards.length > 0 ? T.onAccent : T.textMuted, border: 'none', borderRadius: 5, padding: '7px 16px', cursor: cards.length > 0 ? 'pointer' : 'default', opacity: cards.length > 0 ? 1 : 0.5 }}>Done</button>
       </div>
     </div>
   );
@@ -4763,7 +4770,7 @@ export default function JoltListEditorPage() {
           {/* Side sheet */}
           {activeItemId && !dcMode && (() => {
             const item = findItem(items, activeItemId);
-            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => { setLastActiveItemId(activeItemId); setActiveItemId(null); }} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} flags={flags} onCreateFlag={handleCreateFlag} /> : null;
+            return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => { setLastActiveItemId(activeItemId); setActiveItemId(null); }} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} flags={flags} onCreateFlag={handleCreateFlag} onEnterDCMode={() => { setLastActiveItemId(activeItemId); setActiveItemId(null); setDcMode(true); setDcLinkingId(activeItemId); }} /> : null;
           })()}
         </div>
       )}
