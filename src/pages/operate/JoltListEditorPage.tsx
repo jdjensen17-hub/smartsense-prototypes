@@ -19,8 +19,9 @@ const T = {
 type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' | 'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' | 'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula' | 'asset' | 'email';
 
 type DCConditionYN = { type: 'yn'; value: 'Yes' | 'No' };
-type DCConditionMeas = { type: 'measurement'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
-type DCCondition = DCConditionYN | DCConditionMeas;
+type DCConditionNumeric = { type: 'numeric'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
+type DCConditionMC = { type: 'mc'; choiceId: string; choiceLabel: string };
+type DCCondition = DCConditionYN | DCConditionNumeric | DCConditionMC;
 
 interface MCChoice { id: string; label: string; color: string; icon: string | null; score?: number | ''; flagIds?: string[]; followUpEnabled?: boolean; followUpActions?: string[]; }
 interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; rangeId?: string; }
@@ -33,7 +34,7 @@ interface ListItem {
   inds: string[];
   allowNA: boolean;
   dcParentId?: string;
-  dcCondition?: DCCondition;
+  dcConditions?: DCCondition[];
   choices?: MCChoice[];
   caForNA?: boolean;
   caForYNRules?: CARule[];
@@ -236,7 +237,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       onMouseLeave={() => setRect(null)}
     >
       {children}
-      {rect && ReactDOM.createPortal(
+      {rect && text && ReactDOM.createPortal(
         <span style={{
           position: 'fixed',
           top: rect.top - 6,
@@ -254,10 +255,19 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
   );
 }
 
-function dcCondLabel(cond?: DCCondition) {
-  if (!cond) return '';
+function condSingleLabel(cond: DCCondition): string {
   if (cond.type === 'yn') return `if ${cond.value}`;
-  return `if ${cond.op} ${cond.value}°F`;
+  if (cond.type === 'mc') {
+    const words = cond.choiceLabel.trim().split(/\s+/);
+    return `if ${words.length > 3 ? words.slice(0, 3).join(' ') + '…' : cond.choiceLabel}`;
+  }
+  return `if ${cond.op} ${cond.value}`;
+}
+
+function dcCondLabel(conds?: DCCondition[]) {
+  if (!conds?.length) return '';
+  const first = condSingleLabel(conds[0]);
+  return conds.length > 1 ? `${first} +${conds.length - 1}` : first;
 }
 
 // ── Mini reusable components ──────────────────────────────────────────────
@@ -2798,37 +2808,102 @@ function AddItemPopover({ onSelect, onClose }: { onSelect: (type: ItemType) => v
 }
 
 // ── DC condition popover ───────────────────────────────────────────────────
-function DCConditionPanel({ childItem, parentItem, onSave, onCancel }: { childItem: ListItem; parentItem: ListItem; onSave: (cond: DCCondition) => void; onCancel: () => void }) {
-  const isMeas = parentItem.type === 'measurement';
-  const [ynValue, setYnValue] = useState<'Yes' | 'No'>('No');
-  const [measOp, setMeasOp] = useState<DCConditionMeas['op']>('>=');
-  const [measVal, setMeasVal] = useState(41);
+function DCConditionForm({ parentItem, initial, onAdd }: { parentItem: ListItem; initial?: DCCondition; onAdd: (cond: DCCondition) => void }) {
+  const isYN = parentItem.type === 'yn';
+  const isMC = parentItem.type === 'mc';
+  const isNumeric = ['measurement', 'rating', 'number', 'formula'].includes(parentItem.type);
+  const choices = parentItem.choices ?? [];
+  const OPS: { value: DCConditionNumeric['op']; label: string }[] = [{value:'>',label:'>'},{value:'>=',label:'≥'},{value:'=',label:'='},{value:'<=',label:'≤'},{value:'<',label:'<'}];
 
-  const save = () => {
-    if (isMeas) onSave({ type: 'measurement', op: measOp, value: measVal });
-    else onSave({ type: 'yn', value: ynValue });
+  const [ynValue, setYnValue] = useState<'Yes' | 'No'>(initial?.type === 'yn' ? initial.value : 'No');
+  const [numOp, setNumOp] = useState<DCConditionNumeric['op']>(initial?.type === 'numeric' ? initial.op : '>=');
+  const [numVal, setNumVal] = useState(initial?.type === 'numeric' ? initial.value : 0);
+  const [mcChoiceId, setMcChoiceId] = useState<string>(initial?.type === 'mc' ? initial.choiceId : (choices[0]?.id ?? ''));
+
+  const handleAdd = () => {
+    if (isYN) onAdd({ type: 'yn', value: ynValue });
+    else if (isMC) { const c = choices.find(x => x.id === mcChoiceId); onAdd({ type: 'mc', choiceId: mcChoiceId, choiceLabel: c?.label ?? mcChoiceId }); }
+    else onAdd({ type: 'numeric', op: numOp, value: numVal });
   };
 
   return (
-    <div style={{ width: 300, flexShrink: 0, background: T.surface2, borderLeft: `0.5px solid ${T.border}`, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Condition 1</div>
-      {!isMeas ? (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', background: T.surface1, borderRadius: 6, border: `0.5px solid ${T.border}` }}>
+      {isYN && <Select value={ynValue} onChange={v => setYnValue(v as 'Yes' | 'No')} options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }]} style={{ width: '100%' }} />}
+      {isMC && <Select value={mcChoiceId} onChange={v => setMcChoiceId(v)} options={choices.map(c => ({ value: c.id, label: c.label || '(unlabeled)' }))} style={{ width: '100%' }} />}
+      {isNumeric && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Select value={ynValue} onChange={v => setYnValue(v as 'Yes' | 'No')} options={[{ value: 'No', label: 'No' }, { value: 'Yes', label: 'Yes' }]} style={{ flex: 1 }} />
-        </div>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Select value={measOp} onChange={v => setMeasOp(v as DCConditionMeas['op'])} options={[{value:'>',label:'>'},{value:'>=',label:'≥'},{value:'=',label:'='},{value:'<=',label:'≤'},{value:'<',label:'<'}]} style={{ width: 70 }} />
-          <input type="number" value={measVal} onChange={e => setMeasVal(Number(e.target.value))} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '7px 10px', width: 80, textAlign: 'center' }} />
+          <Select value={numOp} onChange={v => setNumOp(v as DCConditionNumeric['op'])} options={OPS} style={{ width: 70 }} />
+          <input type="number" value={numVal} onChange={e => setNumVal(Number(e.target.value))} style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '7px 10px', width: 80, textAlign: 'center' }} />
         </div>
       )}
-      <button style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0' }}>
-        <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add another condition (OR)
-      </button>
-      <div style={{ height: 0.5, background: T.border }} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={save} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, background: T.fillAccent, color: T.onAccent, border: 'none', borderRadius: 5, padding: '7px 16px', cursor: 'pointer' }}>Save</button>
-        <button onClick={onCancel} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+      <button onClick={handleAdd} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, background: T.fillAccent, color: T.onAccent, border: 'none', borderRadius: 5, padding: '6px 14px', cursor: 'pointer', alignSelf: 'flex-start' }}>Add</button>
+    </div>
+  );
+}
+
+function DCConditionPanel({ childItem, parentItem, onSave, onUpdate, onRemoveLink, onCancel }: { childItem: ListItem; parentItem: ListItem; onSave: (conds: DCCondition[]) => void; onUpdate: (conds: DCCondition[]) => void; onRemoveLink: () => void; onCancel: () => void }) {
+  const originalConditions = useRef<DCCondition[]>(childItem.dcConditions ?? []);
+  const existing = originalConditions.current;
+  const [cards, setCards] = useState<DCCondition[]>(existing);
+  const [showForm, setShowForm] = useState(existing.length === 0);
+
+  const handleAdd = (cond: DCCondition) => {
+    const next = [...cards, cond];
+    setCards(next);
+    setShowForm(false);
+    onUpdate(next);
+  };
+
+  const handleCancel = () => { onUpdate(existing); onCancel(); };
+
+  const handleRemove = (idx: number) => {
+    setCards(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (next.length === 0) setShowForm(true);
+      onUpdate(next);
+      return next;
+    });
+  };
+
+  return (
+    <div style={{ width: 300, flexShrink: 0, background: T.surface2, borderLeft: `0.5px solid ${T.border}`, display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `0.5px solid ${T.border}` }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Condition</div>
+          <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>Show <strong>child</strong> when <strong>parent</strong> is:</div>
+        </div>
+        <button onClick={handleCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 16, display: 'flex', alignItems: 'center', padding: 4 }}><i className="ti ti-x" /></button>
+      </div>
+      {/* Cards + form */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {cards.map((card, idx) => (
+          <React.Fragment key={idx}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: T.surface1, borderRadius: 6, border: `0.5px solid ${T.border}` }}>
+              <span style={{ fontSize: 13, color: T.textPrimary }}>{condSingleLabel(card)}</span>
+              <button onClick={() => handleRemove(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', alignItems: 'center', padding: 2 }}><i className="ti ti-x" /></button>
+            </div>
+            {idx < cards.length - 1 && <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textAlign: 'center', letterSpacing: '0.05em' }}>OR</div>}
+          </React.Fragment>
+        ))}
+        {cards.length > 0 && showForm && <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textAlign: 'center', letterSpacing: '0.05em' }}>OR</div>}
+        {showForm && <DCConditionForm parentItem={parentItem} onAdd={handleAdd} />}
+        {!showForm && (
+          <button onClick={() => setShowForm(true)} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0' }}>
+            <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add another condition (OR)
+          </button>
+        )}
+      </div>
+      {/* Footer */}
+      <div style={{ borderTop: `0.5px solid ${T.border}`, padding: '12px 16px', display: 'flex', gap: 8 }}>
+        {cards.length === 0 ? (
+          <button onClick={onRemoveLink} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, color: T.textDanger, background: 'none', border: `0.5px solid rgba(163,45,45,0.4)`, borderRadius: 5, padding: '7px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <i className="ti ti-unlink" style={{ fontSize: 12 }} /> Remove link
+          </button>
+        ) : (
+          <button onClick={() => onSave(cards)} style={{ fontFamily: T.font, fontSize: 12, fontWeight: 600, background: T.fillAccent, color: T.onAccent, border: 'none', borderRadius: 5, padding: '7px 16px', cursor: 'pointer' }}>Done</button>
+        )}
+        <button onClick={handleCancel} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
       </div>
     </div>
   );
@@ -3424,6 +3499,13 @@ interface RowProps {
   onKebabClose: () => void;
   onKebabAction: (action: string, id: string) => void;
   onDCClick: (id: string) => void;
+  onDCFilterClick: (id: string) => void;
+  onRemoveDCLink: (id: string) => void;
+  onSetCondition: (childId: string, parentId: string) => void;
+  dcDebugId: string | null;
+  dcDebugUnlinkedId: string | null;
+  dcPendingConditionId: string | null;
+  dcConditionPanelOpen: boolean;
   flags: Flag[];
   caToastId: string | null;
   onCaToast: (key: string | null) => void;
@@ -3436,17 +3518,40 @@ const isYNCaUnconfigured = (item: ListItem) =>
 const isNACaUnconfigured = (item: ListItem) =>
   !!item.caForNA && !item.caForNAList && !item.caForNAAdHoc;
 
-function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, flags, caToastId, onCaToast }: RowProps) {
+function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onDCFilterClick, onRemoveDCLink, onSetCondition, dcDebugId, dcDebugUnlinkedId, dcPendingConditionId, dcConditionPanelOpen, flags, caToastId, onCaToast }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
   const parent = item.dcParentId ? findItem(items, item.dcParentId) : null;
   const isChild = !!item.dcParentId;
-  const condLabel = dcCondLabel(item.dcCondition);
+  const condLabel = dcCondLabel(item.dcConditions);
+  const condTooltip = (item.dcConditions?.length ?? 0) > 1
+    ? item.dcConditions!.map(condSingleLabel).join('\nOR ')
+    : '';
   const parentColor = item.dcParentId ? (dcColors[item.dcParentId] ?? T.fillAccent) : '';
-  const isEligibleParent = dcMode && dcLinkingId && item.id !== dcLinkingId && (item.type === 'yn' || item.type === 'measurement');
+  const DC_PARENT_TYPES: ItemType[] = ['yn', 'mc', 'measurement', 'rating', 'formula', 'number'];
+  const isEligibleParent = dcMode && dcLinkingId && item.id !== dcLinkingId && DC_PARENT_TYPES.includes(item.type);
   const isLinkingChild = dcMode && dcLinkingId === item.id;
-  const isTypeDimmed = dcMode && dcLinkingId && !isEligibleParent && !isLinkingChild;
+  const isPendingChild = dcPendingConditionId === item.id;
+  const debugItemIsParent = !!dcDebugId && items.some(i => i.dcParentId === dcDebugId);
+  const isDebugParent = !!dcDebugId && (
+    (debugItemIsParent && item.id === dcDebugId) ||
+    (!debugItemIsParent && items.find(i => i.id === dcDebugId)?.dcParentId === item.id)
+  );
+  const debugItemParentId = !debugItemIsParent ? items.find(i => i.id === dcDebugId)?.dcParentId : undefined;
+  const isDebugChild = !!dcDebugId && dcDebugUnlinkedId !== item.id && (
+    (debugItemIsParent && item.dcParentId === dcDebugId) ||
+    (!debugItemIsParent && !!item.dcParentId && item.dcParentId === debugItemParentId)
+  );
+  const debugParentColor = isDebugParent ? (dcColors[debugItemIsParent ? dcDebugId! : item.id] || T.fillAccent) : '';
+  const debugChildParentColor = isDebugChild ? (dcColors[item.dcParentId!] || T.fillAccent) : '';
+  const debugChildCondLabel = isDebugChild ? dcCondLabel(item.dcConditions) : '';
+  const pendingChild = dcPendingConditionId ? findItem(items, dcPendingConditionId) : null;
+  const isPendingParent = !!dcPendingConditionId && pendingChild?.dcParentId === item.id;
+  const isTypeDimmed = dcMode && (
+    (dcLinkingId && !isEligibleParent && !isLinkingChild) ||
+    (dcPendingConditionId && !isPendingChild && !isPendingParent)
+  );
 
   const derivedInds: { icon: string; title: string }[] = [
     ...(() => {
@@ -3497,11 +3602,12 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
     ...(!!item.dcParentId || items.some(x => x.dcParentId === item.id) ? [{ icon: 'ti-filter', title: 'Display Criteria configured' }] : []),
   ];
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
-  const rowBg = isActive || isLinkingChild ? T.bgAccent : hovered ? T.surface1 : T.surface2;
+  const isBlueRow = isActive || isLinkingChild || isPendingChild;
+  const rowBg = isBlueRow ? T.bgAccent : hovered ? T.surface1 : T.surface2;
   const stickyBg = rowBg;
   // On an active (blue) row, accent pills need a contrasting background so they don't dissolve into the row color
-  const pillBg = (isActive || isLinkingChild) ? 'rgba(255,255,255,0.75)' : T.bgAccent;
-  const pillColor = (isActive || isLinkingChild) ? T.textAccent : T.textAccent;
+  const pillBg = isBlueRow ? 'rgba(255,255,255,0.75)' : T.bgAccent;
+  const pillColor = T.textAccent;
   const sticky = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
     position: 'sticky', left, zIndex: 1, background: stickyBg, ...extra,
   });
@@ -3523,21 +3629,27 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
           <input type="checkbox" checked={isSelected} onChange={() => onCheckbox(item.id)} style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block', opacity: hovered || isSelected || isActive || anySelected ? 1 : 0, cursor: 'pointer' }} />
         </div>
       </td>
-      {/* Stripe */}
-      <td style={sticky(30, { width: 4, padding: 0 })}>
-        <div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} />
+      {/* Stripe / DC dot */}
+      <td style={sticky(30, { width: 10, padding: 0 })}>
+        {dcMode && (isChild || items.some(x => x.dcParentId === item.id)) ? (
+          <div style={{ width: 10, height: 44, position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 8, height: 8, borderRadius: '50%', background: isChild ? parentColor : (dcColors[item.id] || T.fillAccent) }} />
+          </div>
+        ) : (
+          <div style={{ width: 10, height: 44, display: 'flex', alignItems: 'stretch' }}><div style={{ width: 4, height: '100%', background: item.stripe || 'transparent' }} /></div>
+        )}
       </td>
       {/* Prompt */}
-      <td style={sticky(34, { padding: 0, width: activeCols.length > 0 ? promptWidth : undefined })} onClick={() => dcMode ? onDCClick(item.id) : onRowClick(item.id)}>
+      <td style={sticky(40, { padding: 0, width: activeCols.length > 0 ? promptWidth : undefined })} onClick={() => { if (dcMode) { if (dcPendingConditionId || dcConditionPanelOpen) return; if (!dcLinkingId || isLinkingChild || isEligibleParent) onDCClick(item.id); } else { onRowClick(item.id); } }}>
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, background: T.borderStrong, zIndex: 2 }} />
         <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 6, cursor: dcMode ? 'pointer' : 'default', overflow: 'hidden', width: '100%' }}>
           {isChild && <span style={{ fontSize: 12, color: T.textMuted, flexShrink: 0 }}>↳</span>}
           <span style={{ fontSize: 13, color: isLinkingChild || (isActive && !dcMode) ? T.textAccent : T.textPrimary, fontWeight: isLinkingChild || (isActive && !dcMode) ? 500 : 400, flex: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.prompt}</span>
           {/* DC mode overlays */}
-          {dcMode && !dcLinkingId && parent && (
-            <span style={{ fontSize: 10, fontWeight: 500, color: 'white', background: parentColor, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{condLabel}</span>
+          {dcMode && !isPendingChild && !isDebugChild && parent && !!condLabel && (
+            <Tooltip text={condTooltip}><span onClick={!dcLinkingId && !dcPendingConditionId ? e => { e.stopPropagation(); onSetCondition(item.id, item.dcParentId!); } : undefined} style={{ fontSize: 10, fontWeight: 500, color: 'white', background: parentColor, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0, cursor: dcLinkingId || dcPendingConditionId ? 'default' : 'pointer', opacity: dcLinkingId || dcPendingConditionId ? 0.6 : 1 }}>{condLabel}</span></Tooltip>
           )}
-          {dcMode && !dcLinkingId && !parent && item.type !== 'subtitle' && (
+          {dcMode && !dcLinkingId && !dcPendingConditionId && !parent && item.type !== 'subtitle' && (
             (() => {
               const hasChildren = items.some(x => x.dcParentId === item.id);
               return hasChildren ? (
@@ -3545,13 +3657,31 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
               ) : null;
             })()
           )}
+          {/* Pending condition overlays */}
+          {isPendingParent && (
+            <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 7px', borderRadius: 3, background: `${dcColors[item.id] || T.fillAccent}18`, color: dcColors[item.id] || T.fillAccent, flexShrink: 0 }}>parent</span>
+          )}
+          {isPendingChild && (item.dcConditions?.length ? (
+            <Tooltip text={condTooltip}><span onClick={e => { e.stopPropagation(); if (item.dcParentId) onSetCondition(item.id, item.dcParentId); }} style={{ fontSize: 10, fontWeight: 500, color: 'white', background: parentColor, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer' }}>{condLabel}</span></Tooltip>
+          ) : (
+            <button onClick={e => { e.stopPropagation(); if (item.dcParentId) onSetCondition(item.id, item.dcParentId); }} style={{ fontFamily: T.font, fontSize: 10, fontWeight: 600, color: T.textAccent, background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 4, padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>Set condition</button>
+          ))}
           {isEligibleParent && (
             <button style={{ fontFamily: T.font, fontSize: 10, fontWeight: 600, color: T.textAccent, background: T.bgAccent, border: `0.5px solid ${T.borderAccent}`, borderRadius: 4, padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); onDCClick(item.id); }}>Set as parent</button>
+          )}
+          {/* Debug mode overlays */}
+          {isDebugChild && !!debugChildCondLabel && (
+            <Tooltip text={debugChildCondLabel.includes('+') ? item.dcConditions!.map(condSingleLabel).join('\nOR ') : ''}><span onClick={e => { e.stopPropagation(); if (item.dcParentId) onSetCondition(item.id, item.dcParentId); }} style={{ fontSize: 10, fontWeight: 500, color: 'white', background: debugChildParentColor, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer' }}>{debugChildCondLabel}</span></Tooltip>
+          )}
+          {isDebugChild && (
+            <button onClick={e => { e.stopPropagation(); onRemoveDCLink(item.id); }} style={{ fontFamily: T.font, fontSize: 11, color: T.textDanger, background: 'none', border: `0.5px solid rgba(163,45,45,0.4)`, borderRadius: 4, padding: '2px 8px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+              <i className="ti ti-unlink" style={{ fontSize: 11 }} /> Remove link
+            </button>
           )}
         </div>
       </td>
       {/* Type icon — sticky just past the prompt */}
-      <td style={sticky(34 + promptWidth, { width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.borderStrong}`, textAlign: 'center' })}>
+      <td style={sticky(40 + promptWidth, { width: 32, padding: '0 5px', borderLeft: `0.5px solid ${T.borderStrong}`, textAlign: 'center' })}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 44 }}>
           <i className={`ti ${meta.icon}`} style={{ fontSize: 15, color: T.textMuted }} title={meta.label} />
         </div>
@@ -3559,11 +3689,20 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
       {/* Config indicators */}
       <td style={{ width: 88, padding: '0 8px', borderLeft: `0.5px solid ${T.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 44 }}>
-          {derivedInds.map(ind => (
-            <Tooltip key={ind.icon} text={ind.title}>
-              <i className={`ti ${ind.icon}`} style={{ fontSize: 13, color: indColor(ind.icon) }} />
-            </Tooltip>
-          ))}
+          {derivedInds.map(ind => {
+            const filterColor = ind.icon === 'ti-filter'
+              ? (isChild ? parentColor : (dcColors[item.id] || T.fillAccent))
+              : indColor(ind.icon);
+            return (
+              <Tooltip key={ind.icon} text={ind.title}>
+                {ind.icon === 'ti-filter' && dcMode && !dcLinkingId ? (
+                  <i className={`ti ${ind.icon}`} style={{ fontSize: 13, color: filterColor, cursor: 'pointer' }} onClick={e => { e.stopPropagation(); onDCFilterClick(item.id); }} />
+                ) : (
+                  <i className={`ti ${ind.icon}`} style={{ fontSize: 13, color: filterColor }} />
+                )}
+              </Tooltip>
+            );
+          })}
         </div>
       </td>
       {/* Optional columns */}
@@ -4258,6 +4397,9 @@ export default function JoltListEditorPage() {
   const [dcMode, setDcMode] = useState(false);
   const [dcLinkingId, setDcLinkingId] = useState<string | null>(null);
   const [dcConditionState, setDcConditionState] = useState<{ childId: string; parentId: string } | null>(null);
+  const [dcDebugId, setDcDebugId] = useState<string | null>(null);
+  const [dcDebugUnlinkedId, setDcDebugUnlinkedId] = useState<string | null>(null);
+  const [dcPendingConditionId, setDcPendingConditionId] = useState<string | null>(null);
   const [colValues, setColValues] = useState<Record<string, Record<string, string>>>({});
   const setColValue = (itemId: string, colKey: string, value: string | null) => {
     setColValues(prev => {
@@ -4339,7 +4481,7 @@ export default function JoltListEditorPage() {
 
   function deleteItem(id: string) {
     const remainingItems = items.filter(it => it.id !== id);
-    setItems(prev => prev.filter(it => it.id !== id).map(it => it.dcParentId === id ? { ...it, dcParentId: undefined, dcCondition: undefined } : it));
+    setItems(prev => prev.filter(it => it.id !== id).map(it => it.dcParentId === id ? { ...it, dcParentId: undefined, dcConditions: undefined } : it));
     setShownCols(prev => {
       const next = new Set(prev);
       for (const col of ALL_COLS) {
@@ -4404,6 +4546,11 @@ export default function JoltListEditorPage() {
     if (!dcMode) return;
     const item = findItem(items, id);
     if (!item) return;
+    // In debug mode, clicking condition badge re-opens condition panel
+    if (dcDebugId === id && item.dcParentId) {
+      setDcConditionState({ childId: id, parentId: item.dcParentId });
+      return;
+    }
     if (!dcLinkingId) {
       // Start linking this item as child
       setDcLinkingId(id);
@@ -4411,21 +4558,29 @@ export default function JoltListEditorPage() {
     } else if (dcLinkingId === id) {
       setDcLinkingId(null);
     } else {
-      // Set as parent
-      setDcConditionState({ childId: dcLinkingId, parentId: id });
+      // Set as parent — write link immediately, enter pending condition state
+      updateItem(dcLinkingId, { dcParentId: id });
+      setDcPendingConditionId(dcLinkingId);
       setDcLinkingId(null);
     }
   }
 
-  function saveDCCondition(cond: DCCondition) {
+  function saveDCCondition(conds: DCCondition[]) {
     if (!dcConditionState) return;
     const { childId, parentId } = dcConditionState;
-    updateItem(childId, { dcParentId: parentId, dcCondition: cond });
+    updateItem(childId, { dcParentId: parentId, dcConditions: conds });
     setDcConditionState(null);
+    setDcPendingConditionId(null);
+  }
+
+  function updateDCConditions(conds: DCCondition[]) {
+    if (!dcConditionState) return;
+    const { childId, parentId } = dcConditionState;
+    updateItem(childId, { dcParentId: parentId, dcConditions: conds });
   }
 
   function removeDCLink(id: string) {
-    updateItem(id, { dcParentId: undefined, dcCondition: undefined });
+    updateItem(id, { dcParentId: undefined, dcConditions: undefined });
   }
 
   function handleKebabAction(action: string, id: string) {
@@ -4464,9 +4619,17 @@ export default function JoltListEditorPage() {
   const conditionParentItem = dcConditionState ? findItem(items, dcConditionState.parentId) : null;
   const conditionChildItem = dcConditionState ? findItem(items, dcConditionState.childId) : null;
 
-  const bannerMsg = dcLinkingId
-    ? `Linking: "${findItem(items, dcLinkingId)?.prompt ?? ''}" — click any eligible item to set as parent`
-    : 'Click any item to start linking · click a filter indicator to debug';
+  const bannerMsg = (() => {
+    if (dcConditionState) return 'Add a condition.';
+    if (dcPendingConditionId) return 'Parent set. Click "Set condition" next.';
+    if (!dcLinkingId) return 'Click any item to start linking OR click a filter icon to start debugging.';
+    const raw = findItem(items, dcLinkingId)?.prompt ?? '';
+    const prompt = raw.length > 60 ? raw.slice(0, 60).trimEnd() + '…' : raw;
+    return `Linking: "${prompt}" — Set the parent item.`;
+  })();
+  const debugItem = dcDebugId ? findItem(items, dcDebugId) : null;
+  const debugBannerMsg = `Debugging: "${debugItem?.prompt ?? ''}"`;
+  const isDebugMode = dcMode && !!dcDebugId;
 
   return (
     <div style={{ fontFamily: T.font, height: 'calc(100vh - 52px)', background: T.surface0, overflow: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
@@ -4494,7 +4657,7 @@ export default function JoltListEditorPage() {
           </div>
         ))}
         <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: 6 }}>
-          <Btn onClick={() => { setDcMode(v => !v); setDcLinkingId(null); setDcConditionState(null); }} style={dcMode ? { background: '#FFF8E1', color: '#5D4037', borderColor: '#FFD54F' } : {}}>
+          <Btn onClick={() => { if (dcPendingConditionId && !findItem(items, dcPendingConditionId)?.dcConditions?.length) removeDCLink(dcPendingConditionId); setDcMode(v => !v); setDcLinkingId(null); setDcConditionState(null); setDcDebugId(null); setDcDebugUnlinkedId(null); setDcPendingConditionId(null); }} style={dcMode ? { background: '#FFF8E1', color: '#5D4037', borderColor: '#FFD54F' } : {}}>
             <i className="ti ti-filter" /> {dcMode ? 'Exit display criteria' : 'Display criteria'}
           </Btn>
           <ColumnPicker shownCols={effectiveShownCols} onChange={setShownCols} scoringOn={scoringOn} />
@@ -4537,42 +4700,58 @@ export default function JoltListEditorPage() {
             </div>
 
             {/* DC banner */}
-            {dcMode && (
+            {dcMode && (isDebugMode ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: '#E6F1FB', borderBottom: `0.5px solid #378ADD`, fontSize: 12, fontWeight: 500, color: '#185FA5', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="ti ti-filter" style={{ fontSize: 14 }} />
+                  {debugBannerMsg}
+                </div>
+                <button onClick={() => { setDcDebugId(null); setDcDebugUnlinkedId(null); }} style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '4px 12px', borderRadius: 5, border: `0.5px solid #378ADD`, background: T.surface2, color: '#185FA5', cursor: 'pointer' }}>Exit debug</button>
+              </div>
+            ) : (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: '#FFF8E1', borderBottom: `0.5px solid #FFD54F`, fontSize: 12, fontWeight: 500, color: '#5D4037', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <i className="ti ti-filter" style={{ fontSize: 14 }} />
                   {bannerMsg}
                 </div>
               </div>
-            )}
+            ))}
 
             {/* Table area */}
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }} onClick={e => { if ((e.target as HTMLElement).closest('tr') === null) setKebabOpenId(null); }}>
               {dcConditionState && conditionParentItem && conditionChildItem ? (
                 <div style={{ display: 'flex', height: '100%' }}>
                   <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} lastActiveItemId={lastActiveItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
+                    <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} lastActiveItemId={lastActiveItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={isDebugMode ? new Set<string>() : effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                       onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                       onRowClick={id => { setLastActiveItemId(null); setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                       onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
                       onKebabClose={() => setKebabOpenId(null)}
                       onKebabAction={handleKebabAction}
                       onDCClick={handleDCClick}
+                      onDCFilterClick={id => { setDcDebugId(id); setDcDebugUnlinkedId(null); }}
+                      onRemoveDCLink={id => { const parentId = findItem(items, id)?.dcParentId; removeDCLink(id); setDcDebugUnlinkedId(id); if (parentId) setDcDebugId(parentId); }}
+                      onSetCondition={(childId, parentId) => setDcConditionState({ childId, parentId })}
+                      dcDebugId={dcDebugId} dcDebugUnlinkedId={dcDebugUnlinkedId} dcPendingConditionId={dcPendingConditionId} dcConditionPanelOpen={!!dcConditionState}
                       onEditChange={setEditingPrompt}
                       onEditCommit={commitEdit}
                       flags={flags} caToastId={caToastId} onCaToast={setCaToastId}
                     />
                   </div>
-                  <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onCancel={() => setDcConditionState(null)} />
+                  <DCConditionPanel childItem={conditionChildItem} parentItem={conditionParentItem} onSave={saveDCCondition} onUpdate={updateDCConditions} onRemoveLink={() => { const parentId = conditionChildItem.dcParentId; removeDCLink(conditionChildItem.id); setDcDebugUnlinkedId(conditionChildItem.id); if (parentId) setDcDebugId(parentId); setDcPendingConditionId(null); setDcConditionState(null); }} onCancel={() => { if (dcPendingConditionId && !conditionChildItem.dcConditions?.length) { removeDCLink(dcPendingConditionId); } setDcPendingConditionId(null); setDcConditionState(null); }} />
                 </div>
               ) : (
-                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} lastActiveItemId={lastActiveItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
+                <ItemsTable items={items} selectedIds={selectedIds} activeItemId={activeItemId} lastActiveItemId={lastActiveItemId} cutIds={cutIds} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} editingRowId={editingRowId} editingPrompt={editingPrompt} editInputRef={editInputRef} shownCols={isDebugMode ? new Set<string>() : effectiveShownCols} colValues={colValues} onColChange={setColValue} onUpdate={updateItem}
                   onCheckbox={id => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
                   onRowClick={id => { setLastActiveItemId(null); setActiveItemId(prev => prev === id ? null : id); setKebabOpenId(null); }}
                   onKebab={id => setKebabOpenId(prev => prev === id ? null : id)}
                   onKebabClose={() => setKebabOpenId(null)}
                   onKebabAction={handleKebabAction}
                   onDCClick={handleDCClick}
+                  onDCFilterClick={id => { setDcDebugId(id); setDcDebugUnlinkedId(null); }}
+                  onRemoveDCLink={id => { const parentId = findItem(items, id)?.dcParentId; removeDCLink(id); setDcDebugUnlinkedId(id); if (parentId) setDcDebugId(parentId); }}
+                  onSetCondition={(childId, parentId) => setDcConditionState({ childId, parentId })}
+                  dcDebugId={dcDebugId} dcDebugUnlinkedId={dcDebugUnlinkedId} dcPendingConditionId={dcPendingConditionId} dcConditionPanelOpen={!!dcConditionState}
                   onEditChange={setEditingPrompt}
                   onEditCommit={commitEdit}
                   flags={flags} caToastId={caToastId} onCaToast={setCaToastId}
@@ -4617,6 +4796,13 @@ interface ItemsTableProps {
   onKebabClose: () => void;
   onKebabAction: (action: string, id: string) => void;
   onDCClick: (id: string) => void;
+  onDCFilterClick: (id: string) => void;
+  onRemoveDCLink: (id: string) => void;
+  onSetCondition: (childId: string, parentId: string) => void;
+  dcDebugId: string | null;
+  dcDebugUnlinkedId: string | null;
+  dcPendingConditionId: string | null;
+  dcConditionPanelOpen: boolean;
   onEditChange: (v: string) => void;
   onEditCommit: () => void;
   flags: Flag[];
@@ -4624,12 +4810,12 @@ interface ItemsTableProps {
   onCaToast: (key: string | null) => void;
 }
 
-function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onEditChange, onEditCommit, flags, caToastId, onCaToast }: ItemsTableProps) {
+function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds, dcMode, dcLinkingId, dcColors, kebabOpenId, editingRowId, editingPrompt, editInputRef, shownCols, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onDCFilterClick, onRemoveDCLink, onSetCondition, dcDebugId, dcDebugUnlinkedId, dcPendingConditionId, dcConditionPanelOpen, onEditChange, onEditCommit, flags, caToastId, onCaToast }: ItemsTableProps) {
   const activeCols = ALL_COLS.filter(c => shownCols.has(c.key));
   const totalCols = 6 + activeCols.length; // checkbox+stripe+prompt+type+indicators+kebab + optional cols
   const [promptWidth, setPromptWidth] = useState(300);
   // Cumulative left offsets for sticky columns: checkbox=0, stripe=30, prompt=34, type=34+promptWidth
-  const S = { checkbox: 0, stripe: 30, prompt: 34, type: 34 + promptWidth };
+  const S = { checkbox: 0, stripe: 30, prompt: 40, type: 40 + promptWidth };
   const stickyHead = (left: number, extra?: React.CSSProperties): React.CSSProperties => ({
     position: 'sticky', left, zIndex: 12, background: T.surface1, ...extra,
   });
@@ -4657,7 +4843,7 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
     <table style={{ width: hasCols ? 'max-content' : '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         <col style={{ width: 30 }} />
-        <col style={{ width: 4 }} />
+        <col style={{ width: 10 }} />
         <col style={{ width: hasCols ? promptWidth : undefined }} />
         <col style={{ width: 32 }} />
         <col style={{ width: 100 }} />
@@ -4746,11 +4932,17 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
         </thead>
       )}
       <tbody>
-        {items.map(item => (
+        {(dcDebugId ? items.filter(item => {
+          const debugIsParent = items.some(i => i.dcParentId === dcDebugId);
+          if (debugIsParent) return item.id === dcDebugId || item.dcParentId === dcDebugId;
+          const parentId = items.find(i => i.id === dcDebugId)?.dcParentId;
+          if (!parentId) return item.id === dcDebugId;
+          return item.id === parentId || item.dcParentId === parentId;
+        }) : items).map(item => (
           editingRowId === item.id ? (
             <tr key={item.id} style={{ height: 44, borderBottom: `0.5px solid ${T.borderAccent}`, background: '#F0F7FF', borderLeft: `3px solid ${T.fillAccent}` }}>
               <td style={{ width: 30, padding: '0 6px' }}><input type="checkbox" style={{ accentColor: T.fillAccent, width: 13, height: 13, display: 'block' }} /></td>
-              <td style={{ width: 4, padding: 0 }}><div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} /></td>
+              <td style={{ width: 10, padding: 0 }}><div style={{ width: 4, height: 44, background: item.stripe || 'transparent' }} /></td>
               <td style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 8px', gap: 8 }}>
                   <input ref={editInputRef} value={editingPrompt} onChange={e => onEditChange(e.target.value)} onBlur={onEditCommit} onKeyDown={e => { if (e.key === 'Enter') onEditCommit(); if (e.key === 'Escape') onEditCommit(); }} placeholder="Type prompt text…" style={{ fontFamily: T.font, fontSize: 13, border: 'none', outline: 'none', background: 'transparent', color: T.textPrimary, width: '100%' }} />
@@ -4767,7 +4959,7 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
-            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} anySelected={selectedIds.size > 0} isActive={activeItemId === item.id || (!activeItemId && lastActiveItemId === item.id)} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} flags={flags} caToastId={caToastId} onCaToast={onCaToast} />
+            <ItemRow key={item.id} item={item} items={items} isSelected={selectedIds.has(item.id)} anySelected={selectedIds.size > 0} isActive={activeItemId === item.id || (!activeItemId && lastActiveItemId === item.id)} isCut={cutIds.has(item.id)} dcMode={dcMode} dcLinkingId={dcLinkingId} dcColors={dcColors} kebabOpenId={kebabOpenId} shownCols={shownCols} promptWidth={promptWidth} colValues={colValues} onColChange={onColChange} onUpdate={onUpdate} onCheckbox={onCheckbox} onRowClick={onRowClick} onKebab={onKebab} onKebabClose={onKebabClose} onKebabAction={onKebabAction} onDCClick={onDCClick} onDCFilterClick={onDCFilterClick} onRemoveDCLink={onRemoveDCLink} onSetCondition={onSetCondition} dcDebugId={dcDebugId} dcDebugUnlinkedId={dcDebugUnlinkedId} dcPendingConditionId={dcPendingConditionId} dcConditionPanelOpen={dcConditionPanelOpen} flags={flags} caToastId={caToastId} onCaToast={onCaToast} />
           )
         ))}
       </tbody>
