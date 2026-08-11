@@ -4442,6 +4442,11 @@ export default function JoltListEditorPage() {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeItemId]);
+  const handlePreview = () => {
+    localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items }));
+    window.open('/operate/jolt-preview', 'jolt-preview-tab');
+  };
+
   const handleSetScoringOn = (v: boolean) => {
     if (!v) {
       setItems(prev => prev.map(item => ({ ...item, scoreYes: undefined, scoreNo: undefined, scoreEnabled: undefined })));
@@ -4652,6 +4657,7 @@ export default function JoltListEditorPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: T.textMuted, fontStyle: 'italic' }}>Changes publish Jul 21 at 12:00 PM</span>
           <button style={{ background: 'none', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 8px', cursor: 'pointer', color: T.textSecondary, fontSize: 16, display: 'flex', alignItems: 'center' }}><i className="ti ti-dots-vertical" /></button>
+          <button onClick={handlePreview} style={{ background: 'none', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', color: T.textSecondary, fontSize: 13, fontFamily: T.font, display: 'flex', alignItems: 'center', gap: 5 }}><i className="ti ti-eye" style={{ fontSize: 14 }} /> Preview</button>
           <button style={{ background: T.fillAccent, color: T.onAccent, fontFamily: T.font, fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer' }}>Save</button>
         </div>
       </div>
