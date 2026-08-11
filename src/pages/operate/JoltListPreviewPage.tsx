@@ -18,9 +18,9 @@ type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | '
   'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' |
   'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula' | 'asset' | 'email';
 
-type DCConditionYN     = { type: 'yn'; value: 'Yes' | 'No' };
+type DCConditionYN      = { type: 'yn'; value: 'Yes' | 'No' };
 type DCConditionNumeric = { type: 'numeric'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
-type DCConditionMC     = { type: 'mc'; choiceId: string; choiceLabel: string };
+type DCConditionMC      = { type: 'mc'; choiceId: string; choiceLabel: string };
 type DCCondition = DCConditionYN | DCConditionNumeric | DCConditionMC;
 
 interface MCChoice { id: string; label: string; color: string; icon: string | null; }
@@ -46,6 +46,7 @@ interface PreviewItem {
   infoInline?: boolean;
   measUnit?: string;
   measSensorId?: string;
+  subItems?: PreviewItem[];
 }
 
 type ItemAnswer = string | number | boolean | null;
@@ -68,7 +69,14 @@ const FALLBACK_ITEMS: PreviewItem[] = [
     { id: 'c2', label: 'US Foods',               color: '#2196F3', icon: null },
     { id: 'c3', label: 'Performance Food Group', color: '#FF9800', icon: null },
   ]},
-  { id: 'temp-guidelines', prompt: 'Temperature Guidelines', type: 'subtitle', stripe: '', allowNA: false },
+  { id: 'temp-checks', prompt: 'Temperature Checks', type: 'sublist', stripe: '#E8D0F0', allowNA: false, points: 20,
+    subItems: [
+      { id: 'sub-freezer', prompt: 'Walk-in freezer temp', type: 'measurement', stripe: '', allowNA: false, points: 10, measUnit: '°F' },
+      { id: 'sub-cooler1', prompt: 'Prep cooler #1 temp',  type: 'measurement', stripe: '', allowNA: true,  points: 10, measUnit: '°F' },
+      { id: 'sub-hothold', prompt: 'Hot holding station temp OK?', type: 'yn', stripe: '', allowNA: false, points: 5 },
+      { id: 'sub-signoff', prompt: 'Temperature log signed off',   type: 'checkmark', stripe: '', allowNA: false },
+    ]
+  },
   { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', allowNA: false, ratingMin: 1, ratingMax: 5, points: 15 },
 ];
 
@@ -141,12 +149,13 @@ function RatingButtons({ min, max, value, onChange }: { min: number; max: number
 }
 
 // ── Score bar ─────────────────────────────────────────────────────────────
-function ScoreBar({ items, answers, naItems, oooItems, scoringOn }: {
+function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
   items: PreviewItem[];
   answers: Record<string, ItemAnswer>;
   naItems: Set<string>;
   oooItems: Set<string>;
   scoringOn: boolean;
+  label?: string;
 }) {
   if (!scoringOn) return null;
   const excluded = new Set([...naItems, ...oooItems]);
@@ -160,7 +169,7 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn }: {
   return (
     <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: TEXT_SECONDARY }}>
       <i className="ti ti-trophy" style={{ fontSize: 14, color: TEXT_MUTED }} />
-      <span>Score</span>
+      <span>{label ?? 'Score'}</span>
       <span style={{ fontWeight: 600, color: TEXT_PRIMARY }}>{pct.toFixed(2)}%</span>
       <span style={{ color: TEXT_MUTED, fontSize: 12 }}>({earned} / {possible} pts)</span>
     </div>
@@ -168,7 +177,7 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn }: {
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
@@ -182,6 +191,8 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   onAssign: (id: string, name: string) => void;
   onCAOpen: (id: string) => void;
   caSubmitted: Set<string>;
+  sublistProgress?: { done: number; total: number };
+  onSublistOpen?: (id: string) => void;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [measInput, setMeasInput] = useState('');
@@ -191,7 +202,10 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   const isNA = naItems.has(item.id);
   const isOOO = oooItems.has(item.id);
   const assignedTo = assignedItems[item.id] ?? null;
-  const completed = itemCompleted(item, answer, isNA, isOOO);
+  const sublistAllDone = sublistProgress ? sublistProgress.done === sublistProgress.total && sublistProgress.total > 0 : false;
+  const completed = item.type === 'sublist'
+    ? sublistAllDone
+    : itemCompleted(item, answer, isNA, isOOO);
   const showCA = !caSubmitted.has(item.id) && triggerCA(item, answer);
   const hasFlag = !!(item.flagsForNo?.length && answer === 'No');
   const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -341,22 +355,40 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
             <input type="number" value={(answer as string) ?? ''} onChange={e => onAnswer(item.id, e.target.value)} placeholder="Enter number..." style={{ width: '100%', border: '1.5px solid #C8C8D0', borderRadius: 8, background: SURFACE_1, fontFamily: FONT, fontSize: 14, color: answer ? TEXT_PRIMARY : TEXT_MUTED, padding: '10px 12px', boxSizing: 'border-box' }} />
           )}
           {/* Tap-to-complete types */}
-          {item.type === 'photo'     && <AppBtn icon="ti-camera"        label={answer ? 'Photo taken ✓'   : 'Take Photo'}       completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />}
-          {item.type === 'signature' && <AppBtn icon="ti-pencil"        label={answer ? 'Signed ✓'        : 'Signature'}        completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'signed')} />}
-          {item.type === 'barcode'   && <AppBtn icon="ti-barcode"       label={answer ? 'Scanned ✓'       : 'Scan Barcode'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
-          {item.type === 'qr'        && <AppBtn icon="ti-qrcode"        label={answer ? 'Scanned ✓'       : 'Scan QR Code'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
-          {item.type === 'employee'  && <AppBtn icon="ti-user"          label={answer ? String(answer)    : 'Select Employee'}  completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Jane Smith')} />}
-          {item.type === 'stopwatch' && <AppBtn icon="ti-clock"         label={answer ? String(answer)    : 'Start Timer'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : '00:05:32')} />}
-          {item.type === 'date'      && <AppBtn icon="ti-calendar"      label={answer ? String(answer)    : 'Select Date'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} />}
-          {item.type === 'time'      && <AppBtn icon="ti-clock"         label={answer ? String(answer)    : 'Select Time'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }))} />}
-          {item.type === 'datetime'  && <AppBtn icon="ti-calendar-time" label={answer ? String(answer)    : 'Select Date & Time'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }))} />}
-          {item.type === 'asset'     && <AppBtn icon="ti-box"           label={answer ? String(answer)    : 'Select Asset'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Asset #4821')} />}
-          {item.type === 'sublist'   && <AppBtn icon="ti-layout-list"   label={answer ? String(answer)    : 'Open Sublist'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Sublist 0 / 3')} />}
-          {item.type === 'formula' && (
+          {item.type === 'photo'     && <AppBtn icon="ti-camera"        label={answer ? 'Photo taken ✓'    : 'Take Photo'}        completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />}
+          {item.type === 'signature' && <AppBtn icon="ti-pencil"        label={answer ? 'Signed ✓'         : 'Signature'}         completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'signed')} />}
+          {item.type === 'barcode'   && <AppBtn icon="ti-barcode"       label={answer ? 'Scanned ✓'        : 'Scan Barcode'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
+          {item.type === 'qr'        && <AppBtn icon="ti-qrcode"        label={answer ? 'Scanned ✓'        : 'Scan QR Code'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
+          {item.type === 'employee'  && <AppBtn icon="ti-user"          label={answer ? String(answer)     : 'Select Employee'}   completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Jane Smith')} />}
+          {item.type === 'stopwatch' && <AppBtn icon="ti-clock"         label={answer ? String(answer)     : 'Start Timer'}       completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : '00:05:32')} />}
+          {item.type === 'date'      && <AppBtn icon="ti-calendar"      label={answer ? String(answer)     : 'Select Date'}       completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} />}
+          {item.type === 'time'      && <AppBtn icon="ti-clock"         label={answer ? String(answer)     : 'Select Time'}       completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }))} />}
+          {item.type === 'datetime'  && <AppBtn icon="ti-calendar-time" label={answer ? String(answer)     : 'Select Date & Time'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }))} />}
+          {item.type === 'asset'     && <AppBtn icon="ti-box"           label={answer ? String(answer)     : 'Select Asset'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Asset #4821')} />}
+          {item.type === 'formula'   && (
             <div style={{ border: '1.5px solid #C8C8D0', borderRadius: 8, background: SURFACE_1, fontSize: 15, fontWeight: 600, color: TEXT_SECONDARY, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: TEXT_MUTED, fontSize: 18 }}>=</span> —
             </div>
           )}
+
+          {/* Sublist */}
+          {item.type === 'sublist' && (() => {
+            const { done, total } = sublistProgress ?? { done: 0, total: 0 };
+            const label = done > 0 && !sublistAllDone ? `${done} / ${total} complete` : sublistAllDone ? `${total} / ${total} complete` : 'Open';
+            return (
+              <button onClick={() => onSublistOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${sublistAllDone ? APP_BLUE : APP_BLUE}`, borderRadius: 8, color: sublistAllDone ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: sublistAllDone ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="ti ti-layout-list" style={{ fontSize: 18 }} /> {label}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {!sublistAllDone && done > 0 && (
+                    <span style={{ fontSize: 12, fontWeight: 600, background: `${APP_BLUE}22`, color: APP_BLUE, padding: '2px 8px', borderRadius: 10 }}>{done}/{total}</span>
+                  )}
+                  <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
+                </span>
+              </button>
+            );
+          })()}
 
           {/* CA trigger */}
           {showCA && (
@@ -447,6 +479,67 @@ function CASurface({ itemPrompt, onBack, onSubmit }: { itemPrompt: string; onBac
   );
 }
 
+// ── Sublist surface ───────────────────────────────────────────────────────
+function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onBack, scoringOn }: {
+  item: PreviewItem;
+  answers: Record<string, ItemAnswer>;
+  naItems: Set<string>;
+  onAnswer: (id: string, val: ItemAnswer) => void;
+  onNA: (id: string) => void;
+  onClearNA: (id: string) => void;
+  onBack: () => void;
+  scoringOn: boolean;
+}) {
+  const subItems = item.subItems ?? [];
+  const done = subItems.filter(si => itemCompleted(si, answers[si.id] ?? null, naItems.has(si.id), false)).length;
+  const total = subItems.length;
+  const emptySet = new Set<string>();
+  const emptyObj: Record<string, string> = {};
+  const emptyCA = new Set<string>();
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header */}
+      <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8 }}>
+          <i className="ti ti-chevron-left" style={{ fontSize: 18 }} />
+        </button>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.prompt}</div>
+        </div>
+        <div style={{ background: done === total && total > 0 ? '#27AE60' : 'rgba(255,255,255,0.2)', borderRadius: 20, padding: '4px 12px', fontSize: 13, fontWeight: 600, color: 'white', flexShrink: 0, marginLeft: 8 }}>
+          {done} / {total}
+        </div>
+      </div>
+
+      {/* Mini score bar */}
+      <ScoreBar items={subItems} answers={answers} naItems={naItems} oooItems={emptySet} scoringOn={scoringOn} label="Sublist score" />
+
+      {/* Sub-items */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {subItems.map(si => (
+          <ItemCard
+            key={si.id}
+            item={si}
+            answer={answers[si.id] ?? null}
+            naItems={naItems}
+            oooItems={emptySet}
+            assignedItems={emptyObj}
+            onAnswer={onAnswer}
+            onNA={onNA}
+            onClearNA={onClearNA}
+            onOOO={() => {}}
+            onClearOOO={() => {}}
+            onAssign={() => {}}
+            onCAOpen={() => {}}
+            caSubmitted={emptyCA}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────
 export default function JoltListPreviewPage() {
   const [items, setItems] = useState<PreviewItem[]>(FALLBACK_ITEMS);
@@ -459,6 +552,10 @@ export default function JoltListPreviewPage() {
   const [assignedItems, setAssignedItems] = useState<Record<string, string>>({});
   const [caSubmitted, setCaSubmitted] = useState<Set<string>>(new Set());
   const [caOpenId, setCaOpenId] = useState<string | null>(null);
+
+  const [sublistOpenId, setSublistOpenId] = useState<string | null>(null);
+  const [subAnswers, setSubAnswers] = useState<Record<string, Record<string, ItemAnswer>>>({});
+  const [subNaItems, setSubNaItems] = useState<Record<string, Set<string>>>({});
 
   useEffect(() => {
     const raw = localStorage.getItem('jolt-preview-payload');
@@ -481,6 +578,46 @@ export default function JoltListPreviewPage() {
     });
   };
 
+  const handleSubAnswer = (sublistId: string, subItemId: string, val: ItemAnswer) => {
+    const newSubAns = { ...(subAnswers[sublistId] ?? {}), [subItemId]: val };
+    const newSubAnswers = { ...subAnswers, [sublistId]: newSubAns };
+    setSubAnswers(newSubAnswers);
+    // Sync sublist completion back to parent answers so ScoreBar and ItemCard pick it up
+    const sublist = items.find(i => i.id === sublistId);
+    if (sublist?.subItems?.length) {
+      const subNa = subNaItems[sublistId] ?? new Set<string>();
+      const allDone = sublist.subItems.every(si => itemCompleted(si, newSubAns[si.id] ?? null, subNa.has(si.id), false));
+      setAnswers(prev => ({ ...prev, [sublistId]: allDone ? 'complete' : null }));
+    }
+  };
+
+  const handleSubNA = (sublistId: string, subItemId: string) => {
+    const newSubNa = new Set([...(subNaItems[sublistId] ?? []), subItemId]);
+    const newSubNaItems = { ...subNaItems, [sublistId]: newSubNa };
+    setSubNaItems(newSubNaItems);
+    const sublist = items.find(i => i.id === sublistId);
+    if (sublist?.subItems?.length) {
+      const subAns = subAnswers[sublistId] ?? {};
+      const allDone = sublist.subItems.every(si => itemCompleted(si, subAns[si.id] ?? null, newSubNa.has(si.id), false));
+      setAnswers(prev => ({ ...prev, [sublistId]: allDone ? 'complete' : null }));
+    }
+  };
+
+  const handleClearSubNA = (sublistId: string, subItemId: string) => {
+    const newSubNa = new Set(subNaItems[sublistId] ?? []);
+    newSubNa.delete(subItemId);
+    setSubNaItems(prev => ({ ...prev, [sublistId]: newSubNa }));
+    setAnswers(prev => ({ ...prev, [sublistId]: null }));
+  };
+
+  const getSublistProgress = (item: PreviewItem): { done: number; total: number } => {
+    if (!item.subItems?.length) return { done: 0, total: 0 };
+    const subAns = subAnswers[item.id] ?? {};
+    const subNa = subNaItems[item.id] ?? new Set<string>();
+    const done = item.subItems.filter(si => itemCompleted(si, subAns[si.id] ?? null, subNa.has(si.id), false)).length;
+    return { done, total: item.subItems.length };
+  };
+
   const reset = () => {
     setAnswers({});
     setNaItems(new Set());
@@ -488,6 +625,9 @@ export default function JoltListPreviewPage() {
     setAssignedItems({});
     setCaSubmitted(new Set());
     setCaOpenId(null);
+    setSublistOpenId(null);
+    setSubAnswers({});
+    setSubNaItems({});
   };
 
   const submitCA = () => {
@@ -498,7 +638,9 @@ export default function JoltListPreviewPage() {
   };
 
   const caItem = caOpenId ? items.find(i => i.id === caOpenId) : null;
+  const sublistItem = sublistOpenId ? items.find(i => i.id === sublistOpenId) : null;
   const visibleItems = items.filter(item => isItemVisible(item, answers));
+  const isOverlayOpen = !!(caOpenId || sublistOpenId);
 
   return (
     <div style={{ fontFamily: FONT, minHeight: '100vh', background: SURFACE_0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -511,9 +653,9 @@ export default function JoltListPreviewPage() {
           </div>
         </div>
 
-        {/* Slides: list ← → CA */}
+        {/* Slides: list ← → overlay (CA or Sublist) */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-          <div style={{ flex: '0 0 100%', overflowY: 'auto', transform: caOpenId ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
+          <div style={{ flex: '0 0 100%', overflowY: 'auto', transform: isOverlayOpen ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
             <ScoreBar items={visibleItems} answers={answers} naItems={naItems} oooItems={oooItems} scoringOn={scoringOn} />
             {visibleItems.map(item => (
               <ItemCard
@@ -531,12 +673,32 @@ export default function JoltListPreviewPage() {
                 onAssign={(id, name) => setAssignedItems(prev => ({ ...prev, [id]: name }))}
                 onCAOpen={setCaOpenId}
                 caSubmitted={caSubmitted}
+                sublistProgress={item.type === 'sublist' ? getSublistProgress(item) : undefined}
+                onSublistOpen={id => setSublistOpenId(id)}
               />
             ))}
           </div>
+
+          {/* CA overlay */}
           {caOpenId && caItem && (
-            <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10, transform: 'translateX(0)', transition: 'transform 0.3s ease' }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10 }}>
               <CASurface itemPrompt={caItem.prompt} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
+            </div>
+          )}
+
+          {/* Sublist overlay */}
+          {sublistOpenId && sublistItem && (
+            <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10 }}>
+              <SublistSurface
+                item={sublistItem}
+                answers={subAnswers[sublistOpenId] ?? {}}
+                naItems={subNaItems[sublistOpenId] ?? new Set()}
+                onAnswer={(id, val) => handleSubAnswer(sublistOpenId, id, val)}
+                onNA={id => handleSubNA(sublistOpenId, id)}
+                onClearNA={id => handleClearSubNA(sublistOpenId, id)}
+                onBack={() => setSublistOpenId(null)}
+                scoringOn={scoringOn}
+              />
             </div>
           )}
         </div>
