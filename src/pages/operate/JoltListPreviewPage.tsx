@@ -284,7 +284,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   }
 
   return (
-    <div style={{ background: item.stripe || (completed && !isNA && !isOOO && !showCA ? '#EBF5FF' : 'white'), borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
+    <div style={{ background: item.stripe || 'white', borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
       {/* Info library badge */}
       {item.infoFile && (
         <div onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, cursor: 'pointer', flexShrink: 0 }}>
