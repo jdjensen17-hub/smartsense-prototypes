@@ -222,7 +222,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 
   if (item.type === 'subtitle' || item.type === 'text') {
     return (
-      <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, borderLeft: item.stripe ? `4px solid ${item.stripe}` : undefined, padding: item.stripe ? '12px 16px 12px 12px' : '12px 16px' }}>
+      <div style={{ background: item.stripe || 'white', borderBottom: `1px solid ${BORDER}`, padding: '12px 16px' }}>
         <div style={{ fontSize: 14, color: TEXT_SECONDARY, lineHeight: 1.5 }}>{item.prompt}</div>
       </div>
     );
@@ -266,7 +266,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   }
 
   return (
-    <div style={{ background: completed && !isNA && !isOOO && !showCA ? '#EBF5FF' : 'white', borderBottom: `1px solid ${BORDER}`, borderLeft: item.stripe ? `4px solid ${item.stripe}` : undefined, padding: item.stripe ? '14px 16px 12px 12px' : '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
+    <div style={{ background: item.stripe || (completed && !isNA && !isOOO && !showCA ? '#EBF5FF' : 'white'), borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
       {/* Info library badge */}
       {(item.infoFile || item.infoInline) && (
         <div style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
