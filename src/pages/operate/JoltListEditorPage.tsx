@@ -4444,7 +4444,7 @@ export default function JoltListEditorPage() {
   }, [activeItemId]);
   const handlePreview = () => {
     localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items }));
-    window.open('/operate/jolt-preview', 'jolt-preview-tab');
+    window.open('/#/operate/jolt-preview', 'jolt-preview-tab');
   };
 
   const handleSetScoringOn = (v: boolean) => {
