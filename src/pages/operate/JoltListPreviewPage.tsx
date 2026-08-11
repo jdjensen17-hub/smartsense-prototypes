@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const APP_BLUE = '#2979C7';
+const APP_PURPLE = '#7B4FA6';
 const SURFACE_0 = '#F0F0F2';
 const SURFACE_1 = '#F7F7FA';
 const BORDER = 'rgba(26,26,31,0.12)';
@@ -10,14 +11,16 @@ const TEXT_SECONDARY = '#5C5C6E';
 const TEXT_MUTED = '#9898A8';
 const FONT = "'Inter', -apple-system, sans-serif";
 
+const ASSIGN_NAMES = ['Sarah Johnson', 'Mike Chen', 'Alex Rivera', 'Dana Kim'];
+
 // ── Types — mirror editor exactly ─────────────────────────────────────────
 type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' |
   'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' |
   'stopwatch' | 'subtitle' | 'text' | 'barcode' | 'sublist' | 'formula' | 'asset' | 'email';
 
-type DCConditionYN = { type: 'yn'; value: 'Yes' | 'No' };
+type DCConditionYN     = { type: 'yn'; value: 'Yes' | 'No' };
 type DCConditionNumeric = { type: 'numeric'; op: '>' | '>=' | '=' | '<=' | '<'; value: number };
-type DCConditionMC = { type: 'mc'; choiceId: string; choiceLabel: string };
+type DCConditionMC     = { type: 'mc'; choiceId: string; choiceLabel: string };
 type DCCondition = DCConditionYN | DCConditionNumeric | DCConditionMC;
 
 interface MCChoice { id: string; label: string; color: string; icon: string | null; }
@@ -29,6 +32,8 @@ interface PreviewItem {
   type: ItemType;
   stripe: string;
   allowNA: boolean;
+  allowOOO?: boolean;
+  assignable?: boolean;
   dcParentId?: string;
   dcConditions?: DCCondition[];
   choices?: MCChoice[];
@@ -45,22 +50,22 @@ interface PreviewItem {
 
 type ItemAnswer = string | number | boolean | null;
 
-// ── Fallback data (no payload in localStorage) ────────────────────────────
+// ── Fallback data ─────────────────────────────────────────────────────────
 const FALLBACK_ITEMS: PreviewItem[] = [
-  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', allowNA: false,
+  { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', allowNA: false, assignable: true,
     caForYNRules: [{ id: 'r1', caList: 'Corrective Actions', adHoc: false, nextStep: 'repeat-item' }],
     flagsForNo: ['f1'], points: 25 },
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', allowNA: true,
     dcParentId: 'cooler-ok', dcConditions: [{ type: 'yn', value: 'No' }] },
   { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', allowNA: false },
-  { id: 'prep-temp', prompt: 'Record prep cooler temp', type: 'measurement', stripe: '#C1E1C5', allowNA: true, points: 25, measUnit: '°F' },
+  { id: 'prep-temp', prompt: 'Record prep cooler temp', type: 'measurement', stripe: '#C1E1C5', allowNA: true, allowOOO: true, points: 25, measUnit: '°F' },
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', allowNA: false,
     dcParentId: 'prep-temp', dcConditions: [{ type: 'numeric', op: '>=', value: 41 }] },
   { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false },
-  { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', allowNA: false, points: 10 },
+  { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', allowNA: true, allowOOO: true, points: 10 },
   { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', allowNA: false, choices: [
-    { id: 'c1', label: 'Sysco', color: '#4CAF50', icon: null },
-    { id: 'c2', label: 'US Foods', color: '#2196F3', icon: null },
+    { id: 'c1', label: 'Sysco',                  color: '#4CAF50', icon: null },
+    { id: 'c2', label: 'US Foods',               color: '#2196F3', icon: null },
     { id: 'c3', label: 'Performance Food Group', color: '#FF9800', icon: null },
   ]},
   { id: 'temp-guidelines', prompt: 'Temperature Guidelines', type: 'subtitle', stripe: '', allowNA: false },
@@ -93,8 +98,8 @@ function isItemVisible(item: PreviewItem, answers: Record<string, ItemAnswer>): 
   return item.dcConditions.some(cond => evalCondition(cond, parentAnswer));
 }
 
-function itemCompleted(item: PreviewItem, answer: ItemAnswer, isNA: boolean): boolean {
-  if (isNA) return true;
+function itemCompleted(item: PreviewItem, answer: ItemAnswer, isNA: boolean, isOOO: boolean): boolean {
+  if (isNA || isOOO) return true;
   if (item.type === 'subtitle' || item.type === 'text') return true;
   return answer !== null && answer !== undefined && answer !== '';
 }
@@ -136,13 +141,20 @@ function RatingButtons({ min, max, value, onChange }: { min: number; max: number
 }
 
 // ── Score bar ─────────────────────────────────────────────────────────────
-function ScoreBar({ items, answers, naItems, scoringOn }: { items: PreviewItem[]; answers: Record<string, ItemAnswer>; naItems: Set<string>; scoringOn: boolean }) {
+function ScoreBar({ items, answers, naItems, oooItems, scoringOn }: {
+  items: PreviewItem[];
+  answers: Record<string, ItemAnswer>;
+  naItems: Set<string>;
+  oooItems: Set<string>;
+  scoringOn: boolean;
+}) {
   if (!scoringOn) return null;
-  const scoreable = items.filter(i => i.points && i.type !== 'subtitle' && i.type !== 'text');
+  const excluded = new Set([...naItems, ...oooItems]);
+  const scoreable = items.filter(i => i.points && i.type !== 'subtitle' && i.type !== 'text' && !excluded.has(i.id));
   const possible = scoreable.reduce((sum, i) => sum + (i.points ?? 0), 0);
   if (!possible) return null;
   const earned = scoreable
-    .filter(i => itemCompleted(i, answers[i.id] ?? null, naItems.has(i.id)) && !naItems.has(i.id))
+    .filter(i => itemCompleted(i, answers[i.id] ?? null, false, false))
     .reduce((sum, i) => sum + (i.points ?? 0), 0);
   const pct = Math.round((earned / possible) * 10000) / 100;
   return (
@@ -156,26 +168,43 @@ function ScoreBar({ items, answers, naItems, scoringOn }: { items: PreviewItem[]
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, onAnswer, onNA, onClearNA, onCAOpen, caSubmitted }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
+  oooItems: Set<string>;
+  assignedItems: Record<string, string>;
   onAnswer: (id: string, val: ItemAnswer) => void;
   onNA: (id: string) => void;
   onClearNA: (id: string) => void;
+  onOOO: (id: string) => void;
+  onClearOOO: (id: string) => void;
+  onAssign: (id: string, name: string) => void;
   onCAOpen: (id: string) => void;
   caSubmitted: Set<string>;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [measInput, setMeasInput] = useState('');
   const [showMeasModal, setShowMeasModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
   const isNA = naItems.has(item.id);
-  const completed = itemCompleted(item, answer, isNA);
+  const isOOO = oooItems.has(item.id);
+  const assignedTo = assignedItems[item.id] ?? null;
+  const completed = itemCompleted(item, answer, isNA, isOOO);
   const showCA = !caSubmitted.has(item.id) && triggerCA(item, answer);
   const hasFlag = !!(item.flagsForNo?.length && answer === 'No');
   const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     + ' · ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  const closeKebab = () => setKebabOpen(false);
+
+  const clearAll = (id: string) => {
+    onAnswer(id, null);
+    onClearNA(id);
+    onClearOOO(id);
+    closeKebab();
+  };
 
   if (item.type === 'subtitle' || item.type === 'text') {
     return (
@@ -185,8 +214,45 @@ function ItemCard({ item, answer, naItems, onAnswer, onNA, onClearNA, onCAOpen, 
     );
   }
 
+  // Kebab menu items — per handoff rules
+  const kebabItems: React.ReactNode[] = [];
+  if (completed) {
+    kebabItems.push(
+      <div key="clear" onClick={() => clearAll(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', fontSize: 15, color: '#C0282F', cursor: 'pointer' }}>
+        <i className="ti ti-rotate-clockwise" style={{ fontSize: 18, color: '#C0282F' }} /> Clear response
+      </div>
+    );
+  } else {
+    if (item.assignable) {
+      kebabItems.push(
+        <div key="assign" onClick={() => { setShowAssignModal(true); closeKebab(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', fontSize: 15, color: TEXT_PRIMARY, borderBottom: `1px solid ${BORDER}`, cursor: 'pointer' }}>
+          <i className="ti ti-user-plus" style={{ fontSize: 18, color: TEXT_SECONDARY }} /> {assignedTo ? 'Reassign to...' : 'Assign to...'}
+        </div>
+      );
+    }
+    if (item.allowOOO) {
+      kebabItems.push(
+        <div key="ooo" onClick={() => { onOOO(item.id); closeKebab(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', fontSize: 15, color: TEXT_PRIMARY, borderBottom: `1px solid ${BORDER}`, cursor: 'pointer' }}>
+          <i className="ti ti-circle-off" style={{ fontSize: 18, color: TEXT_SECONDARY }} /> Mark as Out of Order
+        </div>
+      );
+    }
+    if (item.allowNA) {
+      kebabItems.push(
+        <div key="na" onClick={() => { onNA(item.id); closeKebab(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', fontSize: 15, color: TEXT_PRIMARY, cursor: 'pointer' }}>
+          <i className="ti ti-ban" style={{ fontSize: 18, color: TEXT_SECONDARY }} /> Mark as N/A
+        </div>
+      );
+    }
+    if (kebabItems.length === 0) {
+      kebabItems.push(
+        <div key="none" style={{ padding: '14px 20px', fontSize: 13, color: TEXT_MUTED }}>No actions available</div>
+      );
+    }
+  }
+
   return (
-    <div style={{ background: completed && !showCA ? '#EBF5FF' : 'white', borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && setKebabOpen(false)}>
+    <div style={{ background: completed && !isNA && !isOOO && !showCA ? '#EBF5FF' : 'white', borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
       {/* Info library badge */}
       {(item.infoFile || item.infoInline) && (
         <div style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
@@ -204,19 +270,7 @@ function ItemCard({ item, answer, naItems, onAnswer, onNA, onClearNA, onCAOpen, 
           </div>
           {kebabOpen && (
             <div style={{ position: 'absolute', right: 0, top: 24, background: 'white', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', overflow: 'hidden', width: 220, zIndex: 10 }}>
-              {completed && (
-                <div onClick={() => { onAnswer(item.id, null); onClearNA(item.id); setKebabOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', fontSize: 15, color: '#C0282F', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer' }}>
-                  <i className="ti ti-rotate-clockwise" style={{ fontSize: 18, color: '#C0282F' }} /> Clear response
-                </div>
-              )}
-              {!completed && item.allowNA && (
-                <div onClick={() => { onNA(item.id); setKebabOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', fontSize: 15, color: TEXT_PRIMARY, cursor: 'pointer' }}>
-                  <i className="ti ti-ban" style={{ fontSize: 18, color: TEXT_SECONDARY }} /> Mark as N/A
-                </div>
-              )}
-              {!completed && !item.allowNA && (
-                <div style={{ padding: '14px 20px', fontSize: 13, color: TEXT_MUTED }}>No actions available</div>
-              )}
+              {kebabItems}
             </div>
           )}
         </div>
@@ -225,6 +279,8 @@ function ItemCard({ item, answer, naItems, onAnswer, onNA, onClearNA, onCAOpen, 
       {/* N/A state */}
       {isNA ? (
         <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', border: '1.5px solid #C8C8D0', borderRadius: 8, color: TEXT_MUTED, fontFamily: FONT, fontSize: 15, fontWeight: 500, padding: '10px 18px', background: SURFACE_1, width: '100%', cursor: 'default' }}>N/A</button>
+      ) : isOOO ? (
+        <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', border: '1.5px solid #C8C8D0', borderRadius: 8, color: TEXT_MUTED, fontFamily: FONT, fontSize: 15, fontWeight: 500, padding: '10px 18px', background: SURFACE_1, width: '100%', cursor: 'default' }}>Out of Order</button>
       ) : (
         <>
           {item.type === 'yn' && (
@@ -285,17 +341,17 @@ function ItemCard({ item, answer, naItems, onAnswer, onNA, onClearNA, onCAOpen, 
             <input type="number" value={(answer as string) ?? ''} onChange={e => onAnswer(item.id, e.target.value)} placeholder="Enter number..." style={{ width: '100%', border: '1.5px solid #C8C8D0', borderRadius: 8, background: SURFACE_1, fontFamily: FONT, fontSize: 14, color: answer ? TEXT_PRIMARY : TEXT_MUTED, padding: '10px 12px', boxSizing: 'border-box' }} />
           )}
           {/* Tap-to-complete types */}
-          {item.type === 'photo' && <AppBtn icon="ti-camera" label={answer ? 'Photo taken ✓' : 'Take Photo'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />}
-          {item.type === 'signature' && <AppBtn icon="ti-pencil" label={answer ? 'Signed ✓' : 'Signature'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'signed')} />}
-          {item.type === 'barcode' && <AppBtn icon="ti-barcode" label={answer ? 'Scanned ✓' : 'Scan Barcode'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
-          {item.type === 'qr' && <AppBtn icon="ti-qrcode" label={answer ? 'Scanned ✓' : 'Scan QR Code'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
-          {item.type === 'employee' && <AppBtn icon="ti-user" label={answer ? String(answer) : 'Select Employee'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Jane Smith')} />}
-          {item.type === 'stopwatch' && <AppBtn icon="ti-clock" label={answer ? String(answer) : 'Start Timer'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : '00:05:32')} />}
-          {item.type === 'date' && <AppBtn icon="ti-calendar" label={answer ? String(answer) : 'Select Date'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} />}
-          {item.type === 'time' && <AppBtn icon="ti-clock" label={answer ? String(answer) : 'Select Time'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }))} />}
-          {item.type === 'datetime' && <AppBtn icon="ti-calendar-time" label={answer ? String(answer) : 'Select Date & Time'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }))} />}
-          {item.type === 'asset' && <AppBtn icon="ti-box" label={answer ? String(answer) : 'Select Asset'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Asset #4821')} />}
-          {item.type === 'sublist' && <AppBtn icon="ti-layout-list" label={answer ? String(answer) : 'Open Sublist'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Sublist 0 / 3')} />}
+          {item.type === 'photo'     && <AppBtn icon="ti-camera"        label={answer ? 'Photo taken ✓'   : 'Take Photo'}       completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />}
+          {item.type === 'signature' && <AppBtn icon="ti-pencil"        label={answer ? 'Signed ✓'        : 'Signature'}        completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'signed')} />}
+          {item.type === 'barcode'   && <AppBtn icon="ti-barcode"       label={answer ? 'Scanned ✓'       : 'Scan Barcode'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
+          {item.type === 'qr'        && <AppBtn icon="ti-qrcode"        label={answer ? 'Scanned ✓'       : 'Scan QR Code'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
+          {item.type === 'employee'  && <AppBtn icon="ti-user"          label={answer ? String(answer)    : 'Select Employee'}  completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Jane Smith')} />}
+          {item.type === 'stopwatch' && <AppBtn icon="ti-clock"         label={answer ? String(answer)    : 'Start Timer'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : '00:05:32')} />}
+          {item.type === 'date'      && <AppBtn icon="ti-calendar"      label={answer ? String(answer)    : 'Select Date'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} />}
+          {item.type === 'time'      && <AppBtn icon="ti-clock"         label={answer ? String(answer)    : 'Select Time'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }))} />}
+          {item.type === 'datetime'  && <AppBtn icon="ti-calendar-time" label={answer ? String(answer)    : 'Select Date & Time'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }))} />}
+          {item.type === 'asset'     && <AppBtn icon="ti-box"           label={answer ? String(answer)    : 'Select Asset'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Asset #4821')} />}
+          {item.type === 'sublist'   && <AppBtn icon="ti-layout-list"   label={answer ? String(answer)    : 'Open Sublist'}     completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Sublist 0 / 3')} />}
           {item.type === 'formula' && (
             <div style={{ border: '1.5px solid #C8C8D0', borderRadius: 8, background: SURFACE_1, fontSize: 15, fontWeight: 600, color: TEXT_SECONDARY, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: TEXT_MUTED, fontSize: 18 }}>=</span> —
@@ -314,12 +370,35 @@ function ItemCard({ item, answer, naItems, onAnswer, onNA, onClearNA, onCAOpen, 
       {/* Footer */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
         {!!item.points && <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: APP_BLUE, color: 'white', fontSize: 11, fontWeight: 700, minWidth: 24, height: 24, padding: '0 5px', borderRadius: 4 }}>{item.points}</span>}
-        {completed ? (
+        {isNA ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>N/A · {now}</span>
+        ) : isOOO ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#E8E8EC', color: TEXT_SECONDARY, fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>Out of Order · {now}</span>
+        ) : completed ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>Completed · {now}</span>
+        ) : assignedTo ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: APP_PURPLE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>
+            <i className="ti ti-user" style={{ fontSize: 11 }} /> Assigned to {assignedTo}
+          </span>
         ) : (
           <span style={{ display: 'inline-flex', alignItems: 'center', background: '#E8E8EC', color: TEXT_SECONDARY, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 3 }}>Incomplete</span>
         )}
       </div>
+
+      {/* Assign modal */}
+      {showAssignModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowAssignModal(false)}>
+          <div style={{ background: 'white', borderRadius: 12, width: 280, fontFamily: FONT, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}`, fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY }}>Assign to</div>
+            {ASSIGN_NAMES.map(name => (
+              <div key={name} onClick={() => { onAssign(item.id, name); setShowAssignModal(false); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', fontSize: 15, color: name === assignedTo ? APP_BLUE : TEXT_PRIMARY, fontWeight: name === assignedTo ? 600 : 400, borderBottom: `1px solid ${BORDER}`, cursor: 'pointer' }}>
+                <i className="ti ti-user-circle" style={{ fontSize: 20, color: name === assignedTo ? APP_BLUE : TEXT_MUTED }} /> {name}
+              </div>
+            ))}
+            <div onClick={() => setShowAssignModal(false)} style={{ padding: '14px 20px', fontSize: 15, color: TEXT_MUTED, cursor: 'pointer', textAlign: 'center' }}>Cancel</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -376,6 +455,8 @@ export default function JoltListPreviewPage() {
 
   const [answers, setAnswers] = useState<Record<string, ItemAnswer>>({});
   const [naItems, setNaItems] = useState<Set<string>>(new Set());
+  const [oooItems, setOooItems] = useState<Set<string>>(new Set());
+  const [assignedItems, setAssignedItems] = useState<Record<string, string>>({});
   const [caSubmitted, setCaSubmitted] = useState<Set<string>>(new Set());
   const [caOpenId, setCaOpenId] = useState<string | null>(null);
 
@@ -393,7 +474,6 @@ export default function JoltListPreviewPage() {
   const setAnswer = (id: string, val: ItemAnswer) => {
     setAnswers(prev => {
       const next = { ...prev, [id]: val };
-      // cascade: clear children whose condition is no longer met
       items.filter(i => i.dcParentId === id).forEach(child => {
         if (!isItemVisible(child, next)) delete next[child.id];
       });
@@ -404,6 +484,8 @@ export default function JoltListPreviewPage() {
   const reset = () => {
     setAnswers({});
     setNaItems(new Set());
+    setOooItems(new Set());
+    setAssignedItems({});
     setCaSubmitted(new Set());
     setCaOpenId(null);
   };
@@ -432,16 +514,28 @@ export default function JoltListPreviewPage() {
         {/* Slides: list ← → CA */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
           <div style={{ flex: '0 0 100%', overflowY: 'auto', transform: caOpenId ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
-            <ScoreBar items={visibleItems} answers={answers} naItems={naItems} scoringOn={scoringOn} />
+            <ScoreBar items={visibleItems} answers={answers} naItems={naItems} oooItems={oooItems} scoringOn={scoringOn} />
             {visibleItems.map(item => (
-              <ItemCard key={item.id} item={item} answer={answers[item.id] ?? null} naItems={naItems}
-                onAnswer={setAnswer} onNA={id => setNaItems(prev => new Set([...prev, id]))}
+              <ItemCard
+                key={item.id}
+                item={item}
+                answer={answers[item.id] ?? null}
+                naItems={naItems}
+                oooItems={oooItems}
+                assignedItems={assignedItems}
+                onAnswer={setAnswer}
+                onNA={id => setNaItems(prev => new Set([...prev, id]))}
                 onClearNA={id => setNaItems(prev => { const n = new Set(prev); n.delete(id); return n; })}
-                onCAOpen={setCaOpenId} caSubmitted={caSubmitted} />
+                onOOO={id => setOooItems(prev => new Set([...prev, id]))}
+                onClearOOO={id => setOooItems(prev => { const n = new Set(prev); n.delete(id); return n; })}
+                onAssign={(id, name) => setAssignedItems(prev => ({ ...prev, [id]: name }))}
+                onCAOpen={setCaOpenId}
+                caSubmitted={caSubmitted}
+              />
             ))}
           </div>
           {caOpenId && caItem && (
-            <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10, transform: caOpenId ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.3s ease' }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10, transform: 'translateX(0)', transition: 'transform 0.3s ease' }}>
               <CASurface itemPrompt={caItem.prompt} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
             </div>
           )}
