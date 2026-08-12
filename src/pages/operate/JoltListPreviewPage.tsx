@@ -13,6 +13,27 @@ const FONT = "'Inter', -apple-system, sans-serif";
 
 const ASSIGN_NAMES = ['Sarah Johnson', 'Mike Chen', 'Alex Rivera', 'Dana Kim'];
 
+// Returns a darkened version of a hex color for use as text/border on light backgrounds
+function darkenColor(hex: string, amount = 0.45): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const dr = Math.round(r * (1 - amount));
+  const dg = Math.round(g * (1 - amount));
+  const db = Math.round(b * (1 - amount));
+  return `rgb(${dr},${dg},${db})`;
+}
+// Returns perceived luminance (0=dark, 1=light)
+function luminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function choiceTextColor(hex: string): string {
+  return luminance(hex) > 0.4 ? darkenColor(hex) : hex;
+}
+
 // ── Types — mirror editor exactly ─────────────────────────────────────────
 type ItemType = 'yn' | 'checkmark' | 'rating' | 'signature' | 'mc' | 'short' | 'free' |
   'measurement' | 'number' | 'photo' | 'qr' | 'employee' | 'date' | 'datetime' | 'time' |
@@ -395,7 +416,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
           {item.type === 'mc' && (() => {
             const choices = item.choices ?? [];
             const isMulti = item.mcMultiSelect ?? false;
-            const selectedLabels: string[] = (() => {
+            const selectedIds: string[] = (() => {
               if (!answer) return [];
               if (isMulti) { try { return JSON.parse(answer as string); } catch { return []; } }
               return [answer as string];
@@ -405,29 +426,30 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {choices.map(c => {
-                    const isSelected = selectedLabels.includes(c.label);
+                    const isSelected = selectedIds.includes(c.id);
                     const toggle = () => {
                       if (isMulti) {
-                        const next = isSelected ? selectedLabels.filter(s => s !== c.label) : [...selectedLabels, c.label];
+                        const next = isSelected ? selectedIds.filter(s => s !== c.id) : [...selectedIds, c.id];
                         onAnswer(item.id, next.length > 0 ? JSON.stringify(next) : null);
                       } else {
-                        onAnswer(item.id, isSelected ? null : c.label);
+                        onAnswer(item.id, isSelected ? null : c.id);
                       }
                     };
                     const choiceColor = c.color || APP_BLUE;
+                    const choiceFg = c.color ? choiceTextColor(c.color) : APP_BLUE;
                     return (
-                      <div key={c.id} onClick={toggle} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1.5px solid ${isSelected ? choiceColor : BORDER}`, borderRadius: 8, cursor: 'pointer', background: isSelected ? `${choiceColor}18` : 'white' }}>
+                      <div key={c.id} onClick={toggle} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1.5px solid ${isSelected ? choiceFg : BORDER}`, borderRadius: 8, cursor: 'pointer', background: isSelected ? `${choiceColor}28` : 'white' }}>
                         {isMulti ? (
-                          <div style={{ width: 18, height: 18, borderRadius: 3, border: `2px solid ${isSelected ? choiceColor : '#C0C0C8'}`, background: isSelected ? choiceColor : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 18, height: 18, borderRadius: 3, border: `2px solid ${isSelected ? choiceFg : '#C0C0C8'}`, background: isSelected ? choiceFg : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {isSelected && <i className="ti ti-check" style={{ fontSize: 12, color: 'white' }} />}
                           </div>
                         ) : (
-                          <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? choiceColor : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {isSelected && <div style={{ width: 9, height: 9, borderRadius: '50%', background: choiceColor }} />}
+                          <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? choiceFg : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {isSelected && <div style={{ width: 9, height: 9, borderRadius: '50%', background: choiceFg }} />}
                           </div>
                         )}
                         {c.color && <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
-                        <span style={{ fontSize: 14, color: isSelected ? choiceColor : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
+                        <span style={{ fontSize: 14, color: isSelected ? choiceFg : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
                       </div>
                     );
                   })}
@@ -435,14 +457,16 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
               );
             }
 
+            const selectedLabel = !isMulti ? choices.find(c => c.id === selectedIds[0])?.label : undefined;
             const btnLabel = isMulti
-              ? (selectedLabels.length > 0 ? `${selectedLabels.length} selected` : 'Select options')
-              : (selectedLabels[0] ?? 'Select option');
-            const hasAnswer = selectedLabels.length > 0;
-            const selectedChoice = !isMulti ? choices.find(c => c.label === selectedLabels[0]) : null;
+              ? (selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Select options')
+              : (selectedLabel ?? 'Select option');
+            const hasAnswer = selectedIds.length > 0;
+            const selectedChoice = !isMulti ? choices.find(c => c.id === selectedIds[0]) : null;
             const btnColor = selectedChoice?.color || APP_BLUE;
+            const btnFg = choiceTextColor(btnColor);
             return (
-              <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${hasAnswer ? btnColor : APP_BLUE}`, borderRadius: 8, color: hasAnswer ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? btnColor : 'white', cursor: 'pointer', width: '100%' }}>
+              <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${hasAnswer ? btnFg : APP_BLUE}`, borderRadius: 8, color: hasAnswer ? btnFg : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? `${btnColor}28` : 'white', cursor: 'pointer', width: '100%' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <i className="ti ti-list" style={{ fontSize: 18 }} /> {btnLabel}
                 </span>
@@ -655,21 +679,21 @@ function MCSurface({ item, answer, onAnswer, onBack }: {
   const choices = item.choices ?? [];
   const isMulti = item.mcMultiSelect ?? false;
 
-  const selectedLabels: string[] = (() => {
+  const selectedIds: string[] = (() => {
     if (!answer) return [];
     if (isMulti) { try { return JSON.parse(answer as string); } catch { return []; } }
     return [answer as string];
   })();
 
-  const toggle = (label: string) => {
+  const toggle = (id: string) => {
     if (isMulti) {
-      const next = selectedLabels.includes(label)
-        ? selectedLabels.filter(s => s !== label)
-        : [...selectedLabels, label];
+      const next = selectedIds.includes(id)
+        ? selectedIds.filter(s => s !== id)
+        : [...selectedIds, id];
       onAnswer(item.id, next.length > 0 ? JSON.stringify(next) : null);
     } else {
-      const isSame = selectedLabels[0] === label;
-      onAnswer(item.id, isSame ? null : label);
+      const isSame = selectedIds[0] === id;
+      onAnswer(item.id, isSame ? null : id);
       if (!isSame) onBack();
     }
   };
@@ -681,19 +705,19 @@ function MCSurface({ item, answer, onAnswer, onBack }: {
           <i className="ti ti-chevron-left" style={{ fontSize: 18 }} />
         </button>
         <div style={{ flex: 1, fontSize: 17, fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.prompt}</div>
-        {isMulti && selectedLabels.length > 0 && (
+        {isMulti && selectedIds.length > 0 && (
           <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: '4px 12px', fontSize: 13, fontWeight: 600, color: 'white', flexShrink: 0, marginLeft: 8 }}>
-            {selectedLabels.length}
+            {selectedIds.length}
           </div>
         )}
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
         {choices.map(c => {
-          const isSelected = selectedLabels.includes(c.label);
+          const isSelected = selectedIds.includes(c.id);
           const choiceColor = c.color || APP_BLUE;
           return (
-            <div key={c.id} onClick={() => toggle(c.label)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer', background: isSelected ? `${choiceColor}10` : 'white' }}>
+            <div key={c.id} onClick={() => toggle(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer', background: isSelected ? `${choiceColor}10` : 'white' }}>
               {isMulti ? (
                 <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${isSelected ? choiceColor : '#C0C0C8'}`, background: isSelected ? choiceColor : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {isSelected && <i className="ti ti-check" style={{ fontSize: 13, color: 'white' }} />}
@@ -712,8 +736,9 @@ function MCSurface({ item, answer, onAnswer, onBack }: {
 
       {isMulti && (
         <div style={{ background: 'white', padding: 16, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
-          <button onClick={onBack} style={{ background: selectedLabels.length > 0 ? APP_BLUE : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: 'pointer', letterSpacing: '0.03em' }}>
-            {selectedLabels.length > 0 ? `Done (${selectedLabels.length} selected)` : 'Done'}
+          <button onClick={onBack} style={{ background: selectedIds.length > 0 ? APP_BLUE : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: 'pointer', letterSpacing: '0.03em' }}>
+            {selectedIds.length > 0 ? `Done (${selectedIds.length} selected)` : 'Done'}
+
           </button>
         </div>
       )}
