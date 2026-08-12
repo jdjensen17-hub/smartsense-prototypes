@@ -414,19 +414,20 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
                         onAnswer(item.id, isSelected ? null : c.label);
                       }
                     };
+                    const choiceColor = c.color || APP_BLUE;
                     return (
-                      <div key={c.id} onClick={toggle} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1.5px solid ${isSelected ? APP_BLUE : BORDER}`, borderRadius: 8, cursor: 'pointer', background: isSelected ? `${APP_BLUE}10` : 'white' }}>
+                      <div key={c.id} onClick={toggle} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1.5px solid ${isSelected ? choiceColor : BORDER}`, borderRadius: 8, cursor: 'pointer', background: isSelected ? `${choiceColor}18` : 'white' }}>
                         {isMulti ? (
-                          <div style={{ width: 18, height: 18, borderRadius: 3, border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, background: isSelected ? APP_BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 18, height: 18, borderRadius: 3, border: `2px solid ${isSelected ? choiceColor : '#C0C0C8'}`, background: isSelected ? choiceColor : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {isSelected && <i className="ti ti-check" style={{ fontSize: 12, color: 'white' }} />}
                           </div>
                         ) : (
-                          <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {isSelected && <div style={{ width: 9, height: 9, borderRadius: '50%', background: APP_BLUE }} />}
+                          <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? choiceColor : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {isSelected && <div style={{ width: 9, height: 9, borderRadius: '50%', background: choiceColor }} />}
                           </div>
                         )}
                         {c.color && <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
-                        <span style={{ fontSize: 14, color: isSelected ? APP_BLUE : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
+                        <span style={{ fontSize: 14, color: isSelected ? choiceColor : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
                       </div>
                     );
                   })}
@@ -438,8 +439,10 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
               ? (selectedLabels.length > 0 ? `${selectedLabels.length} selected` : 'Select options')
               : (selectedLabels[0] ?? 'Select option');
             const hasAnswer = selectedLabels.length > 0;
+            const selectedChoice = !isMulti ? choices.find(c => c.label === selectedLabels[0]) : null;
+            const btnColor = selectedChoice?.color || APP_BLUE;
             return (
-              <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${APP_BLUE}`, borderRadius: 8, color: hasAnswer ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
+              <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${hasAnswer ? btnColor : APP_BLUE}`, borderRadius: 8, color: hasAnswer ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? btnColor : 'white', cursor: 'pointer', width: '100%' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <i className="ti ti-list" style={{ fontSize: 18 }} /> {btnLabel}
                 </span>
@@ -688,19 +691,20 @@ function MCSurface({ item, answer, onAnswer, onBack }: {
       <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
         {choices.map(c => {
           const isSelected = selectedLabels.includes(c.label);
+          const choiceColor = c.color || APP_BLUE;
           return (
-            <div key={c.id} onClick={() => toggle(c.label)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer' }}>
+            <div key={c.id} onClick={() => toggle(c.label)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer', background: isSelected ? `${choiceColor}10` : 'white' }}>
               {isMulti ? (
-                <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, background: isSelected ? APP_BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${isSelected ? choiceColor : '#C0C0C8'}`, background: isSelected ? choiceColor : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {isSelected && <i className="ti ti-check" style={{ fontSize: 13, color: 'white' }} />}
                 </div>
               ) : (
-                <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {isSelected && <div style={{ width: 10, height: 10, borderRadius: '50%', background: APP_BLUE }} />}
+                <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${isSelected ? choiceColor : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {isSelected && <div style={{ width: 10, height: 10, borderRadius: '50%', background: choiceColor }} />}
                 </div>
               )}
               {c.color && <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
-              <span style={{ fontSize: 15, color: isSelected ? APP_BLUE : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
+              <span style={{ fontSize: 15, color: isSelected ? choiceColor : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
             </div>
           );
         })}
