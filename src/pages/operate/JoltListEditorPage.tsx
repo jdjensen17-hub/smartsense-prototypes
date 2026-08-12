@@ -2642,7 +2642,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
                       color: active ? T.textAccent : T.textSecondary,
                       cursor: 'pointer',
                     }}>
-                      {val}
+                      {val === 'OOO' ? 'Out of Order' : val}
                     </button>
                   );
                 })}
@@ -4443,7 +4443,11 @@ export default function JoltListEditorPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeItemId]);
   const handlePreview = () => {
-    localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items }));
+    const previewItems = items.map(item => {
+      const ma = colValues[item.id]?.['all-mark-as'] ?? null;
+      return { ...item, allowNA: ma === 'N/A', allowOOO: ma === 'OOO' };
+    });
+    localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items: previewItems }));
     window.open('/#/operate/jolt-preview', 'jolt-preview-tab');
   };
 

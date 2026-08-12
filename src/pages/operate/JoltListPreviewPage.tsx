@@ -44,6 +44,8 @@ interface PreviewItem {
   ratingMax?: number;
   infoFile?: string;
   infoInline?: boolean;
+  labelPrint?: boolean;
+  labelIds?: string[];
   measUnit?: string;
   measSensorId?: string;
   subItems?: PreviewItem[];
@@ -62,7 +64,7 @@ const FALLBACK_ITEMS: PreviewItem[] = [
   { id: 'prep-temp', prompt: 'Record prep cooler temp', type: 'measurement', stripe: '#C1E1C5', allowNA: true, allowOOO: true, points: 25, measUnit: '°F' },
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', allowNA: false,
     dcParentId: 'prep-temp', dcConditions: [{ type: 'numeric', op: '>=', value: 41 }] },
-  { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false, infoFile: 'Date Label Policy.pdf', infoInline: true },
+  { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false, infoFile: 'Date Label Policy.pdf', infoInline: true, labelPrint: true },
   { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', allowNA: true, allowOOO: true, points: 10 },
   { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', allowNA: false, choices: [
     { id: 'c1', label: 'Sysco',                  color: '#4CAF50', icon: null },
@@ -177,7 +179,7 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onInfoOpen }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onInfoOpen, onPrinterOpen }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
@@ -193,7 +195,8 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   caSubmitted: Set<string>;
   sublistProgress?: { done: number; total: number };
   onSublistOpen?: (id: string) => void;
-  onInfoOpen?: (file: string) => void;
+  onInfoOpen?: (file: string, anchorY: number) => void;
+  onPrinterOpen?: (anchorY: number) => void;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [measInput, setMeasInput] = useState('');
@@ -223,18 +226,25 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 
   if (item.type === 'subtitle' || item.type === 'text') {
     return (
-      <div style={{ background: item.stripe || 'white', borderBottom: `1px solid ${BORDER}`, padding: '12px 16px' }}>
+      <div data-card="" style={{ background: item.stripe || 'white', borderBottom: `1px solid ${BORDER}`, padding: '12px 16px' }}>
         {item.infoFile && (
-          <div onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, cursor: 'pointer', flexShrink: 0 }}>
+          <div onClick={e => { e.stopPropagation(); const r = (e.currentTarget as HTMLElement).closest('[data-card]')?.getBoundingClientRect(); onInfoOpen?.(item.infoFile!, r?.bottom ?? 0); }} style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, cursor: 'pointer', flexShrink: 0 }}>
             <i className="ti ti-info-circle" style={{ color: 'white', fontSize: 15 }} />
           </div>
         )}
-        <div style={{ fontSize: 14, color: TEXT_SECONDARY, lineHeight: 1.5 }}>{item.prompt}</div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ fontSize: 14, color: TEXT_SECONDARY, lineHeight: 1.5, flex: 1 }}>{item.prompt}</div>
+          {(item.labelPrint || (item.labelIds?.length ?? 0) > 0) && (
+            <div onClick={e => { e.stopPropagation(); const r = (e.currentTarget as HTMLElement).closest('[data-card]')?.getBoundingClientRect(); onPrinterOpen?.(r?.bottom ?? 0); }} style={{ color: TEXT_SECONDARY, fontSize: 16, cursor: 'pointer', flexShrink: 0 }}>
+              <i className="ti ti-printer" />
+            </div>
+          )}
+        </div>
         {item.infoFile && item.infoInline && (
           <div style={{ border: '1.5px solid #C8C8D0', borderRadius: 8, overflow: 'hidden', marginTop: 10 }}>
             <div style={{ background: SURFACE_1, padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${BORDER}` }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY }}>{item.infoFile}</span>
-              <span onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ fontSize: 11, fontWeight: 600, color: APP_BLUE, letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'pointer' }}>Fullscreen</span>
+              <span onClick={e => { e.stopPropagation(); const r = (e.currentTarget as HTMLElement).closest('[data-card]')?.getBoundingClientRect(); onInfoOpen?.(item.infoFile!, r?.bottom ?? 0); }} style={{ fontSize: 11, fontWeight: 600, color: APP_BLUE, letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'pointer' }}>Fullscreen</span>
             </div>
             <div style={{ background: '#F8F8F8', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_MUTED, fontSize: 12, gap: 6 }}>
               <i className="ti ti-file-text" style={{ fontSize: 20 }} />
@@ -284,10 +294,10 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   }
 
   return (
-    <div style={{ background: item.stripe || 'white', borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
+    <div data-card="" style={{ background: item.stripe || 'white', borderBottom: `1px solid ${BORDER}`, padding: '14px 16px 12px', position: 'relative' }} onClick={() => kebabOpen && closeKebab()}>
       {/* Info library badge */}
       {item.infoFile && (
-        <div onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, cursor: 'pointer', flexShrink: 0 }}>
+        <div onClick={e => { e.stopPropagation(); const r = (e.currentTarget as HTMLElement).closest('[data-card]')?.getBoundingClientRect(); onInfoOpen?.(item.infoFile!, r?.bottom ?? 0); }} style={{ width: 28, height: 28, background: APP_BLUE, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, cursor: 'pointer', flexShrink: 0 }}>
           <i className="ti ti-info-circle" style={{ color: 'white', fontSize: 15 }} />
         </div>
       )}
@@ -297,6 +307,11 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
         <div style={{ fontSize: 15, color: TEXT_PRIMARY, lineHeight: 1.35, flex: 1 }}>{item.prompt}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, position: 'relative' }}>
           {hasFlag && <i className="ti ti-alert-triangle" style={{ fontSize: 18, color: '#E67E22' }} />}
+          {(item.labelPrint || (item.labelIds?.length ?? 0) > 0) && (
+            <div onClick={e => { e.stopPropagation(); const r = (e.currentTarget as HTMLElement).closest('[data-card]')?.getBoundingClientRect(); onPrinterOpen?.(r?.bottom ?? 0); }} style={{ color: TEXT_SECONDARY, fontSize: 16, cursor: 'pointer' }}>
+              <i className="ti ti-printer" />
+            </div>
+          )}
           <div onClick={e => { e.stopPropagation(); setKebabOpen(v => !v); }} style={{ color: TEXT_MUTED, fontSize: 16, cursor: 'pointer' }}>
             <i className="ti ti-dots-vertical" />
           </div>
@@ -313,7 +328,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
         <div style={{ border: '1.5px solid #C8C8D0', borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
           <div style={{ background: SURFACE_1, padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${BORDER}` }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY }}>{item.infoFile}</span>
-            <span onClick={e => { e.stopPropagation(); onInfoOpen?.(item.infoFile!); }} style={{ fontSize: 11, fontWeight: 600, color: APP_BLUE, letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'pointer' }}>Fullscreen</span>
+            <span onClick={e => { e.stopPropagation(); const r = (e.currentTarget as HTMLElement).closest('[data-card]')?.getBoundingClientRect(); onInfoOpen?.(item.infoFile!, r?.bottom ?? 0); }} style={{ fontSize: 11, fontWeight: 600, color: APP_BLUE, letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'pointer' }}>Fullscreen</span>
           </div>
           <div style={{ background: '#F8F8F8', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_MUTED, fontSize: 12, gap: 6 }}>
             <i className="ti ti-file-text" style={{ fontSize: 20 }} />
@@ -437,7 +452,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
         {isNA ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>N/A · {now}</span>
         ) : isOOO ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#E8E8EC', color: TEXT_SECONDARY, fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>Out of Order · {now}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>OOO · {now}</span>
         ) : completed ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>Completed · {now}</span>
         ) : assignedTo ? (
@@ -588,7 +603,10 @@ export default function JoltListPreviewPage() {
   const [sublistOpenId, setSublistOpenId] = useState<string | null>(null);
   const [subAnswers, setSubAnswers] = useState<Record<string, Record<string, ItemAnswer>>>({});
   const [subNaItems, setSubNaItems] = useState<Record<string, Set<string>>>({});
+  const [refreshSpin, setRefreshSpin] = useState(false);
   const [infoOpenFile, setInfoOpenFile] = useState<string | null>(null);
+  const [infoModalY, setInfoModalY] = useState(0);
+  const [printerModalY, setPrinterModalY] = useState<number | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem('jolt-preview-payload');
@@ -699,13 +717,15 @@ export default function JoltListPreviewPage() {
   const isOverlayOpen = !!(caOpenId || sublistOpenId);
 
   return (
+    <>
+    <style>{`@keyframes preview-refresh { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .preview-refresh-spin { animation: preview-refresh 0.5s ease-out; }`}</style>
     <div style={{ fontFamily: FONT, minHeight: '100vh', background: SURFACE_0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
         {/* App header */}
         <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', top: 0, zIndex: 20 }}>
           <div style={{ fontSize: 17, fontWeight: 600, color: 'white', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listName}</div>
-          <div onClick={reset} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', opacity: 0.85, cursor: 'pointer', flexShrink: 0 }}>
-            <i className="ti ti-refresh" style={{ fontSize: 18 }} />
+          <div onClick={() => { reset(); setRefreshSpin(true); setTimeout(() => setRefreshSpin(false), 600); }} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', opacity: 0.85, cursor: 'pointer', flexShrink: 0 }}>
+            <i className={`ti ti-refresh${refreshSpin ? ' preview-refresh-spin' : ''}`} style={{ fontSize: 18 }} />
           </div>
         </div>
 
@@ -731,7 +751,8 @@ export default function JoltListPreviewPage() {
                 caSubmitted={caSubmitted}
                 sublistProgress={item.type === 'sublist' ? getSublistProgress(item) : undefined}
                 onSublistOpen={id => setSublistOpenId(id)}
-                onInfoOpen={file => setInfoOpenFile(file)}
+                onInfoOpen={(file, y) => { setInfoOpenFile(file); setInfoModalY(y); }}
+                onPrinterOpen={y => setPrinterModalY(y)}
               />
             ))}
           </div>
@@ -768,8 +789,8 @@ export default function JoltListPreviewPage() {
 
       {/* Info library modal — rendered outside the transformed column so position:fixed works correctly */}
       {infoOpenFile && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setInfoOpenFile(null)}>
-          <div style={{ width: 420, height: 400, background: '#1A1A1F', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} onClick={() => setInfoOpenFile(null)}>
+          <div style={{ position: 'absolute', top: infoModalY, left: '50%', transform: 'translateX(-50%)', width: 420, height: 400, background: 'white', borderRadius: '0 0 12px 12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
             <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               <button onClick={() => setInfoOpenFile(null)} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: 2, fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8, flexShrink: 0 }}>
                 <i className="ti ti-chevron-left" style={{ fontSize: 20 }} /> Back
@@ -777,13 +798,42 @@ export default function JoltListPreviewPage() {
               <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{infoOpenFile}</div>
               <div style={{ width: 56, flexShrink: 0 }} />
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: 'rgba(255,255,255,0.45)' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: TEXT_MUTED }}>
               <i className="ti ti-file-text" style={{ fontSize: 52 }} />
               <div style={{ fontSize: 15, fontWeight: 500 }}>Info library document preview</div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Label printer modal */}
+      {printerModalY !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} onClick={() => setPrinterModalY(null)}>
+          <div style={{ position: 'absolute', top: printerModalY, left: '50%', transform: 'translateX(-50%)', width: 420, height: 400, background: 'white', borderRadius: '0 0 12px 12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <button onClick={() => setPrinterModalY(null)} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: 2, fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8, flexShrink: 0 }}>
+                <i className="ti ti-chevron-left" style={{ fontSize: 20 }} /> Back
+              </button>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'white' }}>Select a label</div>
+              <div style={{ width: 56, flexShrink: 0 }} />
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 20, gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: TEXT_MUTED }}>
+                <i className="ti ti-printer-off" style={{ fontSize: 16 }} />
+                <span style={{ fontSize: 13 }}>No printers available</span>
+              </div>
+              <div style={{ border: `1.5px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ background: SURFACE_1, padding: '8px 14px', borderBottom: `1px solid ${BORDER}`, fontSize: 12, fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>Label preview</div>
+                <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: TEXT_MUTED, fontSize: 12 }}>
+                  <i className="ti ti-tag" style={{ fontSize: 24 }} />
+                  <span>Placeholder label</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+    </>
   );
 }
