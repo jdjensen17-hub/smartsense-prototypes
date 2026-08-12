@@ -448,7 +448,9 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
                             {isSelected && <div style={{ width: 9, height: 9, borderRadius: '50%', background: choiceFg }} />}
                           </div>
                         )}
-                        {c.color && <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
+                        {c.icon
+                          ? <i className={`ti ${c.icon}`} style={{ fontSize: 16, color: isSelected ? choiceFg : TEXT_MUTED, flexShrink: 0 }} />
+                          : c.color ? <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.color, flexShrink: 0 }} /> : null}
                         <span style={{ fontSize: 14, color: isSelected ? choiceFg : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
                       </div>
                     );
@@ -468,7 +470,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
             return (
               <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${hasAnswer ? btnFg : APP_BLUE}`, borderRadius: 8, color: hasAnswer ? btnFg : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? `${btnColor}28` : 'white', cursor: 'pointer', width: '100%' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="ti ti-list" style={{ fontSize: 18 }} /> {btnLabel}
+                  <i className={`ti ${selectedChoice?.icon || 'ti-list'}`} style={{ fontSize: 18 }} /> {btnLabel}
                 </span>
                 <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
               </button>
@@ -727,7 +729,9 @@ function MCSurface({ item, answer, onAnswer, onBack }: {
                   {isSelected && <div style={{ width: 10, height: 10, borderRadius: '50%', background: choiceColor }} />}
                 </div>
               )}
-              {c.color && <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
+              {c.icon
+                ? <i className={`ti ${c.icon}`} style={{ fontSize: 18, color: isSelected ? choiceColor : TEXT_MUTED, flexShrink: 0 }} />
+                : c.color ? <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0 }} /> : null}
               <span style={{ fontSize: 15, color: isSelected ? choiceColor : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
             </div>
           );
