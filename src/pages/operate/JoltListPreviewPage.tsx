@@ -37,6 +37,8 @@ interface PreviewItem {
   dcParentId?: string;
   dcConditions?: DCCondition[];
   choices?: MCChoice[];
+  mcMultiSelect?: boolean;
+  mcShowInline?: boolean;
   caForYNRules?: CARule[];
   flagsForNo?: string[];
   points?: number;
@@ -66,10 +68,16 @@ const FALLBACK_ITEMS: PreviewItem[] = [
     dcParentId: 'prep-temp', dcConditions: [{ type: 'numeric', op: '>=', value: 41 }] },
   { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false, infoFile: 'Date Label Policy.pdf', infoInline: true, labelPrint: true },
   { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', allowNA: true, allowOOO: true, points: 10 },
-  { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', allowNA: false, choices: [
+  { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', allowNA: false, mcShowInline: false, mcMultiSelect: false, choices: [
     { id: 'c1', label: 'Sysco',                  color: '#4CAF50', icon: null },
     { id: 'c2', label: 'US Foods',               color: '#2196F3', icon: null },
     { id: 'c3', label: 'Performance Food Group', color: '#FF9800', icon: null },
+  ]},
+  { id: 'issues-mc', prompt: 'Issues found during opening?', type: 'mc', stripe: '', allowNA: false, mcShowInline: true, mcMultiSelect: true, choices: [
+    { id: 'i1', label: 'Equipment not working',  color: '#E53935', icon: null },
+    { id: 'i2', label: 'Cleanliness issue',      color: '#FB8C00', icon: null },
+    { id: 'i3', label: 'Supply shortage',        color: '#8E24AA', icon: null },
+    { id: 'i4', label: 'No issues',              color: '#43A047', icon: null },
   ]},
   { id: 'temp-checks', prompt: 'Temperature Checks', type: 'sublist', stripe: '#E8D0F0', allowNA: false, points: 20,
     subItems: [
@@ -179,7 +187,7 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onInfoOpen, onPrinterOpen }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onInfoOpen, onPrinterOpen }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
@@ -195,6 +203,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   caSubmitted: Set<string>;
   sublistProgress?: { done: number; total: number };
   onSublistOpen?: (id: string) => void;
+  onMCOpen?: (id: string) => void;
   onInfoOpen?: (file: string, anchorY: number) => void;
   onPrinterOpen?: (anchorY: number) => void;
 }) {
@@ -384,11 +393,57 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
             <RatingButtons min={item.ratingMin ?? 1} max={item.ratingMax ?? 5} value={answer as number | null} onChange={v => onAnswer(item.id, v)} />
           )}
           {item.type === 'mc' && (() => {
-            const options = item.choices ?? [];
-            const currentIdx = options.findIndex(c => c.label === answer);
+            const choices = item.choices ?? [];
+            const isMulti = item.mcMultiSelect ?? false;
+            const selectedLabels: string[] = (() => {
+              if (!answer) return [];
+              if (isMulti) { try { return JSON.parse(answer as string); } catch { return []; } }
+              return [answer as string];
+            })();
+
+            if (item.mcShowInline) {
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {choices.map(c => {
+                    const isSelected = selectedLabels.includes(c.label);
+                    const toggle = () => {
+                      if (isMulti) {
+                        const next = isSelected ? selectedLabels.filter(s => s !== c.label) : [...selectedLabels, c.label];
+                        onAnswer(item.id, next.length > 0 ? JSON.stringify(next) : null);
+                      } else {
+                        onAnswer(item.id, isSelected ? null : c.label);
+                      }
+                    };
+                    return (
+                      <div key={c.id} onClick={toggle} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1.5px solid ${isSelected ? APP_BLUE : BORDER}`, borderRadius: 8, cursor: 'pointer', background: isSelected ? `${APP_BLUE}10` : 'white' }}>
+                        {isMulti ? (
+                          <div style={{ width: 18, height: 18, borderRadius: 3, border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, background: isSelected ? APP_BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {isSelected && <i className="ti ti-check" style={{ fontSize: 12, color: 'white' }} />}
+                          </div>
+                        ) : (
+                          <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {isSelected && <div style={{ width: 9, height: 9, borderRadius: '50%', background: APP_BLUE }} />}
+                          </div>
+                        )}
+                        {c.color && <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
+                        <span style={{ fontSize: 14, color: isSelected ? APP_BLUE : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+
+            const btnLabel = isMulti
+              ? (selectedLabels.length > 0 ? `${selectedLabels.length} selected` : 'Select options')
+              : (selectedLabels[0] ?? 'Select option');
+            const hasAnswer = selectedLabels.length > 0;
             return (
-              <button onClick={() => { const next = (currentIdx + 1) % (options.length + 1); onAnswer(item.id, next < options.length ? options[next].label : null); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: `2px solid ${APP_BLUE}`, borderRadius: 8, color: answer ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: answer ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
-                <i className="ti ti-list" style={{ fontSize: 18 }} /> {answer ? String(answer) : 'Select option'}
+              <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${APP_BLUE}`, borderRadius: 8, color: hasAnswer ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="ti ti-list" style={{ fontSize: 18 }} /> {btnLabel}
+                </span>
+                <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
               </button>
             );
           })()}
@@ -587,6 +642,81 @@ function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onB
   );
 }
 
+// ── MC surface ────────────────────────────────────────────────────────────
+function MCSurface({ item, answer, onAnswer, onBack }: {
+  item: PreviewItem;
+  answer: ItemAnswer;
+  onAnswer: (id: string, val: ItemAnswer) => void;
+  onBack: () => void;
+}) {
+  const choices = item.choices ?? [];
+  const isMulti = item.mcMultiSelect ?? false;
+
+  const selectedLabels: string[] = (() => {
+    if (!answer) return [];
+    if (isMulti) { try { return JSON.parse(answer as string); } catch { return []; } }
+    return [answer as string];
+  })();
+
+  const toggle = (label: string) => {
+    if (isMulti) {
+      const next = selectedLabels.includes(label)
+        ? selectedLabels.filter(s => s !== label)
+        : [...selectedLabels, label];
+      onAnswer(item.id, next.length > 0 ? JSON.stringify(next) : null);
+    } else {
+      const isSame = selectedLabels[0] === label;
+      onAnswer(item.id, isSame ? null : label);
+      if (!isSame) onBack();
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8 }}>
+          <i className="ti ti-chevron-left" style={{ fontSize: 18 }} />
+        </button>
+        <div style={{ flex: 1, fontSize: 17, fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.prompt}</div>
+        {isMulti && selectedLabels.length > 0 && (
+          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: '4px 12px', fontSize: 13, fontWeight: 600, color: 'white', flexShrink: 0, marginLeft: 8 }}>
+            {selectedLabels.length}
+          </div>
+        )}
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
+        {choices.map(c => {
+          const isSelected = selectedLabels.includes(c.label);
+          return (
+            <div key={c.id} onClick={() => toggle(c.label)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer' }}>
+              {isMulti ? (
+                <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, background: isSelected ? APP_BLUE : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {isSelected && <i className="ti ti-check" style={{ fontSize: 13, color: 'white' }} />}
+                </div>
+              ) : (
+                <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${isSelected ? APP_BLUE : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {isSelected && <div style={{ width: 10, height: 10, borderRadius: '50%', background: APP_BLUE }} />}
+                </div>
+              )}
+              {c.color && <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
+              <span style={{ fontSize: 15, color: isSelected ? APP_BLUE : TEXT_PRIMARY, fontWeight: isSelected ? 600 : 400, flex: 1 }}>{c.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {isMulti && (
+        <div style={{ background: 'white', padding: 16, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          <button onClick={onBack} style={{ background: selectedLabels.length > 0 ? APP_BLUE : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: 'pointer', letterSpacing: '0.03em' }}>
+            {selectedLabels.length > 0 ? `Done (${selectedLabels.length} selected)` : 'Done'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────
 export default function JoltListPreviewPage() {
   const [items, setItems] = useState<PreviewItem[]>(FALLBACK_ITEMS);
@@ -601,6 +731,7 @@ export default function JoltListPreviewPage() {
   const [caOpenId, setCaOpenId] = useState<string | null>(null);
 
   const [sublistOpenId, setSublistOpenId] = useState<string | null>(null);
+  const [mcOpenId, setMcOpenId] = useState<string | null>(null);
   const [subAnswers, setSubAnswers] = useState<Record<string, Record<string, ItemAnswer>>>({});
   const [subNaItems, setSubNaItems] = useState<Record<string, Set<string>>>({});
   const [refreshSpin, setRefreshSpin] = useState(false);
@@ -714,7 +845,7 @@ export default function JoltListPreviewPage() {
   const caItem = caOpenId ? items.find(i => i.id === caOpenId) : null;
   const sublistItem = sublistOpenId ? items.find(i => i.id === sublistOpenId) : null;
   const visibleItems = items.filter(item => isItemVisible(item, answers));
-  const isOverlayOpen = !!(caOpenId || sublistOpenId);
+  const isOverlayOpen = !!(caOpenId || sublistOpenId || mcOpenId);
 
   return (
     <>
@@ -751,6 +882,7 @@ export default function JoltListPreviewPage() {
                 caSubmitted={caSubmitted}
                 sublistProgress={item.type === 'sublist' ? getSublistProgress(item) : undefined}
                 onSublistOpen={id => setSublistOpenId(id)}
+                onMCOpen={id => setMcOpenId(id)}
                 onInfoOpen={(file, y) => { setInfoOpenFile(file); setInfoModalY(y); }}
                 onPrinterOpen={y => setPrinterModalY(y)}
               />
@@ -779,6 +911,22 @@ export default function JoltListPreviewPage() {
               />
             </div>
           )}
+
+          {/* MC overlay */}
+          {mcOpenId && (() => {
+            const mcItem = items.find(i => i.id === mcOpenId);
+            if (!mcItem) return null;
+            return (
+              <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10 }}>
+                <MCSurface
+                  item={mcItem}
+                  answer={answers[mcOpenId] ?? null}
+                  onAnswer={setAnswer}
+                  onBack={() => setMcOpenId(null)}
+                />
+              </div>
+            );
+          })()}
         </div>
       </div>
 

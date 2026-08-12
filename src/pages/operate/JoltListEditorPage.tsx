@@ -4445,7 +4445,13 @@ export default function JoltListEditorPage() {
   const handlePreview = () => {
     const previewItems = items.map(item => {
       const ma = colValues[item.id]?.['all-mark-as'] ?? null;
-      return { ...item, allowNA: ma === 'N/A', allowOOO: ma === 'OOO' };
+      return {
+        ...item,
+        allowNA: ma === 'N/A',
+        allowOOO: ma === 'OOO',
+        mcMultiSelect: item.mcMultiSelect ?? false,
+        mcShowInline: item.mcShowInline ?? false,
+      };
     });
     localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items: previewItems }));
     window.open('/#/operate/jolt-preview', 'jolt-preview-tab');
