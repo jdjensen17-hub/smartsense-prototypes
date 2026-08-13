@@ -360,30 +360,31 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
     scoreDisplay = possible > 0 ? `${((earned / possible) * 100).toFixed(2)}%` : '0.00%';
   }
 
-  const box: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px' };
+  const box: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, padding: '8px 12px' };
+  const txt: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 1 };
   const lbl: React.CSSProperties = { fontSize: 11, color: TEXT_MUTED, fontWeight: 500 };
-  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 5 };
   const val: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY };
   const div = <div style={{ width: 1, background: BORDER, alignSelf: 'stretch', margin: '6px 0' }} />;
-  const icon = (cls: string) => <i className={`ti ${cls}`} style={{ fontSize: 14, color: TEXT_MUTED }} />;
+  const icon = (cls: string) => <i className={`ti ${cls}`} style={{ fontSize: 18, color: TEXT_MUTED, flexShrink: 0 }} />;
+
+  const Box = ({ ic, label, value }: { ic: string; label: string; value: string }) => (
+    <div style={box}>
+      {icon(ic)}
+      <div style={txt}>
+        <span style={lbl}>{label}</span>
+        <span style={val}>{value}</span>
+      </div>
+    </div>
+  );
 
   if (!scoringOn) {
     return (
       <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
-        <div style={box}>
-          <span style={lbl}>Displayed</span>
-          <div style={row}>{icon('ti-clock')}<span style={val}>{fmtTime(displayedAt)}</span></div>
-        </div>
+        <Box ic="ti-clock" label="Displayed" value={fmtTime(displayedAt)} />
         {div}
-        <div style={box}>
-          <span style={lbl}>Due by</span>
-          <div style={row}>{icon('ti-alarm')}<span style={val}>{fmtTime(due)}</span></div>
-        </div>
+        <Box ic="ti-alarm" label="Due by" value={fmtTime(due)} />
         {div}
-        <div style={box}>
-          <span style={lbl}>Expires</span>
-          <div style={row}>{icon('ti-calendar-x')}<span style={val}>{fmtExpires(expires)}</span></div>
-        </div>
+        <Box ic="ti-calendar-x" label="Expires" value={fmtExpires(expires)} />
       </div>
     );
   }
@@ -391,26 +392,14 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
   return (
     <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${BORDER}` }}>
-        <div style={box}>
-          <span style={lbl}>Displayed</span>
-          <div style={row}>{icon('ti-clock')}<span style={val}>{fmtTime(displayedAt)}</span></div>
-        </div>
+        <Box ic="ti-clock" label="Displayed" value={fmtTime(displayedAt)} />
         {div}
-        <div style={box}>
-          <span style={lbl}>Due by</span>
-          <div style={row}>{icon('ti-alarm')}<span style={val}>{fmtTime(due)}</span></div>
-        </div>
+        <Box ic="ti-alarm" label="Due by" value={fmtTime(due)} />
       </div>
       <div style={{ display: 'flex', alignItems: 'stretch' }}>
-        <div style={box}>
-          <span style={lbl}>Expires</span>
-          <div style={row}>{icon('ti-calendar-x')}<span style={val}>{fmtExpires(expires)}</span></div>
-        </div>
+        <Box ic="ti-calendar-x" label="Expires" value={fmtExpires(expires)} />
         {div}
-        <div style={box}>
-          <span style={lbl}>Score</span>
-          <div style={row}>{icon('ti-trophy')}<span style={val}>{scoreDisplay}</span></div>
-        </div>
+        <Box ic="ti-trophy" label="Score" value={scoreDisplay} />
       </div>
     </div>
   );
