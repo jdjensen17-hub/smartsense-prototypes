@@ -333,6 +333,89 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
   );
 }
 
+// ── Status boxes ─────────────────────────────────────────────────────────
+function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt }: {
+  scoringOn: boolean;
+  items: PreviewItem[];
+  answers: Record<string, ItemAnswer>;
+  naItems: Set<string>;
+  oooItems: Set<string>;
+  displayedAt: Date;
+}) {
+  const due = new Date(displayedAt.getTime() + 8 * 60 * 60 * 1000);
+  const expires = new Date(due.getTime() + 24 * 60 * 60 * 1000);
+
+  const fmtTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const fmtExpires = (d: Date) =>
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + fmtTime(d);
+
+  let scoreDisplay = '0.00%';
+  if (scoringOn) {
+    const excluded = new Set([...naItems, ...oooItems]);
+    const scoreable = items.filter(i => i.points && i.type !== 'subtitle' && i.type !== 'text' && !excluded.has(i.id));
+    const possible = scoreable.reduce((sum, i) => sum + (i.points ?? 0), 0);
+    const earned = scoreable
+      .filter(i => itemCompleted(i, answers[i.id] ?? null, false, false))
+      .reduce((sum, i) => sum + (i.points ?? 0), 0);
+    scoreDisplay = possible > 0 ? `${((earned / possible) * 100).toFixed(2)}%` : '0.00%';
+  }
+
+  const box: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px' };
+  const lbl: React.CSSProperties = { fontSize: 11, color: TEXT_MUTED, fontWeight: 500 };
+  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 5 };
+  const val: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY };
+  const div = <div style={{ width: 1, background: BORDER, alignSelf: 'stretch', margin: '6px 0' }} />;
+  const icon = (cls: string) => <i className={`ti ${cls}`} style={{ fontSize: 14, color: TEXT_MUTED }} />;
+
+  if (!scoringOn) {
+    return (
+      <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+        <div style={box}>
+          <span style={lbl}>Displayed</span>
+          <div style={row}>{icon('ti-clock')}<span style={val}>{fmtTime(displayedAt)}</span></div>
+        </div>
+        {div}
+        <div style={box}>
+          <span style={lbl}>Due by</span>
+          <div style={row}>{icon('ti-alarm')}<span style={val}>{fmtTime(due)}</span></div>
+        </div>
+        {div}
+        <div style={box}>
+          <span style={lbl}>Expires</span>
+          <div style={row}>{icon('ti-calendar-x')}<span style={val}>{fmtExpires(expires)}</span></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${BORDER}` }}>
+        <div style={box}>
+          <span style={lbl}>Displayed</span>
+          <div style={row}>{icon('ti-clock')}<span style={val}>{fmtTime(displayedAt)}</span></div>
+        </div>
+        {div}
+        <div style={box}>
+          <span style={lbl}>Due by</span>
+          <div style={row}>{icon('ti-alarm')}<span style={val}>{fmtTime(due)}</span></div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'stretch' }}>
+        <div style={box}>
+          <span style={lbl}>Expires</span>
+          <div style={row}>{icon('ti-calendar-x')}<span style={val}>{fmtExpires(expires)}</span></div>
+        </div>
+        {div}
+        <div style={box}>
+          <span style={lbl}>Score</span>
+          <div style={row}>{icon('ti-trophy')}<span style={val}>{scoreDisplay}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Item card ─────────────────────────────────────────────────────────────
 function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onInfoOpen, onPrinterOpen, flags, formulaResult }: {
   item: PreviewItem;
@@ -991,6 +1074,7 @@ export default function JoltListPreviewPage() {
   const [listName, setListName] = useState('Opening Checklist');
   const [scoringOn, setScoringOn] = useState(false);
   const [flags, setFlags] = useState<Flag[]>(FALLBACK_FLAGS);
+  const [displayedAt] = useState(() => new Date());
 
   const [answers, setAnswers] = useState<Record<string, ItemAnswer>>({});
   const [naItems, setNaItems] = useState<Set<string>>(new Set());
@@ -1164,7 +1248,7 @@ export default function JoltListPreviewPage() {
         {/* Slides: list ← → overlay (CA or Sublist) */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
           <div style={{ flex: '0 0 100%', overflowY: 'auto', transform: isOverlayOpen ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
-            <ScoreBar items={visibleItems} answers={answers} naItems={naItems} oooItems={oooItems} scoringOn={scoringOn} />
+            <StatusBoxes scoringOn={scoringOn} items={visibleItems} answers={answers} naItems={naItems} oooItems={oooItems} displayedAt={displayedAt} />
             {visibleItems.map(item => (
               <ItemCard
                 key={item.id}
