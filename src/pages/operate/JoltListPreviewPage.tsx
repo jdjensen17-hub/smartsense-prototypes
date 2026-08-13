@@ -688,11 +688,11 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
           {/* Sublist */}
           {item.type === 'sublist' && (
             <button onClick={() => onSublistOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${APP_BLUE}`, borderRadius: 8, color: sublistDone ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: sublistDone ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <i className="ti ti-layout-list" style={{ fontSize: 18 }} />
+              <i className="ti ti-layout-list" style={{ fontSize: 18 }} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
                 {sublistProgress ? `${sublistProgress.done} / ${sublistProgress.total}` : '0 / 0'}
+                <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
               </span>
-              <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
             </button>
           )}
 
