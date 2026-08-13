@@ -77,6 +77,7 @@ interface PreviewItem {
   infoFile?: string;
   infoInline?: boolean;
   labelPrint?: boolean;
+  photoAllowUpload?: boolean;
   labelIds?: string[];
   measUnit?: string;
   measSensorId?: string;
@@ -649,7 +650,14 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
             <input type="number" value={(answer as string) ?? ''} onChange={e => onAnswer(item.id, e.target.value)} placeholder="Enter number..." style={{ width: '100%', border: '1.5px solid #C8C8D0', borderRadius: 8, background: SURFACE_1, fontFamily: FONT, fontSize: 14, color: answer ? TEXT_PRIMARY : TEXT_MUTED, padding: '10px 12px', boxSizing: 'border-box' }} />
           )}
           {/* Tap-to-complete types */}
-          {item.type === 'photo'     && <AppBtn icon="ti-camera"        label={answer ? 'Photo taken ✓'    : 'Take Photo'}        completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />}
+          {item.type === 'photo' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <AppBtn icon="ti-camera" label={answer ? 'Photo taken ✓' : 'Take Photo'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />
+              {item.photoAllowUpload && (
+                <AppBtn icon="ti-photo" label="Upload Photo" completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />
+              )}
+            </div>
+          )}
           {item.type === 'signature' && <AppBtn icon="ti-pencil"        label={answer ? 'Signed ✓'         : 'Signature'}         completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'signed')} />}
           {item.type === 'barcode'   && <AppBtn icon="ti-barcode"       label={answer ? 'Scanned ✓'        : 'Scan Barcode'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
           {item.type === 'qr'        && <AppBtn icon="ti-qrcode"        label={answer ? 'Scanned ✓'        : 'Scan QR Code'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
