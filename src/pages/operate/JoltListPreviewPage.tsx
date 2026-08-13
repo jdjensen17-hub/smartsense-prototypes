@@ -45,7 +45,7 @@ type DCConditionMC      = { type: 'mc'; choiceId: string; choiceLabel: string };
 type DCCondition = DCConditionYN | DCConditionNumeric | DCConditionMC;
 
 interface MCChoice { id: string; label: string; color: string; icon: string | null; flagIds?: string[]; }
-interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; }
+interface CARule { id: string; condition?: string; rangeId?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; }
 interface Flag { id: string; name: string; color: string; emoji: string; showOnApp?: boolean; }
 interface MeasRange { id: string; min: string; max: string; }
 interface MeasFlagRule { id: string; condition: string; rangeId: string; flagId: string; flagIds?: string[]; }
@@ -64,6 +64,8 @@ interface PreviewItem {
   mcMultiSelect?: boolean;
   mcShowInline?: boolean;
   caForYNRules?: CARule[];
+  caForMCRules?: CARule[];
+  caForRangeRules?: CARule[];
   flagsForNo?: string[];
   flagsForYes?: string[];
   measRanges?: MeasRange[];
@@ -91,7 +93,7 @@ const FALLBACK_FLAGS: Flag[] = [
 
 const FALLBACK_ITEMS: PreviewItem[] = [
   { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', allowNA: false, assignable: true,
-    caForYNRules: [{ id: 'r1', caList: 'Corrective Actions', adHoc: false, nextStep: 'repeat-item' }],
+    caForYNRules: [{ id: 'r1', condition: 'No', caList: 'Corrective Actions', adHoc: false, nextStep: 'repeat-item' }],
     flagsForNo: ['f1'], points: 25 },
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', allowNA: true,
     dcParentId: 'cooler-ok', dcConditions: [{ type: 'yn', value: 'No' }] },
@@ -102,7 +104,8 @@ const FALLBACK_ITEMS: PreviewItem[] = [
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', allowNA: false,
     dcParentId: 'prep-temp', dcConditions: [{ type: 'numeric', op: '>=', value: 41 }] },
   { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false, infoFile: 'Date Label Policy.pdf', infoInline: true, labelPrint: true },
-  { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', allowNA: true, allowOOO: true, points: 10 },
+  { id: 'handwashing', prompt: 'Handwashing stations stocked', type: 'yn', stripe: '', allowNA: true, allowOOO: true, points: 10,
+    caForYNRules: [{ id: 'r2', condition: 'No', caList: 'Corrective Actions', adHoc: false, nextStep: 'no-repeat' }] },
   { id: 'vendor-mc', prompt: 'Preferred vendor for shortfall?', type: 'mc', stripe: '', allowNA: false, mcShowInline: false, mcMultiSelect: false, choices: [
     { id: 'c1', label: 'Sysco',                  color: '#4CAF50', icon: null },
     { id: 'c2', label: 'US Foods',               color: '#2196F3', icon: null },
@@ -157,11 +160,40 @@ function itemCompleted(item: PreviewItem, answer: ItemAnswer, isNA: boolean, isO
   return answer !== null && answer !== undefined && answer !== '';
 }
 
-function triggerCA(item: PreviewItem, answer: ItemAnswer): boolean {
-  return !!(item.caForYNRules?.length && answer === 'No');
+function getMatchedCARules(item: PreviewItem, answer: ItemAnswer): CARule[] {
+  if (item.type === 'yn' && answer) {
+    return (item.caForYNRules ?? []).filter(r => !r.condition || r.condition === answer);
+  }
+  if (item.type === 'mc' && answer) {
+    const selectedIds: string[] = item.mcMultiSelect
+      ? (() => { try { return JSON.parse(answer as string); } catch { return []; } })()
+      : [answer as string];
+    return (item.caForMCRules ?? []).filter(r => selectedIds.includes(r.condition ?? ''));
+  }
+  if (item.type === 'measurement' && answer !== null && answer !== '') {
+    const n = Number(answer);
+    if (!isNaN(n)) {
+      return (item.caForRangeRules ?? []).filter(rule => {
+        const range = item.measRanges?.find(r => r.id === rule.rangeId);
+        if (!range) return false;
+        const min = range.min !== '' ? Number(range.min) : -Infinity;
+        const max = range.max !== '' ? Number(range.max) : Infinity;
+        const inside = n >= min && n <= max;
+        return rule.condition === 'Inside'  ? inside  :
+               rule.condition === 'Outside' ? !inside :
+               rule.condition === 'Above'   ? n > max :
+               rule.condition === 'Below'   ? n < min : false;
+      });
+    }
+  }
+  return [];
 }
 
-const CA_OPTIONS = ['Correct Immediately', 'Discard', 'Notify Manager', 'Review with Employee'];
+const CA_QUESTIONS = [
+  'Did you uncover the issue?',
+  'Did you resolve the issue?',
+  'Are you sure?',
+];
 
 function getTriggeredFlags(item: PreviewItem, answer: ItemAnswer, flags: Flag[]): Flag[] {
   const ids = new Set<string>();
@@ -273,7 +305,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   onOOO: (id: string) => void;
   onClearOOO: (id: string) => void;
   onAssign: (id: string, name: string) => void;
-  onCAOpen: (id: string) => void;
+  onCAOpen: (id: string, nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat') => void;
   caSubmitted: Set<string>;
   sublistProgress?: { done: number; total: number };
   onSublistOpen?: (id: string) => void;
@@ -294,7 +326,8 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   const completed = item.type === 'sublist'
     ? sublistAllDone
     : itemCompleted(item, answer, isNA, isOOO);
-  const showCA = !caSubmitted.has(item.id) && triggerCA(item, answer);
+  const matchedCARules = getMatchedCARules(item, answer);
+  const showCA = !caSubmitted.has(item.id) && matchedCARules.length > 0;
   const triggeredFlags = getTriggeredFlags(item, answer, flags ?? []);
   const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     + ' · ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -608,7 +641,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 
           {/* CA trigger */}
           {showCA && (
-            <button onClick={() => onCAOpen(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '2px solid #C0282F', borderRadius: 8, color: '#C0282F', fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '10px 18px', background: 'white', cursor: 'pointer', width: '100%', marginTop: 8 }}>
+            <button onClick={() => onCAOpen(item.id, matchedCARules[0]?.nextStep ?? 'no-repeat')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '2px solid #C0282F', borderRadius: 8, color: '#C0282F', fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '10px 18px', background: 'white', cursor: 'pointer', width: '100%', marginTop: 8 }}>
               <i className="ti ti-alert-circle" style={{ fontSize: 18 }} /> Required action <i className="ti ti-arrow-right" style={{ marginLeft: 4, fontSize: 14 }} />
             </button>
           )}
@@ -652,43 +685,38 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 }
 
 // ── CA surface ────────────────────────────────────────────────────────────
-function CASurface({ itemPrompt, onBack, onSubmit }: { itemPrompt: string; onBack: () => void; onSubmit: () => void }) {
-  const [selected, setSelected] = useState('');
-  const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    + ' · ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+function CASurface({ itemPrompt, requireAllComplete, onBack, onSubmit }: { itemPrompt: string; requireAllComplete: boolean; onBack: () => void; onSubmit: () => void }) {
+  const [qaAnswers, setQaAnswers] = useState<('Yes' | 'No' | null)[]>([null, null, null]);
+  const allAnswered = qaAnswers.every(a => a !== null);
+  const canSubmit = requireAllComplete ? allAnswered : true;
+  const setQA = (i: number, v: 'Yes' | 'No' | null) =>
+    setQaAnswers(prev => { const n = [...prev] as ('Yes' | 'No' | null)[]; n[i] = v; return n; });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ background: '#5A5A6A', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ background: '#C0282F', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8 }}>
           <i className="ti ti-chevron-left" style={{ fontSize: 18 }} />
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'rgba(255,255,255,0.75)', flex: 1, overflow: 'hidden' }}>
-          <i className="ti ti-checkbox" style={{ fontSize: 13, opacity: 0.6 }} />
-          <strong style={{ color: 'white', fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{itemPrompt}</strong>
-        </div>
-        <div style={{ background: 'white', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: 12, fontWeight: 600, color: '#C0282F', flexShrink: 0 }}>
+        <div style={{ flex: 1, fontSize: 17, fontWeight: 600, color: 'white' }}>Corrective Action</div>
+        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, color: 'white', flexShrink: 0 }}>
           <i className="ti ti-alert-circle" style={{ fontSize: 13 }} /> Required
         </div>
       </div>
-      <div style={{ flex: 1, background: 'white', overflowY: 'auto' }}>
-        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER}`, fontSize: 13, color: TEXT_SECONDARY }}>Select the corrective action you took.</div>
-        {CA_OPTIONS.map(action => (
-          <div key={action} onClick={() => setSelected(action)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, fontSize: 15, cursor: 'pointer' }}>
-            <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${selected === action ? APP_BLUE : '#C0C0C8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {selected === action && <div style={{ width: 10, height: 10, borderRadius: '50%', background: APP_BLUE }} />}
-            </div>
-            <span style={{ color: selected === action ? APP_BLUE : TEXT_PRIMARY, fontWeight: selected === action ? 600 : 400 }}>{action}</span>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, fontSize: 13, color: TEXT_SECONDARY, flexShrink: 0 }}>
+        <i className="ti ti-arrow-badge-right" style={{ fontSize: 13, marginRight: 5 }} />
+        {itemPrompt}
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
+        {CA_QUESTIONS.map((q, i) => (
+          <div key={i} style={{ padding: '14px 16px', borderBottom: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 15, color: TEXT_PRIMARY, marginBottom: 10 }}>{q}</div>
+            <YNButtons value={qaAnswers[i]} onChange={v => setQA(i, v)} />
           </div>
         ))}
-        {selected && (
-          <div style={{ padding: '0 16px 16px' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3 }}>Completed · {now}</span>
-          </div>
-        )}
       </div>
       <div style={{ background: 'white', padding: 16, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
-        <button onClick={onSubmit} disabled={!selected} style={{ background: selected ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: selected ? 'pointer' : 'default', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-          Submit &amp; Repeat
+        <button onClick={onSubmit} disabled={!canSubmit} style={{ background: canSubmit ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: canSubmit ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
+          Submit
         </button>
       </div>
     </div>
@@ -850,6 +878,8 @@ export default function JoltListPreviewPage() {
   const [assignedItems, setAssignedItems] = useState<Record<string, string>>({});
   const [caSubmitted, setCaSubmitted] = useState<Set<string>>(new Set());
   const [caOpenId, setCaOpenId] = useState<string | null>(null);
+  const [caNextStep, setCaNextStep] = useState<'repeat-item' | 'repeat-list' | 'no-repeat'>('no-repeat');
+  const [requireAllComplete, setRequireAllComplete] = useState(false);
 
   const [sublistOpenId, setSublistOpenId] = useState<string | null>(null);
   const [mcOpenId, setMcOpenId] = useState<string | null>(null);
@@ -864,11 +894,12 @@ export default function JoltListPreviewPage() {
     const raw = localStorage.getItem('jolt-preview-payload');
     if (!raw) return;
     try {
-      const payload = JSON.parse(raw) as { listName: string; scoringOn: boolean; items: PreviewItem[]; flags?: Flag[] };
+      const payload = JSON.parse(raw) as { listName: string; scoringOn: boolean; submission?: string; items: PreviewItem[]; flags?: Flag[] };
       setItems(payload.items ?? FALLBACK_ITEMS);
       setListName(payload.listName ?? 'Preview');
       setScoringOn(payload.scoringOn ?? false);
       setFlags(payload.flags ?? FALLBACK_FLAGS);
+      setRequireAllComplete(payload.submission === 'all-complete');
     } catch {}
   }, []);
 
@@ -876,11 +907,12 @@ export default function JoltListPreviewPage() {
     const handleStorage = (e: StorageEvent) => {
       if (e.key !== 'jolt-preview-payload' || !e.newValue) return;
       try {
-        const payload = JSON.parse(e.newValue) as { listName: string; scoringOn: boolean; items: PreviewItem[]; flags?: Flag[] };
+        const payload = JSON.parse(e.newValue) as { listName: string; scoringOn: boolean; submission?: string; items: PreviewItem[]; flags?: Flag[] };
         setItems(payload.items ?? FALLBACK_ITEMS);
         setListName(payload.listName ?? 'Preview');
         setScoringOn(payload.scoringOn ?? false);
         setFlags(payload.flags ?? FALLBACK_FLAGS);
+        setRequireAllComplete(payload.submission === 'all-complete');
       } catch {}
     };
     window.addEventListener('storage', handleStorage);
@@ -960,8 +992,22 @@ export default function JoltListPreviewPage() {
 
   const submitCA = () => {
     if (!caOpenId) return;
-    setCaSubmitted(prev => new Set([...prev, caOpenId]));
-    setAnswers(prev => { const n = { ...prev }; delete n[caOpenId]; return n; });
+    if (caNextStep === 'repeat-item') {
+      setAnswers(prev => { const n = { ...prev }; delete n[caOpenId]; return n; });
+      setNaItems(prev => { const n = new Set(prev); n.delete(caOpenId); return n; });
+      setOooItems(prev => { const n = new Set(prev); n.delete(caOpenId); return n; });
+      setAssignedItems(prev => { const n = { ...prev }; delete n[caOpenId]; return n; });
+    } else if (caNextStep === 'repeat-list') {
+      setAnswers({});
+      setNaItems(new Set());
+      setOooItems(new Set());
+      setAssignedItems({});
+      setCaSubmitted(new Set());
+      setSubAnswers({});
+      setSubNaItems({});
+    } else {
+      setCaSubmitted(prev => new Set([...prev, caOpenId]));
+    }
     setCaOpenId(null);
   };
 
@@ -1001,7 +1047,7 @@ export default function JoltListPreviewPage() {
                 onOOO={id => setOooItems(prev => new Set([...prev, id]))}
                 onClearOOO={id => setOooItems(prev => { const n = new Set(prev); n.delete(id); return n; })}
                 onAssign={(id, name) => setAssignedItems(prev => ({ ...prev, [id]: name }))}
-                onCAOpen={setCaOpenId}
+                onCAOpen={(id, nextStep) => { setCaOpenId(id); setCaNextStep(nextStep); }}
                 caSubmitted={caSubmitted}
                 sublistProgress={item.type === 'sublist' ? getSublistProgress(item) : undefined}
                 onSublistOpen={id => setSublistOpenId(id)}
@@ -1016,7 +1062,7 @@ export default function JoltListPreviewPage() {
           {/* CA overlay */}
           {caOpenId && caItem && (
             <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10 }}>
-              <CASurface itemPrompt={caItem.prompt} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
+              <CASurface itemPrompt={caItem.prompt} requireAllComplete={requireAllComplete} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
             </div>
           )}
 

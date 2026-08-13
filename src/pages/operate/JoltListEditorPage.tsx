@@ -3046,8 +3046,7 @@ function NotificationSection() {
 }
 
 // ── Settings tab ──────────────────────────────────────────────────────────
-function SettingsTab({ scoringOn, setScoringOn }: { scoringOn: boolean; setScoringOn: (v: boolean) => void }) {
-  const [submission, setSubmission] = useState('items-anytime');
+function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission }: { scoringOn: boolean; setScoringOn: (v: boolean) => void; submission: string; setSubmission: (v: string) => void }) {
   const [submissionAccess, setSubmissionAccess] = useState('anyone-anytime');
   const [listScoreVisible, setListScoreVisible] = useState(true);
   const [itemScoreVisible, setItemScoreVisible] = useState(true);
@@ -4405,6 +4404,7 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
 export default function JoltListEditorPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
   const [scoringOn, setScoringOn] = useState(false);
+  const [submission, setSubmission] = useState('items-anytime');
   const [flags, setFlags] = useState<Flag[]>(INITIAL_FLAGS);
   const handleCreateFlag = (flag: Flag) => setFlags(prev => [...prev, flag]);
   const [caToastId, setCaToastId] = useState<string | null>(null);
@@ -4465,7 +4465,7 @@ export default function JoltListEditorPage() {
         mcShowInline: item.mcShowInline ?? false,
       };
     });
-    localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items: previewItems, flags }));
+    localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, submission, items: previewItems, flags }));
     window.open('/#/operate/jolt-preview', 'jolt-preview-tab');
   };
 
@@ -4701,7 +4701,7 @@ export default function JoltListEditorPage() {
 
       {activeTab === 'settings' ? (
         <div style={{ flex: 1, overflowY: 'auto', background: T.surface0 }}>
-          <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} />
+          <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} submission={submission} setSubmission={setSubmission} />
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
