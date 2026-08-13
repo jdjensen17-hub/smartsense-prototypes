@@ -685,27 +685,53 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 }
 
 // ── CA surface ────────────────────────────────────────────────────────────
-function CASurface({ itemPrompt, requireAllComplete, onBack, onSubmit }: { itemPrompt: string; requireAllComplete: boolean; onBack: () => void; onSubmit: () => void }) {
+const CA_TYPE_BADGE: Record<string, string> = { yn: 'YN', mc: 'MC', measurement: '123', text: 'TXT', sublist: 'LIST', photo: 'IMG' };
+
+function CASurface({ itemPrompt, itemType, requireAllComplete, onBack, onSubmit }: { itemPrompt: string; itemType: string; requireAllComplete: boolean; onBack: () => void; onSubmit: () => void }) {
   const [qaAnswers, setQaAnswers] = useState<('Yes' | 'No' | null)[]>([null, null, null]);
   const allAnswered = qaAnswers.every(a => a !== null);
   const canSubmit = requireAllComplete ? allAnswered : true;
   const setQA = (i: number, v: 'Yes' | 'No' | null) =>
     setQaAnswers(prev => { const n = [...prev] as ('Yes' | 'No' | null)[]; n[i] = v; return n; });
+
+  const now = new Date();
+  const dueBy = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const expires = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const badge = CA_TYPE_BADGE[itemType] ?? 'YN';
+
+  const metaRows = [
+    { icon: 'ti-clock', label: 'Displayed', value: fmt(now) },
+    { icon: 'ti-stopwatch', label: 'Due by', value: fmt(dueBy) },
+    { icon: 'ti-calendar-off', label: 'Expires', value: fmt(expires) },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ background: '#C0282F', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8 }}>
-          <i className="ti ti-chevron-left" style={{ fontSize: 18 }} />
+      {/* Header — grey, matches app item-detail style */}
+      <div style={{ background: '#5A5A6A', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+          <i className="ti ti-chevron-left" style={{ fontSize: 22 }} />
         </button>
-        <div style={{ flex: 1, fontSize: 17, fontWeight: 600, color: 'white' }}>Corrective Action</div>
-        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, color: 'white', flexShrink: 0 }}>
-          <i className="ti ti-alert-circle" style={{ fontSize: 13 }} /> Required
-        </div>
+        <span style={{ border: '1.5px solid rgba(255,255,255,0.55)', borderRadius: 3, padding: '2px 5px', fontSize: 10, fontWeight: 700, color: 'white', letterSpacing: '0.06em', flexShrink: 0 }}>{badge}</span>
+        <span style={{ color: 'white', fontSize: 14, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemPrompt}</span>
+        <i className="ti ti-alert-circle-filled" style={{ fontSize: 22, color: 'white', flexShrink: 0 }} />
       </div>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, fontSize: 13, color: TEXT_SECONDARY, flexShrink: 0 }}>
-        <i className="ti ti-arrow-badge-right" style={{ fontSize: 13, marginRight: 5 }} />
-        {itemPrompt}
+
+      {/* Metadata row */}
+      <div style={{ display: 'flex', background: 'white', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+        {metaRows.map((m, i) => (
+          <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRight: i < 2 ? `1px solid ${BORDER}` : 'none' }}>
+            <i className={`ti ${m.icon}`} style={{ fontSize: 22, color: TEXT_SECONDARY, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 11, color: TEXT_SECONDARY, marginBottom: 1 }}>{m.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 500, color: TEXT_PRIMARY }}>{m.value}</div>
+            </div>
+          </div>
+        ))}
       </div>
+
+      {/* Questions */}
       <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
         {CA_QUESTIONS.map((q, i) => (
           <div key={i} style={{ padding: '14px 16px', borderBottom: `1px solid ${BORDER}` }}>
@@ -714,6 +740,8 @@ function CASurface({ itemPrompt, requireAllComplete, onBack, onSubmit }: { itemP
           </div>
         ))}
       </div>
+
+      {/* Footer */}
       <div style={{ background: 'white', padding: 16, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
         <button onClick={onSubmit} disabled={!canSubmit} style={{ background: canSubmit ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: canSubmit ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
           Submit
@@ -1062,7 +1090,7 @@ export default function JoltListPreviewPage() {
           {/* CA overlay */}
           {caOpenId && caItem && (
             <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10 }}>
-              <CASurface itemPrompt={caItem.prompt} requireAllComplete={requireAllComplete} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
+              <CASurface itemPrompt={caItem.prompt} itemType={caItem.type} requireAllComplete={requireAllComplete} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
             </div>
           )}
 
