@@ -46,7 +46,7 @@ type DCCondition = DCConditionYN | DCConditionNumeric | DCConditionMC;
 
 interface MCChoice { id: string; label: string; color: string; icon: string | null; flagIds?: string[]; }
 interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; }
-interface Flag { id: string; name: string; color: string; emoji: string; }
+interface Flag { id: string; name: string; color: string; emoji: string; showOnApp?: boolean; }
 interface MeasRange { id: string; min: string; max: string; }
 interface MeasFlagRule { id: string; condition: string; rangeId: string; flagId: string; flagIds?: string[]; }
 
@@ -199,7 +199,7 @@ function getTriggeredFlags(item: PreviewItem, answer: ItemAnswer, flags: Flag[])
     }
   }
 
-  return flags.filter(f => ids.has(f.id));
+  return flags.filter(f => ids.has(f.id) && f.showOnApp !== false);
 }
 
 // ── App button ────────────────────────────────────────────────────────────
