@@ -346,8 +346,7 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
   const expires = new Date(due.getTime() + 24 * 60 * 60 * 1000);
 
   const fmtTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  const fmtExpires = (d: Date) =>
-    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + fmtTime(d);
+  const fmtExpires = (_d: Date) => 'In 2 days';
 
   let scoreDisplay = '0.00%';
   if (scoringOn) {
