@@ -651,12 +651,18 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
           )}
           {/* Tap-to-complete types */}
           {item.type === 'photo' && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <AppBtn icon="ti-camera" label={answer ? 'Photo taken ✓' : 'Take Photo'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />
-              {item.photoAllowUpload && (
-                <AppBtn icon="ti-photo" label="Upload Photo" completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'photo-taken')} />
-              )}
-            </div>
+            answer ? (
+              <div onClick={() => onAnswer(item.id, null)} style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', background: '#D0D8E4', display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160 }}>
+                <i className="ti ti-photo" style={{ fontSize: 48, color: 'rgba(255,255,255,0.7)' }} />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <AppBtn icon="ti-camera" label="Take Photo" completed={false} onClick={() => onAnswer(item.id, 'photo-taken')} />
+                {item.photoAllowUpload && (
+                  <AppBtn icon="ti-photo" label="Upload Photo" completed={false} onClick={() => onAnswer(item.id, 'photo-taken')} />
+                )}
+              </div>
+            )
           )}
           {item.type === 'signature' && <AppBtn icon="ti-pencil"        label={answer ? 'Signed ✓'         : 'Signature'}         completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'signed')} />}
           {item.type === 'barcode'   && <AppBtn icon="ti-barcode"       label={answer ? 'Scanned ✓'        : 'Scan Barcode'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'scanned')} />}
