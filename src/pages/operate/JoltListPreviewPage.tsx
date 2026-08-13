@@ -921,6 +921,7 @@ export default function JoltListPreviewPage() {
   const [infoOpenFile, setInfoOpenFile] = useState<string | null>(null);
   const [infoModalY, setInfoModalY] = useState(0);
   const [printerModalY, setPrinterModalY] = useState<number | null>(null);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   useEffect(() => {
     const raw = localStorage.getItem('jolt-preview-payload');
@@ -1091,7 +1092,7 @@ export default function JoltListPreviewPage() {
               />
             ))}
             <div style={{ padding: 16 }}>
-              <button disabled={!allListComplete} style={{ background: allListComplete ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: allListComplete ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
+              <button disabled={!allListComplete} onClick={() => setShowSubmitModal(true)} style={{ background: allListComplete ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: allListComplete ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
                 Submit
               </button>
             </div>
@@ -1143,6 +1144,28 @@ export default function JoltListPreviewPage() {
       <div style={{ position: 'fixed', bottom: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 20, letterSpacing: '0.05em', pointerEvents: 'none', textTransform: 'uppercase' }}>
         Preview — {listName}
       </div>
+
+      {/* Submit confirmation modal */}
+      {showSubmitModal && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => setShowSubmitModal(false)}>
+          <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: TEXT_PRIMARY }}>Submit list</div>
+            </div>
+            <div style={{ padding: '16px 20px 20px' }}>
+              <p style={{ margin: '0 0 20px', fontSize: 15, color: TEXT_PRIMARY }}>Do you want to clear the list?</p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setShowSubmitModal(false)} style={{ flex: 1, background: 'white', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '12px', cursor: 'pointer', color: TEXT_PRIMARY }}>
+                  Cancel
+                </button>
+                <button onClick={() => { reset(); setShowSubmitModal(false); }} style={{ flex: 1, background: '#27AE60', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '12px', cursor: 'pointer', color: 'white' }}>
+                  Yes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Info library modal — rendered outside the transformed column so position:fixed works correctly */}
       {infoOpenFile && (
