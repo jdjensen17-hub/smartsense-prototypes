@@ -1046,6 +1046,7 @@ export default function JoltListPreviewPage() {
   const caItem = caOpenId ? items.find(i => i.id === caOpenId) : null;
   const sublistItem = sublistOpenId ? items.find(i => i.id === sublistOpenId) : null;
   const visibleItems = items.filter(item => isItemVisible(item, answers));
+  const allListComplete = visibleItems.every(item => itemCompleted(item, answers[item.id] ?? null, naItems.has(item.id), oooItems.has(item.id)));
   const isOverlayOpen = !!(caOpenId || sublistOpenId || mcOpenId);
 
   return (
@@ -1089,6 +1090,11 @@ export default function JoltListPreviewPage() {
                 flags={flags}
               />
             ))}
+            <div style={{ padding: 16 }}>
+              <button disabled={!allListComplete} style={{ background: allListComplete ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: allListComplete ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
+                Submit
+              </button>
+            </div>
           </div>
 
           {/* CA overlay */}
