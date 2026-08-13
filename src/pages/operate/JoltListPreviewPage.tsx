@@ -122,7 +122,8 @@ const FALLBACK_ITEMS: PreviewItem[] = [
     subItems: [
       { id: 'sub-freezer', prompt: 'Walk-in freezer temp', type: 'measurement', stripe: '', allowNA: false, points: 10, measUnit: '°F' },
       { id: 'sub-cooler1', prompt: 'Prep cooler #1 temp',  type: 'measurement', stripe: '', allowNA: true,  points: 10, measUnit: '°F' },
-      { id: 'sub-hothold', prompt: 'Hot holding station temp OK?', type: 'yn', stripe: '', allowNA: false, points: 5 },
+      { id: 'sub-hothold', prompt: 'Hot holding station temp OK?', type: 'yn', stripe: '', allowNA: false, points: 5,
+        caForYNRules: [{ id: 'r3', condition: 'No', caList: 'Corrective Actions', adHoc: false, nextStep: 'repeat-item' }] },
       { id: 'sub-signoff', prompt: 'Temperature log signed off',   type: 'checkmark', stripe: '', allowNA: false },
     ]
   },
@@ -822,10 +823,29 @@ function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onB
   const total = subItems.length;
   const emptySet = new Set<string>();
   const emptyObj: Record<string, string> = {};
-  const emptyCA = new Set<string>();
+
+  const [caOpenId, setCaOpenId] = useState<string | null>(null);
+  const [caNextStep, setCaNextStep] = useState<'repeat-item' | 'repeat-list' | 'no-repeat'>('no-repeat');
+  const [caSubmitted, setCaSubmitted] = useState(new Set<string>());
+
+  const caItem = caOpenId ? subItems.find(si => si.id === caOpenId) : null;
+
+  const submitSubCA = () => {
+    if (!caOpenId) return;
+    if (caNextStep === 'repeat-item') {
+      onAnswer(caOpenId, null);
+      onClearNA(caOpenId);
+    } else if (caNextStep === 'repeat-list') {
+      subItems.forEach(si => { onAnswer(si.id, null); onClearNA(si.id); });
+      setCaSubmitted(new Set());
+    } else {
+      setCaSubmitted(prev => new Set([...prev, caOpenId]));
+    }
+    setCaOpenId(null);
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {/* Header */}
       <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', fontFamily: FONT, fontSize: 15, fontWeight: 500, cursor: 'pointer', padding: 0, marginRight: 8 }}>
@@ -858,12 +878,19 @@ function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onB
             onOOO={() => {}}
             onClearOOO={() => {}}
             onAssign={() => {}}
-            onCAOpen={() => {}}
-            caSubmitted={emptyCA}
+            onCAOpen={(id, nextStep) => { setCaOpenId(id); setCaNextStep(nextStep); }}
+            caSubmitted={caSubmitted}
             flags={flags}
           />
         ))}
       </div>
+
+      {/* CA overlay */}
+      {caOpenId && caItem && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
+          <CASurface itemPrompt={caItem.prompt} itemType={caItem.type} onBack={() => setCaOpenId(null)} onSubmit={submitSubCA} />
+        </div>
+      )}
     </div>
   );
 }
