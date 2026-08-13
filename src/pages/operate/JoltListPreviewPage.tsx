@@ -690,7 +690,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
             <button onClick={() => onSublistOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${APP_BLUE}`, borderRadius: 8, color: sublistDone ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: sublistDone ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <i className="ti ti-layout-list" style={{ fontSize: 18 }} />
-                {sublistDone ? 'Completed' : 'Open'}
+                {sublistProgress ? `${sublistProgress.done} / ${sublistProgress.total}` : '0 / 0'}
               </span>
               <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
             </button>
@@ -744,11 +744,15 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 // ── CA surface ────────────────────────────────────────────────────────────
 const CA_TYPE_BADGE: Record<string, string> = { yn: 'YN', mc: 'MC', measurement: '123', text: 'TXT', sublist: 'LIST', photo: 'IMG' };
 
-function CASurface({ itemPrompt, itemType, onBack, onSubmit }: { itemPrompt: string; itemType: string; onBack: () => void; onSubmit: () => void }) {
-  const [qaAnswers, setQaAnswers] = useState<('Yes' | 'No' | null)[]>([null, null, null]);
+function CASurface({ itemPrompt, itemType, initialQAAnswers, onQAChange, onBack, onSubmit }: { itemPrompt: string; itemType: string; initialQAAnswers?: ('Yes' | 'No' | null)[]; onQAChange?: (a: ('Yes' | 'No' | null)[]) => void; onBack: () => void; onSubmit: () => void }) {
+  const [qaAnswers, setQaAnswers] = useState<('Yes' | 'No' | null)[]>(initialQAAnswers ?? [null, null, null]);
   const allAnswered = qaAnswers.every(a => a !== null);
-  const setQA = (i: number, v: 'Yes' | 'No' | null) =>
-    setQaAnswers(prev => { const n = [...prev] as ('Yes' | 'No' | null)[]; n[i] = v; return n; });
+  const setQA = (i: number, v: 'Yes' | 'No' | null) => {
+    const n = [...qaAnswers] as ('Yes' | 'No' | null)[];
+    n[i] = v;
+    setQaAnswers(n);
+    onQAChange?.(n);
+  };
 
   const now = new Date();
   const dueBy = new Date(now.getTime() + 2 * 60 * 60 * 1000);
@@ -998,6 +1002,7 @@ export default function JoltListPreviewPage() {
   const [requireAllComplete, setRequireAllComplete] = useState(false);
 
   const [sublistOpenId, setSublistOpenId] = useState<string | null>(null);
+  const [sublistCAAnswers, setSublistCAAnswers] = useState<Record<string, ('Yes' | 'No' | null)[]>>({});
   const [mcOpenId, setMcOpenId] = useState<string | null>(null);
   const [subAnswers, setSubAnswers] = useState<Record<string, Record<string, ItemAnswer>>>({});
   const [subNaItems, setSubNaItems] = useState<Record<string, Set<string>>>({});
@@ -1104,6 +1109,7 @@ export default function JoltListPreviewPage() {
     setCaOpenId(null);
     setSublistOpenId(null);
     setSubAnswers({});
+    setSublistCAAnswers({});
     setSubNaItems({});
   };
 
@@ -1175,7 +1181,10 @@ export default function JoltListPreviewPage() {
                 onAssign={(id, name) => setAssignedItems(prev => ({ ...prev, [id]: name }))}
                 onCAOpen={(id, nextStep) => { setCaOpenId(id); setCaNextStep(nextStep); }}
                 caSubmitted={caSubmitted}
-                sublistProgress={item.type === 'sublist' ? getSublistProgress(item) : undefined}
+                sublistProgress={item.type === 'sublist' ? {
+                  done: answers[item.id] === 'complete' ? CA_QUESTIONS.length : (sublistCAAnswers[item.id] ?? []).filter(a => a !== null).length,
+                  total: CA_QUESTIONS.length,
+                } : undefined}
                 onSublistOpen={id => setSublistOpenId(id)}
                 onMCOpen={id => setMcOpenId(id)}
                 onInfoOpen={(file, y) => { setInfoOpenFile(file); setInfoModalY(y); }}
@@ -1204,6 +1213,8 @@ export default function JoltListPreviewPage() {
               <CASurface
                 itemPrompt={sublistItem.prompt}
                 itemType="sublist"
+                initialQAAnswers={sublistCAAnswers[sublistOpenId] ?? [null, null, null]}
+                onQAChange={a => setSublistCAAnswers(prev => ({ ...prev, [sublistOpenId]: a }))}
                 onBack={() => setSublistOpenId(null)}
                 onSubmit={() => {
                   setAnswers(prev => ({ ...prev, [sublistOpenId]: 'complete' }));
