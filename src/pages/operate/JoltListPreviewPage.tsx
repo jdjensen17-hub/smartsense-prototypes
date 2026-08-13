@@ -1130,8 +1130,8 @@ export default function JoltListPreviewPage() {
   return (
     <>
     <style>{`@keyframes preview-refresh { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .preview-refresh-spin { animation: preview-refresh 0.5s ease-out; }`}</style>
-    <div style={{ fontFamily: FONT, minHeight: '100vh', background: SURFACE_0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ fontFamily: FONT, height: '100vh', background: SURFACE_0, display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'hidden' }}>
         {/* App header */}
         <div style={{ background: APP_BLUE, padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', top: 0, zIndex: 20 }}>
           <div style={{ fontSize: 17, fontWeight: 600, color: 'white', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listName}</div>
