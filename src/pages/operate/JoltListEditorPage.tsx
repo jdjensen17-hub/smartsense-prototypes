@@ -963,7 +963,6 @@ function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { o
           <div style={{ position: 'absolute', top: 2, left: showOnApp ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: 'white', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
         </div>
       </label>
-      {!showOnApp && <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 10, marginTop: -6 }}>Silent — triggers auto-response only</div>}
       <div style={{ display: 'flex', gap: 8 }}>
         <Btn primary onClick={handleCreate}>Create & select</Btn>
         <button onClick={onCancel} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
