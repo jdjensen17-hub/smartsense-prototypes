@@ -2551,7 +2551,7 @@ function FormulaSection({ item, items, onUpdate }: { item: ListItem; items: List
               <option value="">Select item…</option>
               {eligibleItems.map(it => (
                 <option key={it.id} value={it.id}>
-                  {it.prompt || `(${TYPE_META[it.type].label})`} — {TYPE_META[it.type].label}
+                  {it.prompt || `(${TYPE_META[it.type].label})`}
                 </option>
               ))}
             </select>
