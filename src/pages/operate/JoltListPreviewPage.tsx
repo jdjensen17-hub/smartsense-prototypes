@@ -731,7 +731,7 @@ function CASurface({ itemPrompt, itemType, requireAllComplete, onBack, onSubmit 
         ))}
       </div>
 
-      {/* Questions */}
+      {/* Questions + inline Submit */}
       <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
         {CA_QUESTIONS.map((q, i) => (
           <div key={i} style={{ padding: '14px 16px', borderBottom: `1px solid ${BORDER}` }}>
@@ -739,13 +739,11 @@ function CASurface({ itemPrompt, itemType, requireAllComplete, onBack, onSubmit 
             <YNButtons value={qaAnswers[i]} onChange={v => setQA(i, v)} />
           </div>
         ))}
-      </div>
-
-      {/* Footer */}
-      <div style={{ background: 'white', padding: 16, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
-        <button onClick={onSubmit} disabled={!canSubmit} style={{ background: canSubmit ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: canSubmit ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
-          Submit
-        </button>
+        <div style={{ padding: 16 }}>
+          <button onClick={onSubmit} disabled={!canSubmit} style={{ background: canSubmit ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: canSubmit ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
+            Submit
+          </button>
+        </div>
       </div>
     </div>
   );
