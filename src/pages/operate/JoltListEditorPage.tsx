@@ -2627,7 +2627,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           <PromptEditor item={item} onUpdate={upd} autoFocus={!item.prompt} />
         </SsSection>
         {/* General options */}
-        <SsSection label="General Options" defaultOpen={true}>
+        <SsSection label="General Options" defaultOpen={!(['mc','employee','photo','qr','barcode','measurement','sublist','rating','asset','formula'] as string[]).includes(item.type)}>
           {item.type !== 'text' && item.type !== 'subtitle' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
@@ -4453,7 +4453,7 @@ export default function JoltListEditorPage() {
         mcShowInline: item.mcShowInline ?? false,
       };
     });
-    localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items: previewItems }));
+    localStorage.setItem('jolt-preview-payload', JSON.stringify({ listName: 'Opening Checklist', scoringOn, items: previewItems, flags }));
     window.open('/#/operate/jolt-preview', 'jolt-preview-tab');
   };
 

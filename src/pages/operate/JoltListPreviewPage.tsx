@@ -44,8 +44,11 @@ type DCConditionNumeric = { type: 'numeric'; op: '>' | '>=' | '=' | '<=' | '<'; 
 type DCConditionMC      = { type: 'mc'; choiceId: string; choiceLabel: string };
 type DCCondition = DCConditionYN | DCConditionNumeric | DCConditionMC;
 
-interface MCChoice { id: string; label: string; color: string; icon: string | null; }
+interface MCChoice { id: string; label: string; color: string; icon: string | null; flagIds?: string[]; }
 interface CARule { id: string; condition?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; }
+interface Flag { id: string; name: string; color: string; emoji: string; }
+interface MeasRange { id: string; min: string; max: string; }
+interface MeasFlagRule { id: string; condition: string; rangeId: string; flagId: string; flagIds?: string[]; }
 
 interface PreviewItem {
   id: string;
@@ -62,6 +65,9 @@ interface PreviewItem {
   mcShowInline?: boolean;
   caForYNRules?: CARule[];
   flagsForNo?: string[];
+  flagsForYes?: string[];
+  measRanges?: MeasRange[];
+  measFlagRules?: MeasFlagRule[];
   points?: number;
   ratingMin?: number;
   ratingMax?: number;
@@ -77,6 +83,12 @@ interface PreviewItem {
 type ItemAnswer = string | number | boolean | null;
 
 // ── Fallback data ─────────────────────────────────────────────────────────
+const FALLBACK_FLAGS: Flag[] = [
+  { id: 'f1', name: 'Health & Safety', color: '#EF5350', emoji: '⚠️' },
+  { id: 'f2', name: 'Equipment',       color: '#FF7043', emoji: '🔧' },
+  { id: 'f3', name: 'Food Safety',     color: '#42A5F5', emoji: '🍽️' },
+];
+
 const FALLBACK_ITEMS: PreviewItem[] = [
   { id: 'cooler-ok', prompt: 'Walk-in cooler temp OK?', type: 'yn', stripe: '#5CA6D9', allowNA: false, assignable: true,
     caForYNRules: [{ id: 'r1', caList: 'Corrective Actions', adHoc: false, nextStep: 'repeat-item' }],
@@ -84,7 +96,9 @@ const FALLBACK_ITEMS: PreviewItem[] = [
   { id: 'ca-photo', prompt: 'Take corrective action photo', type: 'photo', stripe: '', allowNA: true,
     dcParentId: 'cooler-ok', dcConditions: [{ type: 'yn', value: 'No' }] },
   { id: 'sign-off', prompt: 'Sign off opening inspection', type: 'signature', stripe: '', allowNA: false, infoFile: 'Opening Procedures.pdf' },
-  { id: 'prep-temp', prompt: 'Record prep cooler temp', type: 'measurement', stripe: '#C1E1C5', allowNA: true, allowOOO: true, points: 25, measUnit: '°F' },
+  { id: 'prep-temp', prompt: 'Record prep cooler temp', type: 'measurement', stripe: '#C1E1C5', allowNA: true, allowOOO: true, points: 25, measUnit: '°F',
+    measRanges: [{ id: 'r1', min: '33', max: '40' }],
+    measFlagRules: [{ id: 'mr1', condition: 'Outside', rangeId: 'r1', flagId: 'f3', flagIds: ['f3'] }] },
   { id: 'ca-notes', prompt: 'Log corrective action notes', type: 'free', stripe: '', allowNA: false,
     dcParentId: 'prep-temp', dcConditions: [{ type: 'numeric', op: '>=', value: 41 }] },
   { id: 'date-labels', prompt: 'All date labels current', type: 'checkmark', stripe: '', allowNA: false, infoFile: 'Date Label Policy.pdf', infoInline: true, labelPrint: true },
@@ -95,8 +109,8 @@ const FALLBACK_ITEMS: PreviewItem[] = [
     { id: 'c3', label: 'Performance Food Group', color: '#FF9800', icon: null },
   ]},
   { id: 'issues-mc', prompt: 'Issues found during opening?', type: 'mc', stripe: '', allowNA: false, mcShowInline: true, mcMultiSelect: true, choices: [
-    { id: 'i1', label: 'Equipment not working',  color: '#E53935', icon: null },
-    { id: 'i2', label: 'Cleanliness issue',      color: '#FB8C00', icon: null },
+    { id: 'i1', label: 'Equipment not working',  color: '#E53935', icon: null, flagIds: ['f2'] },
+    { id: 'i2', label: 'Cleanliness issue',      color: '#FB8C00', icon: null, flagIds: ['f3'] },
     { id: 'i3', label: 'Supply shortage',        color: '#8E24AA', icon: null },
     { id: 'i4', label: 'No issues',              color: '#43A047', icon: null },
   ]},
@@ -148,6 +162,45 @@ function triggerCA(item: PreviewItem, answer: ItemAnswer): boolean {
 }
 
 const CA_OPTIONS = ['Correct Immediately', 'Discard', 'Notify Manager', 'Review with Employee'];
+
+function getTriggeredFlags(item: PreviewItem, answer: ItemAnswer, flags: Flag[]): Flag[] {
+  const ids = new Set<string>();
+
+  if (item.type === 'yn') {
+    const src = answer === 'Yes' ? item.flagsForYes : answer === 'No' ? item.flagsForNo : [];
+    (src ?? []).forEach(id => ids.add(id));
+  }
+
+  if (item.type === 'mc') {
+    const selectedIds: string[] = !answer ? [] : item.mcMultiSelect
+      ? (() => { try { return JSON.parse(answer as string); } catch { return []; } })()
+      : [answer as string];
+    for (const c of item.choices ?? []) {
+      if (selectedIds.includes(c.id)) (c.flagIds ?? []).forEach(id => ids.add(id));
+    }
+  }
+
+  if (item.type === 'measurement' && answer !== null && answer !== '') {
+    const n = Number(answer);
+    if (!isNaN(n)) {
+      for (const rule of item.measFlagRules ?? []) {
+        const range = item.measRanges?.find(r => r.id === rule.rangeId);
+        if (!range) continue;
+        const min = range.min !== '' ? Number(range.min) : -Infinity;
+        const max = range.max !== '' ? Number(range.max) : Infinity;
+        const inside = n >= min && n <= max;
+        const fired =
+          rule.condition === 'Inside'  ? inside :
+          rule.condition === 'Outside' ? !inside :
+          rule.condition === 'Above'   ? n > max :
+          rule.condition === 'Below'   ? n < min : false;
+        if (fired) (rule.flagIds?.length ? rule.flagIds : rule.flagId ? [rule.flagId] : []).forEach(id => ids.add(id));
+      }
+    }
+  }
+
+  return flags.filter(f => ids.has(f.id));
+}
 
 // ── App button ────────────────────────────────────────────────────────────
 function AppBtn({ icon, label, onClick, completed }: { icon: string; label: string; onClick?: () => void; completed?: boolean }) {
@@ -208,7 +261,7 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onInfoOpen, onPrinterOpen }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onInfoOpen, onPrinterOpen, flags }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
@@ -227,6 +280,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   onMCOpen?: (id: string) => void;
   onInfoOpen?: (file: string, anchorY: number) => void;
   onPrinterOpen?: (anchorY: number) => void;
+  flags?: Flag[];
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [measInput, setMeasInput] = useState('');
@@ -241,7 +295,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
     ? sublistAllDone
     : itemCompleted(item, answer, isNA, isOOO);
   const showCA = !caSubmitted.has(item.id) && triggerCA(item, answer);
-  const hasFlag = !!(item.flagsForNo?.length && answer === 'No');
+  const triggeredFlags = getTriggeredFlags(item, answer, flags ?? []);
   const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     + ' · ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
@@ -336,7 +390,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
         <div style={{ fontSize: 15, color: TEXT_PRIMARY, lineHeight: 1.35, flex: 1 }}>{item.prompt}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, position: 'relative' }}>
-          {hasFlag && <i className="ti ti-alert-triangle" style={{ fontSize: 18, color: '#E67E22' }} />}
+          {triggeredFlags.length > 0 && <i className="ti ti-flag-filled" style={{ fontSize: 16, color: '#E67E22' }} />}
           {(item.labelPrint || (item.labelIds?.length ?? 0) > 0) && (
             <div onClick={e => { e.stopPropagation(); const r = (e.currentTarget as HTMLElement).closest('[data-card]')?.getBoundingClientRect(); onPrinterOpen?.(r?.bottom ?? 0); }} style={{ color: TEXT_SECONDARY, fontSize: 16, cursor: 'pointer' }}>
               <i className="ti ti-printer" />
@@ -364,6 +418,20 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
             <i className="ti ti-file-text" style={{ fontSize: 20 }} />
             <span>Document preview placeholder</span>
           </div>
+        </div>
+      )}
+
+      {/* Flag badges */}
+      {triggeredFlags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {triggeredFlags.map(f => {
+            const fg = choiceTextColor(f.color);
+            return (
+              <span key={f.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: `${f.color}28`, color: fg, border: `1px solid ${f.color}80`, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600, fontFamily: FONT }}>
+                {f.emoji} {f.name}
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -467,13 +535,30 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
             const selectedChoice = !isMulti ? choices.find(c => c.id === selectedIds[0]) : null;
             const btnColor = selectedChoice?.color || APP_BLUE;
             const btnFg = choiceTextColor(btnColor);
+            const selectedChips = isMulti ? selectedIds.map(id => choices.find(c => c.id === id)).filter(Boolean) as typeof choices : [];
             return (
-              <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${hasAnswer ? btnFg : APP_BLUE}`, borderRadius: 8, color: hasAnswer ? btnFg : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? `${btnColor}28` : 'white', cursor: 'pointer', width: '100%' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className={`ti ${selectedChoice?.icon || 'ti-list'}`} style={{ fontSize: 18 }} /> {btnLabel}
-                </span>
-                <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={() => onMCOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${hasAnswer ? btnFg : APP_BLUE}`, borderRadius: 8, color: hasAnswer ? btnFg : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: hasAnswer ? `${btnColor}28` : 'white', cursor: 'pointer', width: '100%' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className={`ti ${selectedChoice?.icon || 'ti-list'}`} style={{ fontSize: 18 }} /> {btnLabel}
+                  </span>
+                  <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
+                </button>
+                {selectedChips.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {selectedChips.map(c => {
+                      const chipColor = c.color || APP_BLUE;
+                      const chipFg = choiceTextColor(chipColor);
+                      return (
+                        <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: `${chipColor}28`, color: chipFg, border: `1px solid ${chipColor}60`, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600, fontFamily: FONT }}>
+                          {c.icon && <i className={`ti ${c.icon}`} style={{ fontSize: 13 }} />}
+                          {c.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })()}
           {(item.type === 'free' || item.type === 'email') && (
@@ -611,7 +696,7 @@ function CASurface({ itemPrompt, onBack, onSubmit }: { itemPrompt: string; onBac
 }
 
 // ── Sublist surface ───────────────────────────────────────────────────────
-function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onBack, scoringOn }: {
+function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onBack, scoringOn, flags }: {
   item: PreviewItem;
   answers: Record<string, ItemAnswer>;
   naItems: Set<string>;
@@ -620,6 +705,7 @@ function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onB
   onClearNA: (id: string) => void;
   onBack: () => void;
   scoringOn: boolean;
+  flags?: Flag[];
 }) {
   const subItems = item.subItems ?? [];
   const done = subItems.filter(si => itemCompleted(si, answers[si.id] ?? null, naItems.has(si.id), false)).length;
@@ -664,6 +750,7 @@ function SublistSurface({ item, answers, naItems, onAnswer, onNA, onClearNA, onB
             onAssign={() => {}}
             onCAOpen={() => {}}
             caSubmitted={emptyCA}
+            flags={flags}
           />
         ))}
       </div>
@@ -755,6 +842,7 @@ export default function JoltListPreviewPage() {
   const [items, setItems] = useState<PreviewItem[]>(FALLBACK_ITEMS);
   const [listName, setListName] = useState('Opening Checklist');
   const [scoringOn, setScoringOn] = useState(false);
+  const [flags, setFlags] = useState<Flag[]>(FALLBACK_FLAGS);
 
   const [answers, setAnswers] = useState<Record<string, ItemAnswer>>({});
   const [naItems, setNaItems] = useState<Set<string>>(new Set());
@@ -776,10 +864,11 @@ export default function JoltListPreviewPage() {
     const raw = localStorage.getItem('jolt-preview-payload');
     if (!raw) return;
     try {
-      const payload = JSON.parse(raw) as { listName: string; scoringOn: boolean; items: PreviewItem[] };
+      const payload = JSON.parse(raw) as { listName: string; scoringOn: boolean; items: PreviewItem[]; flags?: Flag[] };
       setItems(payload.items ?? FALLBACK_ITEMS);
       setListName(payload.listName ?? 'Preview');
       setScoringOn(payload.scoringOn ?? false);
+      setFlags(payload.flags ?? FALLBACK_FLAGS);
     } catch {}
   }, []);
 
@@ -787,10 +876,11 @@ export default function JoltListPreviewPage() {
     const handleStorage = (e: StorageEvent) => {
       if (e.key !== 'jolt-preview-payload' || !e.newValue) return;
       try {
-        const payload = JSON.parse(e.newValue) as { listName: string; scoringOn: boolean; items: PreviewItem[] };
+        const payload = JSON.parse(e.newValue) as { listName: string; scoringOn: boolean; items: PreviewItem[]; flags?: Flag[] };
         setItems(payload.items ?? FALLBACK_ITEMS);
         setListName(payload.listName ?? 'Preview');
         setScoringOn(payload.scoringOn ?? false);
+        setFlags(payload.flags ?? FALLBACK_FLAGS);
       } catch {}
     };
     window.addEventListener('storage', handleStorage);
@@ -918,6 +1008,7 @@ export default function JoltListPreviewPage() {
                 onMCOpen={id => setMcOpenId(id)}
                 onInfoOpen={(file, y) => { setInfoOpenFile(file); setInfoModalY(y); }}
                 onPrinterOpen={y => setPrinterModalY(y)}
+                flags={flags}
               />
             ))}
           </div>
@@ -941,6 +1032,7 @@ export default function JoltListPreviewPage() {
                 onClearNA={id => handleClearSubNA(sublistOpenId, id)}
                 onBack={() => setSublistOpenId(null)}
                 scoringOn={scoringOn}
+                flags={flags}
               />
             </div>
           )}
