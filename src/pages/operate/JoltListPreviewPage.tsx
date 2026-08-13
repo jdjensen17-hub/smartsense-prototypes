@@ -362,7 +362,7 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
   const box: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, padding: '8px 12px' };
   const txt: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 1 };
   const lbl: React.CSSProperties = { fontSize: 11, color: TEXT_MUTED, fontWeight: 500 };
-  const val: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY };
+  const val: React.CSSProperties = { fontSize: 14, fontWeight: 400, color: TEXT_PRIMARY };
   const div = <div style={{ width: 1, background: BORDER, alignSelf: 'stretch', margin: '6px 0' }} />;
   const icon = (cls: string) => <i className={`ti ${cls}`} style={{ fontSize: 18, color: TEXT_MUTED, flexShrink: 0 }} />;
 
