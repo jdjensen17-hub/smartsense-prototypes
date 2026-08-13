@@ -687,10 +687,9 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 // ── CA surface ────────────────────────────────────────────────────────────
 const CA_TYPE_BADGE: Record<string, string> = { yn: 'YN', mc: 'MC', measurement: '123', text: 'TXT', sublist: 'LIST', photo: 'IMG' };
 
-function CASurface({ itemPrompt, itemType, requireAllComplete, onBack, onSubmit }: { itemPrompt: string; itemType: string; requireAllComplete: boolean; onBack: () => void; onSubmit: () => void }) {
+function CASurface({ itemPrompt, itemType, onBack, onSubmit }: { itemPrompt: string; itemType: string; onBack: () => void; onSubmit: () => void }) {
   const [qaAnswers, setQaAnswers] = useState<('Yes' | 'No' | null)[]>([null, null, null]);
   const allAnswered = qaAnswers.every(a => a !== null);
-  const canSubmit = requireAllComplete ? allAnswered : true;
   const setQA = (i: number, v: 'Yes' | 'No' | null) =>
     setQaAnswers(prev => { const n = [...prev] as ('Yes' | 'No' | null)[]; n[i] = v; return n; });
 
@@ -737,10 +736,17 @@ function CASurface({ itemPrompt, itemType, requireAllComplete, onBack, onSubmit 
           <div key={i} style={{ padding: '14px 16px', borderBottom: `1px solid ${BORDER}` }}>
             <div style={{ fontSize: 15, color: TEXT_PRIMARY, marginBottom: 10 }}>{q}</div>
             <YNButtons value={qaAnswers[i]} onChange={v => setQA(i, v)} />
+            {qaAnswers[i] !== null && (
+              <div style={{ marginTop: 10 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>
+                  Completed · {fmt(now)}
+                </span>
+              </div>
+            )}
           </div>
         ))}
         <div style={{ padding: 16 }}>
-          <button onClick={onSubmit} disabled={!canSubmit} style={{ background: canSubmit ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: canSubmit ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
+          <button onClick={onSubmit} disabled={!allAnswered} style={{ background: allAnswered ? '#27AE60' : '#C0C0C8', color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '14px 24px', width: '100%', cursor: allAnswered ? 'pointer' : 'default', letterSpacing: '0.03em' }}>
             Submit
           </button>
         </div>
@@ -1088,7 +1094,7 @@ export default function JoltListPreviewPage() {
           {/* CA overlay */}
           {caOpenId && caItem && (
             <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10 }}>
-              <CASurface itemPrompt={caItem.prompt} itemType={caItem.type} requireAllComplete={requireAllComplete} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
+              <CASurface itemPrompt={caItem.prompt} itemType={caItem.type} onBack={() => setCaOpenId(null)} onSubmit={submitCA} />
             </div>
           )}
 
