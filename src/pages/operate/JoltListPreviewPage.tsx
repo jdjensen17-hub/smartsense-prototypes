@@ -540,9 +540,11 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
                 {showMeasModal && (
                   <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
                     <div style={{ background: 'white', borderRadius: 12, padding: 24, width: 280, fontFamily: FONT }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 4 }}>{item.prompt}</div>
-                      {item.measUnit && <div style={{ fontSize: 12, color: TEXT_MUTED, marginBottom: 12 }}>{item.measUnit}</div>}
-                      <input type="number" value={measInput} onChange={e => setMeasInput(e.target.value)} placeholder="0.00" autoFocus style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, border: `2px solid ${APP_BLUE}`, borderRadius: 8, padding: '10px 14px', width: '100%', textAlign: 'right', marginBottom: 16, boxSizing: 'border-box' }} />
+                      <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 16 }}>{item.prompt}</div>
+                      <div style={{ display: 'flex', alignItems: 'stretch', border: `2px solid ${APP_BLUE}`, borderRadius: 8, marginBottom: 16, overflow: 'hidden' }}>
+                        <input type="number" value={measInput} onChange={e => setMeasInput(e.target.value)} placeholder="0.00" autoFocus style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, border: 'none', outline: 'none', flex: 1, padding: '10px 14px', textAlign: 'right', minWidth: 0 }} />
+                        {item.measUnit && <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderLeft: `1px solid ${BORDER}`, fontSize: 14, fontWeight: 500, color: TEXT_SECONDARY, background: SURFACE_1, whiteSpace: 'nowrap' }}>{item.measUnit}</span>}
+                      </div>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => { if (measInput) { onAnswer(item.id, parseFloat(measInput)); setShowMeasModal(false); setMeasInput(''); } }} disabled={!measInput} style={{ flex: 1, background: APP_BLUE, color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '10px', cursor: measInput ? 'pointer' : 'default', opacity: measInput ? 1 : 0.4 }}>Submit</button>
                         <button onClick={() => { setShowMeasModal(false); setMeasInput(''); }} style={{ flex: 1, background: SURFACE_1, color: TEXT_SECONDARY, border: '1.5px solid #C8C8D0', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 500, padding: '10px', cursor: 'pointer' }}>Cancel</button>
