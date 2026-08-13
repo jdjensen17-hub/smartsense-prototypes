@@ -363,11 +363,11 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   const isNA = naItems.has(item.id);
   const isOOO = oooItems.has(item.id);
   const assignedTo = assignedItems[item.id] ?? null;
-  const sublistAllDone = sublistProgress ? sublistProgress.done === sublistProgress.total && sublistProgress.total > 0 : false;
+  const sublistDone = answer === 'complete';
   const completed = item.type === 'formula'
     ? formulaResult != null
     : item.type === 'sublist'
-      ? sublistAllDone
+      ? sublistDone
       : itemCompleted(item, answer, isNA, isOOO);
   const matchedCARules = getMatchedCARules(item, answer);
   const showCA = !caSubmitted.has(item.id) && matchedCARules.length > 0;
@@ -672,23 +672,15 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
           )}
 
           {/* Sublist */}
-          {item.type === 'sublist' && (() => {
-            const { done, total } = sublistProgress ?? { done: 0, total: 0 };
-            const label = done > 0 && !sublistAllDone ? `${done} / ${total} complete` : sublistAllDone ? `${total} / ${total} complete` : 'Open';
-            return (
-              <button onClick={() => onSublistOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${sublistAllDone ? APP_BLUE : APP_BLUE}`, borderRadius: 8, color: sublistAllDone ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: sublistAllDone ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="ti ti-layout-list" style={{ fontSize: 18 }} /> {label}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {!sublistAllDone && done > 0 && (
-                    <span style={{ fontSize: 12, fontWeight: 600, background: `${APP_BLUE}22`, color: APP_BLUE, padding: '2px 8px', borderRadius: 10 }}>{done}/{total}</span>
-                  )}
-                  <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
-                </span>
-              </button>
-            );
-          })()}
+          {item.type === 'sublist' && (
+            <button onClick={() => onSublistOpen?.(item.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `2px solid ${APP_BLUE}`, borderRadius: 8, color: sublistDone ? 'white' : APP_BLUE, fontFamily: FONT, fontSize: 15, fontWeight: 600, padding: '10px 18px', background: sublistDone ? APP_BLUE : 'white', cursor: 'pointer', width: '100%' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="ti ti-layout-list" style={{ fontSize: 18 }} />
+                {sublistDone ? 'Completed' : 'Open'}
+              </span>
+              <i className="ti ti-chevron-right" style={{ fontSize: 16, opacity: 0.7 }} />
+            </button>
+          )}
 
           {/* CA trigger */}
           {showCA && (
@@ -1194,16 +1186,14 @@ export default function JoltListPreviewPage() {
           {/* Sublist overlay */}
           {sublistOpenId && sublistItem && (
             <div style={{ position: 'absolute', inset: 0, background: 'white', zIndex: 10 }}>
-              <SublistSurface
-                item={sublistItem}
-                answers={subAnswers[sublistOpenId] ?? {}}
-                naItems={subNaItems[sublistOpenId] ?? new Set()}
-                onAnswer={(id, val) => handleSubAnswer(sublistOpenId, id, val)}
-                onNA={id => handleSubNA(sublistOpenId, id)}
-                onClearNA={id => handleClearSubNA(sublistOpenId, id)}
+              <CASurface
+                itemPrompt={sublistItem.prompt}
+                itemType="sublist"
                 onBack={() => setSublistOpenId(null)}
-                scoringOn={scoringOn}
-                flags={flags}
+                onSubmit={() => {
+                  setAnswers(prev => ({ ...prev, [sublistOpenId]: 'complete' }));
+                  setSublistOpenId(null);
+                }}
               />
             </div>
           )}
