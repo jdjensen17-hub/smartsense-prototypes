@@ -740,6 +740,7 @@ function CASurface({ itemPrompt, itemType, onBack, onSubmit }: { itemPrompt: str
   const dueBy = new Date(now.getTime() + 2 * 60 * 60 * 1000);
   const expires = new Date(now.getTime() + 4 * 60 * 60 * 1000);
   const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const nowStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + fmt(now);
   const badge = CA_TYPE_BADGE[itemType] ?? 'YN';
 
   const metaRows = [
@@ -782,7 +783,7 @@ function CASurface({ itemPrompt, itemType, onBack, onSubmit }: { itemPrompt: str
             {qaAnswers[i] !== null && (
               <div style={{ marginTop: 10 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', background: APP_BLUE, color: 'white', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>
-                  Completed · {fmt(now)}
+                  Completed · {nowStr}
                 </span>
               </div>
             )}
