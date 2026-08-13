@@ -829,7 +829,7 @@ const COMPLETION_OPS = [
   { value: '>',  label: '>'  },
 ];
 
-type Flag = { id: string; name: string; color: string; emoji: string };
+type Flag = { id: string; name: string; color: string; emoji: string; showOnApp?: boolean };
 
 function CompletionModeSection({ item, onUpdate, flags, onCreateFlag }: { item: ListItem; onUpdate: (updates: Partial<ListItem>) => void; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
   const isAuto = !!item.autoComplete;
@@ -918,11 +918,12 @@ function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { o
   const [newFlagName, setNewFlagName] = useState('');
   const [newFlagColor, setNewFlagColor] = useState(FLAG_COLORS[0]);
   const [newFlagEmoji, setNewFlagEmoji] = useState('');
-  const [nameError, setNameError] = useState(false);
+  const [showOnApp, setShowOnApp] = useState(true);
+  const [identityError, setIdentityError] = useState(false);
 
   const handleCreate = () => {
-    if (!newFlagName.trim()) { setNameError(true); return; }
-    const newFlag: Flag = { id: mkid(), name: newFlagName.trim(), color: newFlagColor, emoji: newFlagEmoji };
+    if (showOnApp && !newFlagName.trim() && !newFlagEmoji) { setIdentityError(true); return; }
+    const newFlag: Flag = { id: mkid(), name: newFlagName.trim(), color: newFlagColor, emoji: newFlagEmoji, showOnApp };
     onCreateFlag(newFlag);
     onSelect(pendingAnswer, newFlag.id);
     onCancel();
@@ -931,10 +932,10 @@ function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { o
   return (
     <div style={{ background: T.surface1, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: 12, marginTop: 8 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>New flag</div>
-      <input value={newFlagName} onChange={e => { setNewFlagName(e.target.value); if (e.target.value.trim()) setNameError(false); }} placeholder="Flag name" autoFocus
+      <input value={newFlagName} onChange={e => { setNewFlagName(e.target.value); setIdentityError(false); }} placeholder="Flag name (optional with emoji)" autoFocus
         onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onCancel(); }}
-        style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${nameError ? '#EF5350' : T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', marginBottom: nameError ? 4 : 8 }} />
-      {nameError && <div style={{ fontSize: 11, color: '#EF5350', marginBottom: 8 }}>Flag name is required</div>}
+        style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${identityError ? '#EF5350' : T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', boxSizing: 'border-box', marginBottom: identityError ? 4 : 8 }} />
+      {identityError && <div style={{ fontSize: 11, color: '#EF5350', marginBottom: 8 }}>Add a name or choose an emoji</div>}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Color</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -944,16 +945,25 @@ function FlagCreateForm({ onCreateFlag, onCancel, pendingAnswer, onSelect }: { o
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Emoji</div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <div onClick={() => setNewFlagEmoji('')} style={{ width: 28, height: 28, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, cursor: 'pointer', color: T.textMuted, background: newFlagEmoji === '' ? T.bgAccent : 'transparent', border: newFlagEmoji === '' ? `0.5px solid ${T.borderAccent}` : `0.5px solid ${T.borderStrong}` }}>
+          <div onClick={() => { setNewFlagEmoji(''); setIdentityError(false); }} style={{ width: 28, height: 28, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, cursor: 'pointer', color: T.textMuted, background: newFlagEmoji === '' ? T.bgAccent : 'transparent', border: newFlagEmoji === '' ? `0.5px solid ${T.borderAccent}` : `0.5px solid ${T.borderStrong}` }}>
             None
           </div>
           {FLAG_EMOJIS.map(e => (
-            <div key={e} onClick={() => setNewFlagEmoji(e)} style={{ width: 28, height: 28, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: 'pointer', background: newFlagEmoji === e ? T.bgAccent : 'transparent', border: newFlagEmoji === e ? `0.5px solid ${T.borderAccent}` : `0.5px solid transparent` }}>
+            <div key={e} onClick={() => { setNewFlagEmoji(e); setIdentityError(false); }} style={{ width: 28, height: 28, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: 'pointer', background: newFlagEmoji === e ? T.bgAccent : 'transparent', border: newFlagEmoji === e ? `0.5px solid ${T.borderAccent}` : `0.5px solid transparent` }}>
               {e}
             </div>
           ))}
         </div>
       </div>
+      {/* Show on app — opt-out, at the bottom */}
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, cursor: 'pointer' }}>
+        <div style={{ fontSize: 13, color: T.textPrimary, fontWeight: 500 }}>Show on app</div>
+        <div onClick={() => { setShowOnApp(v => !v); setIdentityError(false); }}
+          style={{ width: 32, height: 18, borderRadius: 9, background: showOnApp ? T.fillAccent : T.borderStrong, position: 'relative', flexShrink: 0, cursor: 'pointer', transition: 'background 0.15s' }}>
+          <div style={{ position: 'absolute', top: 2, left: showOnApp ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: 'white', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+        </div>
+      </label>
+      {!showOnApp && <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 10, marginTop: -6 }}>Silent — triggers auto-response only</div>}
       <div style={{ display: 'flex', gap: 8 }}>
         <Btn primary onClick={handleCreate}>Create & select</Btn>
         <button onClick={onCancel} style={{ fontFamily: T.font, fontSize: 12, color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
@@ -980,6 +990,7 @@ function FlagPicker({ answer = 'Yes', selectedIds, flags, onToggle, onCreateFlag
   return (
     <div ref={ref} style={{ position: 'relative', flex: 1 }}>
       <div style={{ minHeight: 36, border: `0.5px solid ${conflictingIds.length > 0 ? '#EF5350' : T.borderStrong}`, borderRadius: 6, padding: '4px 8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, cursor: 'pointer', background: T.surface2 }} onClick={() => setOpen(v => !v)}>
+        {selectedIds.length === 0 && <span style={{ fontSize: 13, color: T.textMuted, flex: 1 }}>Select a flag…</span>}
         {selectedIds.map(id => {
           const f = flags.find(x => x.id === id);
           if (!f) return null;
@@ -987,7 +998,8 @@ function FlagPicker({ answer = 'Yes', selectedIds, flags, onToggle, onCreateFlag
           return (
             <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: isConflict ? '#FDECEA' : T.surface1, border: `1.5px solid ${isConflict ? '#EF5350' : f.color}`, borderRadius: 12, padding: '2px 8px', fontSize: 12, fontWeight: 500, color: isConflict ? '#EF5350' : T.textPrimary }}>
               {f.emoji && <span>{f.emoji}</span>}
-              <span>{f.name}</span>
+              {f.name && <span>{f.name}</span>}
+              {!f.showOnApp && <i className="ti ti-eye-off" style={{ fontSize: 10, color: T.textMuted }} />}
               <i className="ti ti-x" style={{ fontSize: 10, color: isConflict ? '#EF5350' : T.textMuted, cursor: 'pointer' }} onClick={e => { e.stopPropagation(); onToggle(id); }} />
             </span>
           );
@@ -1010,7 +1022,9 @@ function FlagPicker({ answer = 'Yes', selectedIds, flags, onToggle, onCreateFlag
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: T.textPrimary, background: isSelected ? T.surface1 : 'transparent' }}
                 onMouseEnter={e => (e.currentTarget.style.background = T.surface0)} onMouseLeave={e => (e.currentTarget.style.background = isSelected ? T.surface1 : 'transparent')}>
                 <i className={`ti ${isSelected ? 'ti-check' : 'ti-circle'}`} style={{ fontSize: 12, color: isSelected ? T.textAccent : T.textMuted, flexShrink: 0 }} />
-                {f.emoji && <span>{f.emoji}</span>}<span>{f.name}</span>
+                {f.emoji && <span>{f.emoji}</span>}
+                {f.name && <span>{f.name}</span>}
+                {!f.showOnApp && <span style={{ fontSize: 11, color: T.textMuted, fontStyle: 'italic' }}>silent</span>}
               </div>
             );
           })}
@@ -1702,11 +1716,12 @@ function FollowUpPanel({ c, onUpdate }: { c: MCChoice; onUpdate?: (id: string, u
   );
 }
 
-function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, focusId, onFocused }: {
+function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, onCreateFlag, focusId, onFocused }: {
   scoringOn: boolean;
   c: MCChoice; idx: number; locked: boolean; flags: Flag[];
   onUpdate?: (id: string, u: Partial<MCChoice>) => void;
   onRemove?: (id: string) => void;
+  onCreateFlag?: (flag: Flag) => void;
   focusId?: string; onFocused?: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -1785,7 +1800,7 @@ function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, foc
                   <i className="ti ti-flag" style={{ fontSize: 11 }} /> Flag ({c.flagIds!.length})
                 </span>
               : <button onClick={() => togglePanel('flag')}
-                  style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid ${hasFlag ? '#F57F17' : T.borderStrong}`, background: hasFlag ? '#FFF8E1' : expandedPanel === 'flag' ? T.surface1 : 'transparent', color: hasFlag ? '#F57F17' : T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid ${hasFlag ? '#F57F17' : T.border}`, background: hasFlag ? '#FFF8E1' : expandedPanel === 'flag' ? T.surface0 : T.surface1, color: hasFlag ? '#F57F17' : T.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <i className="ti ti-flag" style={{ fontSize: 11 }} />
                   {hasFlag ? `Flag (${c.flagIds!.length})` : 'Flag'}
                 </button>
@@ -1798,7 +1813,7 @@ function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, foc
                   <i className="ti ti-arrow-back-up" style={{ fontSize: 11 }} /> Follow-up ✓
                 </span>
               : <button onClick={() => togglePanel('ca')}
-                  style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid ${hasCa ? T.borderAccent : T.borderStrong}`, background: hasCa ? T.bgAccent : expandedPanel === 'ca' ? T.surface1 : 'transparent', color: hasCa ? T.textAccent : T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  style={{ fontFamily: T.font, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 4, border: `0.5px solid ${hasCa ? T.borderAccent : T.border}`, background: hasCa ? T.bgAccent : expandedPanel === 'ca' ? T.surface0 : T.surface1, color: hasCa ? T.textAccent : T.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <i className="ti ti-arrow-back-up" style={{ fontSize: 11 }} />
                   {hasCa ? 'Follow-up ✓' : 'Follow-up'}
                 </button>
@@ -1806,26 +1821,23 @@ function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, foc
         </div>
       )}
 
-      {/* Expanded: Flag panel (read-only when locked) */}
+      {/* Expanded: Flag panel */}
       {expandedPanel === 'flag' && (
         <div style={{ padding: '10px 12px', borderTop: `0.5px solid ${T.border}`, background: T.surface1, borderRadius: '0 0 8px 8px' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Flags</div>
-          {flags.filter(f => locked ? c.flagIds?.includes(f.id) : true).map(f => {
-            const selected = c.flagIds?.includes(f.id) ?? false;
-            return locked
-              ? <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.color, flexShrink: 0, display: 'inline-block' }} />
-                  <span style={{ fontSize: 13, color: T.textPrimary }}>{f.name}</span>
-                </div>
-              : <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={selected} onChange={() => {
-                    const current = c.flagIds ?? [];
-                    onUpdate?.(c.id, { flagIds: selected ? current.filter(x => x !== f.id) : [...current, f.id] });
-                  }} />
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.color, flexShrink: 0, display: 'inline-block' }} />
-                  <span style={{ fontSize: 13, color: T.textPrimary }}>{f.name}</span>
-                </label>;
-          })}
+          <FlagPicker
+            selectedIds={c.flagIds ?? []}
+            flags={flags}
+            onToggle={flagId => {
+              const current = c.flagIds ?? [];
+              const selected = current.includes(flagId);
+              onUpdate?.(c.id, { flagIds: selected ? current.filter(x => x !== flagId) : [...current, flagId] });
+            }}
+            onCreateFlag={flag => {
+              onCreateFlag?.(flag);
+              const current = c.flagIds ?? [];
+              onUpdate?.(c.id, { flagIds: [...current, flag.id] });
+            }}
+          />
         </div>
       )}
 
@@ -1869,17 +1881,18 @@ function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, foc
   );
 }
 
-function MCChoiceList({ choices, locked, scoringOn, flags, onUpdate, onRemove, focusId, onFocused }: {
+function MCChoiceList({ choices, locked, scoringOn, flags, onUpdate, onRemove, onCreateFlag, focusId, onFocused }: {
   choices: MCChoice[]; locked: boolean; scoringOn: boolean; flags: Flag[];
   onUpdate?: (id: string, u: Partial<MCChoice>) => void;
   onRemove?: (id: string) => void;
+  onCreateFlag?: (flag: Flag) => void;
   focusId?: string; onFocused?: () => void
 }) {
   return (
     <div>
       {choices.map((c, idx) => (
         <MCChoiceRow key={c.id} c={c} idx={idx} locked={locked} scoringOn={scoringOn} flags={flags}
-          onUpdate={onUpdate} onRemove={onRemove} focusId={focusId} onFocused={onFocused} />
+          onUpdate={onUpdate} onRemove={onRemove} onCreateFlag={onCreateFlag} focusId={focusId} onFocused={onFocused} />
       ))}
     </div>
   );
@@ -1899,7 +1912,7 @@ function TemplateRow({ tpl, onUse, onCopy }: { tpl: { id: string; name: string; 
   );
 }
 
-function MCChoicesSection({ item, onUpdate, scoringOn, flags }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void; scoringOn: boolean; flags: Flag[] }) {
+function MCChoicesSection({ item, onUpdate, scoringOn, flags, onCreateFlag }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void; scoringOn: boolean; flags: Flag[]; onCreateFlag: (flag: Flag) => void }) {
   const usingTemplate = !!item.mcTemplateId;
   const template = usingTemplate ? MC_TEMPLATES.find(t => t.id === item.mcTemplateId) : null;
   const choices = item.choices ?? [];
@@ -2002,7 +2015,7 @@ function MCChoicesSection({ item, onUpdate, scoringOn, flags }: { item: ListItem
       {/* Choices */}
       <div style={{ padding: 12, background: T.surface1, borderRadius: 8, border: `0.5px solid ${T.border}` }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: choices.length > 0 ? 10 : 0 }}>Choices</div>
-        <MCChoiceList choices={choices} locked={usingTemplate} scoringOn={scoringOn} flags={flags} onUpdate={updateChoice} onRemove={removeChoice} focusId={newChoiceId ?? undefined} onFocused={() => setNewChoiceId(null)} />
+        <MCChoiceList choices={choices} locked={usingTemplate} scoringOn={scoringOn} flags={flags} onUpdate={updateChoice} onRemove={removeChoice} onCreateFlag={onCreateFlag} focusId={newChoiceId ?? undefined} onFocused={() => setNewChoiceId(null)} />
         {!usingTemplate && (
           <button onClick={addChoice} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginTop: choices.length > 0 ? 8 : 8 }}>
             <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add choice
@@ -2708,7 +2721,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           </SsSection>
         )}
         {/* Type-specific sections */}
-        {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} scoringOn={scoringOn} flags={flags} />}
+        {item.type === 'mc' && <MCChoicesSection item={item} onUpdate={upd} scoringOn={scoringOn} flags={flags} onCreateFlag={onCreateFlag} />}
         {item.type === 'mc' && <MCCASection item={item} onUpdate={upd} markAs={markAs} />}
         {item.type === 'rating' && <RatingSection item={item} onUpdate={upd} scoringOn={scoringOn} />}
         {item.type === 'measurement' && <MeasurementSection item={item} onUpdate={upd} />}
@@ -3562,7 +3575,7 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
 
   const derivedInds: { icon: string; title: string }[] = [
     ...(() => {
-      const toName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; };
+      const toName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name || (f.showOnApp === false ? '(silent)' : '(unnamed)')}` : id; };
       const yesIds = item.flagsForYes ?? [];
       const noIds = item.flagsForNo ?? [];
       const measRules = (item.measFlagRules ?? []).filter(r => (r.flagIds?.length ?? 0) > 0 || !!r.flagId);
@@ -4061,7 +4074,7 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
         }
         if (col.key === 'yn-flags-yes' || col.key === 'yn-flags-no') {
           const ids = col.key === 'yn-flags-yes' ? (item.flagsForYes ?? []) : (item.flagsForNo ?? []);
-          const names = ids.map(id => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; });
+          const names = ids.map(id => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name || (f.showOnApp === false ? '(silent)' : '(unnamed)')}` : id; });
           return (
             <td key={col.key} style={{ width: 120, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center' }}>
               {names.length === 0
@@ -4203,7 +4216,7 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
             if (kind === 'flag') {
               // All rules for this range (there can be multiple, each with a condition and multiple flags)
               const rangeRules = range ? (item.measFlagRules ?? []).filter(r => r.rangeId === range.id) : [];
-              const toFlagName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name}` : id; };
+              const toFlagName = (id: string) => { const f = flags.find(x => x.id === id); return f ? `${f.emoji ? f.emoji + ' ' : ''}${f.name || (f.showOnApp === false ? '(silent)' : '(unnamed)')}` : id; };
               // Build flat list of all flags across all rules, with their condition for tooltip
               const allEntries: { name: string; condition: string }[] = [];
               for (const r of rangeRules) {
