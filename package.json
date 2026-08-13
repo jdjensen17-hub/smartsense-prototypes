@@ -16,6 +16,7 @@
     "ag-grid-react": "^36.0.0",
     "formulajs": "^1.0.8",
     "lucide-react": "^1.22.0",
+    "mathjs": "^15.2.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-barcode": "^1.6.1",

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { evaluate as mathEval } from 'mathjs';
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const APP_BLUE = '#2979C7';
@@ -126,6 +127,9 @@ const FALLBACK_ITEMS: PreviewItem[] = [
     ]
   },
   { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', allowNA: false, ratingMin: 1, ratingMax: 5, points: 15 },
+  { id: 'item-formula', prompt: 'Avg cooler temp', type: 'formula', stripe: '', allowNA: false, measUnit: '°F',
+    formulaVars: [{ name: 'A', itemId: 'sub-freezer' }, { name: 'B', itemId: 'sub-cooler1' }],
+    formulaExpr: '(A + B) / 2', formulaType: 'number' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -144,6 +148,41 @@ function evalCondition(cond: DCCondition, answer: ItemAnswer): boolean {
     }
   }
   return false;
+}
+
+// ── Formula evaluation ────────────────────────────────────────────────────
+function transformIF(expr: string): string {
+  let result = expr;
+  let prev = '';
+  while (result !== prev) {
+    prev = result;
+    result = result.replace(/\bIF\s*\(([^()]+),([^()]+),([^()]+)\)/gi, '($1 ? $2 : $3)');
+  }
+  return result;
+}
+
+function evaluateFormula(item: PreviewItem, answers: Record<string, ItemAnswer>): string | null {
+  const vars = item.formulaVars ?? [];
+  const expr = (item.formulaExpr ?? '').trim();
+  if (!expr) return null;
+  const scope: Record<string, number> = {};
+  for (const v of vars) {
+    if (!v.itemId) return null;
+    const raw = answers[v.itemId];
+    if (raw === null || raw === undefined || raw === '') return null;
+    const n = Number(raw);
+    if (isNaN(n)) return null;
+    scope[v.name] = n;
+  }
+  try {
+    const result = mathEval(transformIF(expr), scope);
+    if (typeof result === 'number') {
+      return Number.isInteger(result) ? String(result) : parseFloat(result.toFixed(6)).toString();
+    }
+    return String(result);
+  } catch {
+    return null;
+  }
 }
 
 function isItemVisible(item: PreviewItem, answers: Record<string, ItemAnswer>): boolean {
@@ -293,7 +332,7 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onInfoOpen, onPrinterOpen, flags }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onInfoOpen, onPrinterOpen, flags, formulaResult }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
@@ -313,6 +352,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   onInfoOpen?: (file: string, anchorY: number) => void;
   onPrinterOpen?: (anchorY: number) => void;
   flags?: Flag[];
+  formulaResult?: string | null;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [measInput, setMeasInput] = useState('');
@@ -323,9 +363,11 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   const isOOO = oooItems.has(item.id);
   const assignedTo = assignedItems[item.id] ?? null;
   const sublistAllDone = sublistProgress ? sublistProgress.done === sublistProgress.total && sublistProgress.total > 0 : false;
-  const completed = item.type === 'sublist'
-    ? sublistAllDone
-    : itemCompleted(item, answer, isNA, isOOO);
+  const completed = item.type === 'formula'
+    ? formulaResult != null
+    : item.type === 'sublist'
+      ? sublistAllDone
+      : itemCompleted(item, answer, isNA, isOOO);
   const matchedCARules = getMatchedCARules(item, answer);
   const showCA = !caSubmitted.has(item.id) && matchedCARules.length > 0;
   const triggeredFlags = getTriggeredFlags(item, answer, flags ?? []);
@@ -614,9 +656,15 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
           {item.type === 'time'      && <AppBtn icon="ti-clock"         label={answer ? String(answer)     : 'Select Time'}       completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }))} />}
           {item.type === 'datetime'  && <AppBtn icon="ti-calendar-time" label={answer ? String(answer)     : 'Select Date & Time'} completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }))} />}
           {item.type === 'asset'     && <AppBtn icon="ti-box"           label={answer ? String(answer)     : 'Select Asset'}      completed={!!answer} onClick={() => onAnswer(item.id, answer ? null : 'Asset #4821')} />}
-          {item.type === 'formula'   && (
-            <div style={{ border: '1.5px solid #C8C8D0', borderRadius: 8, background: SURFACE_1, fontSize: 15, fontWeight: 600, color: TEXT_SECONDARY, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: TEXT_MUTED, fontSize: 18 }}>=</span> —
+          {item.type === 'formula' && (
+            <div style={{ border: `1.5px solid ${formulaResult != null ? APP_BLUE : '#C8C8D0'}`, borderRadius: 8, background: formulaResult != null ? '#EBF3FC' : SURFACE_1, fontSize: 15, fontWeight: 600, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: TEXT_MUTED, fontSize: 18 }}>=</span>
+              <span style={{ color: formulaResult != null ? APP_BLUE : TEXT_MUTED }}>
+                {formulaResult ?? '—'}
+              </span>
+              {item.measUnit && formulaResult != null && (
+                <span style={{ color: TEXT_SECONDARY, fontSize: 13, fontWeight: 400 }}>{item.measUnit}</span>
+              )}
             </div>
           )}
 
@@ -1047,7 +1095,15 @@ export default function JoltListPreviewPage() {
   const caItem = caOpenId ? items.find(i => i.id === caOpenId) : null;
   const sublistItem = sublistOpenId ? items.find(i => i.id === sublistOpenId) : null;
   const visibleItems = items.filter(item => isItemVisible(item, answers));
-  const allListComplete = visibleItems.every(item => itemCompleted(item, answers[item.id] ?? null, naItems.has(item.id), oooItems.has(item.id)));
+  const formulaResults = useMemo(() =>
+    Object.fromEntries(items.filter(i => i.type === 'formula').map(i => [i.id, evaluateFormula(i, answers)])),
+    [items, answers]
+  );
+  const allListComplete = visibleItems.every(item =>
+    item.type === 'formula'
+      ? formulaResults[item.id] != null
+      : itemCompleted(item, answers[item.id] ?? null, naItems.has(item.id), oooItems.has(item.id))
+  );
   const isOverlayOpen = !!(caOpenId || sublistOpenId || mcOpenId);
 
   return (
@@ -1089,6 +1145,7 @@ export default function JoltListPreviewPage() {
                 onInfoOpen={(file, y) => { setInfoOpenFile(file); setInfoModalY(y); }}
                 onPrinterOpen={y => setPrinterModalY(y)}
                 flags={flags}
+                formulaResult={item.type === 'formula' ? formulaResults[item.id] : undefined}
               />
             ))}
             <div style={{ padding: 16 }}>
