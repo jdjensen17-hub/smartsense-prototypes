@@ -2639,7 +2639,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           <PromptEditor item={item} onUpdate={upd} autoFocus={!item.prompt} />
         </SsSection>
         {/* General options */}
-        <SsSection label="General Options" defaultOpen={!(['mc','employee','photo','qr','barcode','measurement','sublist','rating','asset','formula'] as string[]).includes(item.type)}>
+        <SsSection label="General Options" defaultOpen={false}>
           {item.type !== 'text' && item.type !== 'subtitle' && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 6 }}>Allow item to be marked as</div>
