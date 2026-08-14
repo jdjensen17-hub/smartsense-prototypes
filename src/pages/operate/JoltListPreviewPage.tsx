@@ -915,27 +915,50 @@ function CASurface({ itemPrompt, itemType, initialQAAnswers, onQAChange, onBack,
         <i className="ti ti-alert-circle-filled" style={{ fontSize: 22, color: 'white', flexShrink: 0 }} />
       </div>
 
-      {/* Metadata row */}
-      <div style={{ display: 'flex', background: 'white', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
-        {metaRows.map((m, i) => (
-          <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRight: i < 2 ? `1px solid ${BORDER}` : 'none' }}>
-            <i className={`ti ${m.icon}`} style={{ fontSize: 22, color: TEXT_SECONDARY, flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: 11, color: TEXT_SECONDARY, marginBottom: 1 }}>{m.label}</div>
-              <div style={{ fontSize: 15, fontWeight: 500, color: TEXT_PRIMARY }}>{m.value}</div>
+      {/* Status boxes — sublist uses same 4-box layout as parent list; CA uses larger 3-column metadata row */}
+      {itemType === 'sublist' ? (() => {
+        const box: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, padding: '8px 12px' };
+        const txt: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 1 };
+        const lbl: React.CSSProperties = { fontSize: 11, color: TEXT_MUTED, fontWeight: 500 };
+        const val: React.CSSProperties = { fontSize: 14, fontWeight: 400, color: TEXT_PRIMARY };
+        const div = <div style={{ width: 1, background: BORDER, alignSelf: 'stretch', margin: '6px 0' }} />;
+        const ic = (cls: string) => <i className={`ti ${cls}`} style={{ fontSize: 18, color: TEXT_MUTED, flexShrink: 0 }} />;
+        const Box = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
+          <div style={box}>{ic(icon)}<div style={txt}><span style={lbl}>{label}</span><span style={val}>{value}</span></div></div>
+        );
+        return scoringOn ? (
+          <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${BORDER}` }}>
+              <Box icon="ti-clock" label="Displayed" value={fmt(now)} />
+              {div}
+              <Box icon="ti-alarm" label="Due by" value={fmt(dueBy)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'stretch' }}>
+              <Box icon="ti-calendar-x" label="Expires" value="In 2 days" />
+              {div}
+              <Box icon="ti-trophy" label="Score" value={sublistScorePct} />
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Sublist score box */}
-      {scoringOn && itemType === 'sublist' && (
-        <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0 }}>
-          <i className="ti ti-trophy" style={{ fontSize: 18, color: TEXT_MUTED, flexShrink: 0 }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 500 }}>Score</span>
-            <span style={{ fontSize: 14, color: TEXT_PRIMARY }}>{sublistScorePct}</span>
+        ) : (
+          <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+            <Box icon="ti-clock" label="Displayed" value={fmt(now)} />
+            {div}
+            <Box icon="ti-alarm" label="Due by" value={fmt(dueBy)} />
+            {div}
+            <Box icon="ti-calendar-x" label="Expires" value="In 2 days" />
           </div>
+        );
+      })() : (
+        <div style={{ display: 'flex', background: 'white', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          {metaRows.map((m, i) => (
+            <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRight: i < 2 ? `1px solid ${BORDER}` : 'none' }}>
+              <i className={`ti ${m.icon}`} style={{ fontSize: 22, color: TEXT_SECONDARY, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 11, color: TEXT_SECONDARY, marginBottom: 1 }}>{m.label}</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: TEXT_PRIMARY }}>{m.value}</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
