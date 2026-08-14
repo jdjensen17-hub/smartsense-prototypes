@@ -131,7 +131,13 @@ const FALLBACK_ITEMS: PreviewItem[] = [
       { id: 'sub-signoff', prompt: 'Temperature log signed off',   type: 'checkmark', stripe: '', allowNA: false },
     ]
   },
-  { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', allowNA: false, ratingMin: 1, ratingMax: 5, points: 15 },
+  { id: 'kitchen-rate', prompt: 'Rate overall kitchen cleanliness', type: 'rating', stripe: '', allowNA: false, ratingMin: 1, ratingMax: 5, points: 15, ratingScores: { 1: 5, 2: 10, 3: 15, 4: 20, 5: 25 } },
+  { id: 'staff-mc', prompt: 'How was staff readiness today?', type: 'mc', stripe: '#B3D9FF', allowNA: false, mcShowInline: false, mcMultiSelect: false, choices: [
+    { id: 'sr1', label: 'Fully prepared',     color: '#4CAF50', icon: null, score: 20 },
+    { id: 'sr2', label: 'Mostly prepared',    color: '#8BC34A', icon: null, score: 15 },
+    { id: 'sr3', label: 'Partially prepared', color: '#FF9800', icon: null, score: 10 },
+    { id: 'sr4', label: 'Not prepared',       color: '#F44336', icon: null, score: 5 },
+  ]},
   { id: 'item-formula', prompt: 'Avg cooler temp', type: 'formula', stripe: '', allowNA: false, measUnit: '°F',
     formulaVars: [{ name: 'A', itemId: 'sub-freezer' }, { name: 'B', itemId: 'sub-cooler1' }],
     formulaExpr: '(A + B) / 2', formulaType: 'number' },
@@ -234,9 +240,9 @@ function getMatchedCARules(item: PreviewItem, answer: ItemAnswer): CARule[] {
 }
 
 const CA_QUESTIONS = [
-  'Did you uncover the issue?',
-  'Did you resolve the issue?',
-  'Are you sure?',
+  { prompt: 'Did you uncover the issue?',  scoreYes: 5, scoreNo: 0 },
+  { prompt: 'Did you resolve the issue?',  scoreYes: 5, scoreNo: 0 },
+  { prompt: 'Are you sure?',               scoreYes: 5, scoreNo: 0 },
 ];
 
 function getTriggeredFlags(item: PreviewItem, answer: ItemAnswer, flags: Flag[]): Flag[] {
@@ -337,13 +343,14 @@ function ScoreBar({ items, answers, naItems, oooItems, scoringOn, label }: {
 }
 
 // ── Status boxes ─────────────────────────────────────────────────────────
-function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt }: {
+function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt, sublistCAAnswers }: {
   scoringOn: boolean;
   items: PreviewItem[];
   answers: Record<string, ItemAnswer>;
   naItems: Set<string>;
   oooItems: Set<string>;
   displayedAt: Date;
+  sublistCAAnswers?: Record<string, ('Yes' | 'No' | null)[]>;
 }) {
   const due = new Date(displayedAt.getTime() + 8 * 60 * 60 * 1000);
   const expires = new Date(due.getTime() + 24 * 60 * 60 * 1000);
@@ -356,7 +363,7 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
     let denom = 0;
     let numer = 0;
     for (const item of items) {
-      if (!['yn', 'rating', 'mc'].includes(item.type)) continue;
+      if (!['yn', 'rating', 'mc', 'sublist'].includes(item.type)) continue;
       if (naItems.has(item.id) || oooItems.has(item.id)) continue;
       const answer = answers[item.id] ?? null;
 
@@ -376,6 +383,18 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
         if (max <= 0) continue;
         denom += max;
         if (answer !== null && answer !== '') numer += scores[Number(answer)] ?? 0;
+
+      } else if (item.type === 'sublist') {
+        const qaArr = sublistCAAnswers?.[item.id] ?? [];
+        for (let i = 0; i < CA_QUESTIONS.length; i++) {
+          const q = CA_QUESTIONS[i];
+          const max = Math.max(q.scoreYes, q.scoreNo);
+          if (max <= 0) continue;
+          denom += max;
+          const a = qaArr[i] ?? null;
+          if (a === 'Yes') numer += q.scoreYes;
+          else if (a === 'No') numer += q.scoreNo;
+        }
 
       } else if (item.type === 'mc') {
         const choices = item.choices ?? [];
@@ -853,9 +872,17 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
 // ── CA surface ────────────────────────────────────────────────────────────
 const CA_TYPE_BADGE: Record<string, string> = { yn: 'YN', mc: 'MC', measurement: '123', text: 'TXT', sublist: 'LIST', photo: 'IMG' };
 
-function CASurface({ itemPrompt, itemType, initialQAAnswers, onQAChange, onBack, onSubmit }: { itemPrompt: string; itemType: string; initialQAAnswers?: ('Yes' | 'No' | null)[]; onQAChange?: (a: ('Yes' | 'No' | null)[]) => void; onBack: () => void; onSubmit: () => void }) {
+function CASurface({ itemPrompt, itemType, initialQAAnswers, onQAChange, onBack, onSubmit, scoringOn }: { itemPrompt: string; itemType: string; initialQAAnswers?: ('Yes' | 'No' | null)[]; onQAChange?: (a: ('Yes' | 'No' | null)[]) => void; onBack: () => void; onSubmit: () => void; scoringOn?: boolean }) {
   const [qaAnswers, setQaAnswers] = useState<('Yes' | 'No' | null)[]>(initialQAAnswers ?? [null, null, null]);
   const allAnswered = qaAnswers.every(a => a !== null);
+
+  const sublistDenom = CA_QUESTIONS.reduce((s, q) => s + Math.max(q.scoreYes, q.scoreNo), 0);
+  const sublistNumer = qaAnswers.reduce((s, a, i) => {
+    if (a === 'Yes') return s + CA_QUESTIONS[i].scoreYes;
+    if (a === 'No') return s + CA_QUESTIONS[i].scoreNo;
+    return s;
+  }, 0);
+  const sublistScorePct = sublistDenom > 0 ? `${((sublistNumer / sublistDenom) * 100).toFixed(2)}%` : '0.00%';
   const setQA = (i: number, v: 'Yes' | 'No' | null) => {
     const n = [...qaAnswers] as ('Yes' | 'No' | null)[];
     n[i] = v;
@@ -901,11 +928,22 @@ function CASurface({ itemPrompt, itemType, initialQAAnswers, onQAChange, onBack,
         ))}
       </div>
 
+      {/* Sublist score box */}
+      {scoringOn && itemType === 'sublist' && (
+        <div style={{ background: 'white', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0 }}>
+          <i className="ti ti-trophy" style={{ fontSize: 18, color: TEXT_MUTED, flexShrink: 0 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 500 }}>Score</span>
+            <span style={{ fontSize: 14, color: TEXT_PRIMARY }}>{sublistScorePct}</span>
+          </div>
+        </div>
+      )}
+
       {/* Questions + inline Submit */}
       <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
         {CA_QUESTIONS.map((q, i) => (
           <div key={i} style={{ padding: '14px 16px', borderBottom: `1px solid ${BORDER}` }}>
-            <div style={{ fontSize: 15, color: TEXT_PRIMARY, marginBottom: 10 }}>{q}</div>
+            <div style={{ fontSize: 15, color: TEXT_PRIMARY, marginBottom: 10 }}>{q.prompt}</div>
             <YNButtons value={qaAnswers[i]} onChange={v => setQA(i, v)} />
             {qaAnswers[i] !== null && (
               <div style={{ marginTop: 10 }}>
@@ -1274,7 +1312,7 @@ export default function JoltListPreviewPage() {
         {/* Slides: list ← → overlay (CA or Sublist) */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
           <div style={{ flex: '0 0 100%', overflowY: 'auto', transform: isOverlayOpen ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
-            <StatusBoxes scoringOn={scoringOn} items={visibleItems} answers={answers} naItems={naItems} oooItems={oooItems} displayedAt={displayedAt} />
+            <StatusBoxes scoringOn={scoringOn} items={visibleItems} answers={answers} naItems={naItems} oooItems={oooItems} displayedAt={displayedAt} sublistCAAnswers={sublistCAAnswers} />
             {visibleItems.map(item => (
               <ItemCard
                 key={item.id}
@@ -1323,6 +1361,7 @@ export default function JoltListPreviewPage() {
               <CASurface
                 itemPrompt={sublistItem.prompt}
                 itemType="sublist"
+                scoringOn={scoringOn}
                 initialQAAnswers={sublistCAAnswers[sublistOpenId] ?? [null, null, null]}
                 onQAChange={a => setSublistCAAnswers(prev => ({ ...prev, [sublistOpenId]: a }))}
                 onBack={() => setSublistOpenId(null)}
