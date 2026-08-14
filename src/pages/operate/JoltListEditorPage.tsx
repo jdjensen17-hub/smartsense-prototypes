@@ -1782,7 +1782,7 @@ function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, onC
               {locked
                 ? <span style={{ fontSize: 12, color: T.textPrimary, padding: '2px 10px', border: `0.5px solid ${T.border}`, borderRadius: 4, background: T.surface1, minWidth: 72, textAlign: 'center', display: 'inline-block' }}>{c.score ?? '—'}</span>
                 : <input type="number" value={c.score ?? ''}
-                    onFocus={() => { if (c.score === undefined || c.score === '') onUpdate?.(c.id, { score: 0 }); }}
+                    onFocus={e => { if (c.score === undefined || c.score === '') onUpdate?.(c.id, { score: 0 }); e.currentTarget.select(); }}
                     onChange={e => onUpdate?.(c.id, { score: e.target.value === '' ? '' : Number(e.target.value) })}
                     placeholder="—"
                     style={{ fontFamily: T.font, fontSize: 12, width: 72, border: `0.5px solid ${T.borderStrong}`, borderRadius: 4, padding: '2px 10px', textAlign: 'center', color: T.textPrimary }} />
@@ -2134,7 +2134,7 @@ function RatingSection({ item, onUpdate, scoringOn }: { item: ListItem; onUpdate
                 <input
                   type="number"
                   value={scores[v] ?? ''}
-                  onFocus={() => { if (scores[v] === undefined) onUpdate({ ratingScores: { ...scores, [v]: 0 } }); }}
+                  onFocus={e => { if (scores[v] === undefined) onUpdate({ ratingScores: { ...scores, [v]: 0 } }); e.currentTarget.select(); }}
                   onChange={e => onUpdate({ ratingScores: { ...scores, [v]: e.target.value === '' ? 0 : Number(e.target.value) } })}
                   style={{ fontFamily: T.font, fontSize: 13, width: '100%', border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 4px', textAlign: 'center', color: T.textPrimary }}
                 />
@@ -2710,6 +2710,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
                         const n = parseInt(e.target.value, 10);
                         if (!isNaN(n)) { row.set(n); row.upd(n); }
                       }}
+                      onFocus={e => e.currentTarget.select()}
                       onKeyDown={e => { if (e.key === 'e' || e.key === 'E' || e.key === '.' || e.key === ',') e.preventDefault(); }}
                       style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 8px', width: 70, textAlign: 'center' }}
                     />
