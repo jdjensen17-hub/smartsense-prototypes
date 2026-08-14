@@ -462,7 +462,7 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
 }
 
 // ── Item card ─────────────────────────────────────────────────────────────
-function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onInfoOpen, onPrinterOpen, flags, formulaResult }: {
+function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, onNA, onClearNA, onOOO, onClearOOO, onAssign, onCAOpen, caSubmitted, sublistProgress, onSublistOpen, onMCOpen, onMeasOpen, onInfoOpen, onPrinterOpen, flags, formulaResult }: {
   item: PreviewItem;
   answer: ItemAnswer;
   naItems: Set<string>;
@@ -479,17 +479,14 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   sublistProgress?: { done: number; total: number };
   onSublistOpen?: (id: string) => void;
   onMCOpen?: (id: string) => void;
+  onMeasOpen?: (id: string) => void;
   onInfoOpen?: (file: string, anchorY: number) => void;
   onPrinterOpen?: (anchorY: number) => void;
   flags?: Flag[];
   formulaResult?: string | null;
 }) {
   const [kebabOpen, setKebabOpen] = useState(false);
-  const [measInput, setMeasInput] = useState('');
-  const [showMeasModal, setShowMeasModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const measInputRef = React.useRef<HTMLInputElement>(null);
-  React.useEffect(() => { if (showMeasModal) measInputRef.current?.focus({ preventScroll: true }); }, [showMeasModal]);
 
   const isNA = naItems.has(item.id);
   const isOOO = oooItems.has(item.id);
@@ -667,24 +664,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
                 <i className="ti ti-calculator" style={{ fontSize: 18, color: APP_BLUE }} /> {answer}{item.measUnit ? ` ${item.measUnit}` : ''}
               </div>
             ) : (
-              <>
-                <AppBtn icon="ti-calculator" label="Enter value" onClick={() => setShowMeasModal(true)} />
-                {showMeasModal && (
-                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-                    <div style={{ background: 'white', borderRadius: 12, padding: 24, width: 280, fontFamily: FONT }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 16 }}>{item.prompt}</div>
-                      <div style={{ display: 'flex', alignItems: 'stretch', border: `2px solid ${APP_BLUE}`, borderRadius: 8, marginBottom: 16, overflow: 'hidden' }}>
-                        <input ref={measInputRef} type="number" value={measInput} onChange={e => setMeasInput(e.target.value)} placeholder="0.00" style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, border: 'none', outline: 'none', flex: 1, padding: '10px 14px', textAlign: 'right', minWidth: 0 }} />
-                        {item.measUnit && <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderLeft: `1px solid ${BORDER}`, fontSize: 14, fontWeight: 500, color: TEXT_SECONDARY, background: SURFACE_1, whiteSpace: 'nowrap' }}>{item.measUnit}</span>}
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => { if (measInput) { onAnswer(item.id, parseFloat(measInput)); setShowMeasModal(false); setMeasInput(''); } }} disabled={!measInput} style={{ flex: 1, background: APP_BLUE, color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '10px', cursor: measInput ? 'pointer' : 'default', opacity: measInput ? 1 : 0.4 }}>Submit</button>
-                        <button onClick={() => { setShowMeasModal(false); setMeasInput(''); }} style={{ flex: 1, background: SURFACE_1, color: TEXT_SECONDARY, border: '1.5px solid #C8C8D0', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 500, padding: '10px', cursor: 'pointer' }}>Cancel</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
+              <AppBtn icon="ti-calculator" label="Enter value" onClick={() => onMeasOpen?.(item.id)} />
             )
           )}
           {item.type === 'rating' && (
@@ -1184,6 +1164,10 @@ export default function JoltListPreviewPage() {
   const [infoModalY, setInfoModalY] = useState(0);
   const [printerModalY, setPrinterModalY] = useState<number | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [measOpenId, setMeasOpenId] = useState<string | null>(null);
+  const [measInput, setMeasInput] = useState('');
+  const measInputRef = React.useRef<HTMLInputElement>(null);
+  useEffect(() => { if (measOpenId) measInputRef.current?.focus({ preventScroll: true }); }, [measOpenId]);
 
   useEffect(() => {
     const raw = localStorage.getItem('jolt-preview-payload');
@@ -1360,6 +1344,7 @@ export default function JoltListPreviewPage() {
                 } : undefined}
                 onSublistOpen={id => setSublistOpenId(id)}
                 onMCOpen={id => setMcOpenId(id)}
+                onMeasOpen={id => { setMeasOpenId(id); setMeasInput(''); }}
                 onInfoOpen={(file, y) => { setInfoOpenFile(file); setInfoModalY(y); }}
                 onPrinterOpen={y => setPrinterModalY(y)}
                 flags={flags}
@@ -1415,6 +1400,27 @@ export default function JoltListPreviewPage() {
           })()}
         </div>
       </div>
+
+      {/* Measurement modal — rendered here (outside transformed div) so position: absolute is relative to phone frame */}
+      {measOpenId && (() => {
+        const mItem = items.find(i => i.id === measOpenId);
+        if (!mItem) return null;
+        return (
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setMeasOpenId(null); setMeasInput(''); }}>
+            <div style={{ background: 'white', borderRadius: 12, padding: 24, width: 'calc(100% - 64px)', fontFamily: FONT }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 16 }}>{mItem.prompt}</div>
+              <div style={{ display: 'flex', alignItems: 'stretch', border: `2px solid ${APP_BLUE}`, borderRadius: 8, marginBottom: 16, overflow: 'hidden' }}>
+                <input ref={measInputRef} type="number" value={measInput} onChange={e => setMeasInput(e.target.value)} placeholder="0.00" style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, border: 'none', outline: 'none', flex: 1, padding: '10px 14px', textAlign: 'right', minWidth: 0 }} />
+                {mItem.measUnit && <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderLeft: `1px solid ${BORDER}`, fontSize: 14, fontWeight: 500, color: TEXT_SECONDARY, background: SURFACE_1, whiteSpace: 'nowrap' }}>{mItem.measUnit}</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { if (measInput) { setAnswer(measOpenId, parseFloat(measInput)); setMeasOpenId(null); setMeasInput(''); } }} disabled={!measInput} style={{ flex: 1, background: APP_BLUE, color: 'white', border: 'none', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 700, padding: '10px', cursor: measInput ? 'pointer' : 'default', opacity: measInput ? 1 : 0.4 }}>Submit</button>
+                <button onClick={() => { setMeasOpenId(null); setMeasInput(''); }} style={{ flex: 1, background: SURFACE_1, color: TEXT_SECONDARY, border: '1.5px solid #C8C8D0', borderRadius: 8, fontFamily: FONT, fontSize: 15, fontWeight: 500, padding: '10px', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Submit confirmation modal */}
       {showSubmitModal && (
