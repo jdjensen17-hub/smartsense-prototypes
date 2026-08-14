@@ -1416,8 +1416,8 @@ export default function JoltListPreviewPage() {
 
       {/* Submit confirmation modal */}
       {showSubmitModal && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => setShowSubmitModal(false)}>
-          <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowSubmitModal(false)}>
+          <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', width: 'calc(100% - 48px)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}` }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: TEXT_PRIMARY }}>Submit list</div>
             </div>
