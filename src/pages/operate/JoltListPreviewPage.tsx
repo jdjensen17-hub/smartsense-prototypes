@@ -1399,9 +1399,8 @@ export default function JoltListPreviewPage() {
             );
           })()}
         </div>
-      </div>
 
-      {/* Measurement modal — rendered here (outside transformed div) so position: absolute is relative to phone frame */}
+      {/* Measurement modal — position: absolute relative to phone frame (position: relative) */}
       {measOpenId && (() => {
         const mItem = items.find(i => i.id === measOpenId);
         if (!mItem) return null;
@@ -1443,8 +1442,9 @@ export default function JoltListPreviewPage() {
           </div>
         </div>
       )}
+      </div>{/* end phone frame */}
 
-      {/* Info library modal — rendered outside the transformed column so position:fixed works correctly */}
+      {/* Info library modal — position: fixed, so ancestor positioning doesn't matter */}
       {infoOpenFile && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} onClick={() => setInfoOpenFile(null)}>
           <div style={{ position: 'absolute', top: infoModalY, left: '50%', transform: 'translateX(-50%)', width: 420, height: 400, background: 'white', borderRadius: '0 0 12px 12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
