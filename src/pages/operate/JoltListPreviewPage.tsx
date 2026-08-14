@@ -1407,7 +1407,7 @@ export default function JoltListPreviewPage() {
         if (!mItem) return null;
         return (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setMeasOpenId(null); setMeasInput(''); }}>
-            <div style={{ background: 'white', borderRadius: 12, padding: 24, width: 'calc(100% - 64px)', fontFamily: FONT }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: 'white', borderRadius: 12, padding: 24, width: 280, fontFamily: FONT }} onClick={e => e.stopPropagation()}>
               <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 16 }}>{mItem.prompt}</div>
               <div style={{ display: 'flex', alignItems: 'stretch', border: `2px solid ${APP_BLUE}`, borderRadius: 8, marginBottom: 16, overflow: 'hidden' }}>
                 <input ref={measInputRef} type="number" value={measInput} onChange={e => setMeasInput(e.target.value)} placeholder="0.00" style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, border: 'none', outline: 'none', flex: 1, padding: '10px 14px', textAlign: 'right', minWidth: 0 }} />
