@@ -45,7 +45,7 @@ type DCConditionNumeric = { type: 'numeric'; op: '>' | '>=' | '=' | '<=' | '<'; 
 type DCConditionMC      = { type: 'mc'; choiceId: string; choiceLabel: string };
 type DCCondition = DCConditionYN | DCConditionNumeric | DCConditionMC;
 
-interface MCChoice { id: string; label: string; color: string; icon: string | null; flagIds?: string[]; }
+interface MCChoice { id: string; label: string; color: string; icon: string | null; flagIds?: string[]; score?: number | ''; }
 interface CARule { id: string; condition?: string; rangeId?: string; caList: string; adHoc: boolean; nextStep: 'repeat-item' | 'repeat-list' | 'no-repeat'; optional?: boolean; }
 interface Flag { id: string; name: string; color: string; emoji: string; showOnApp?: boolean; }
 interface MeasRange { id: string; min: string; max: string; }
@@ -72,8 +72,11 @@ interface PreviewItem {
   measRanges?: MeasRange[];
   measFlagRules?: MeasFlagRule[];
   points?: number;
+  scoreYes?: number;
+  scoreNo?: number;
   ratingMin?: number;
   ratingMax?: number;
+  ratingScores?: Record<number, number>;
   infoFile?: string;
   infoInline?: boolean;
   labelPrint?: boolean;
@@ -350,13 +353,48 @@ function StatusBoxes({ scoringOn, items, answers, naItems, oooItems, displayedAt
 
   let scoreDisplay = '0.00%';
   if (scoringOn) {
-    const excluded = new Set([...naItems, ...oooItems]);
-    const scoreable = items.filter(i => i.points && i.type !== 'subtitle' && i.type !== 'text' && !excluded.has(i.id));
-    const possible = scoreable.reduce((sum, i) => sum + (i.points ?? 0), 0);
-    const earned = scoreable
-      .filter(i => itemCompleted(i, answers[i.id] ?? null, false, false))
-      .reduce((sum, i) => sum + (i.points ?? 0), 0);
-    scoreDisplay = possible > 0 ? `${((earned / possible) * 100).toFixed(2)}%` : '0.00%';
+    let denom = 0;
+    let numer = 0;
+    for (const item of items) {
+      if (!['yn', 'rating', 'mc'].includes(item.type)) continue;
+      if (naItems.has(item.id) || oooItems.has(item.id)) continue;
+      const answer = answers[item.id] ?? null;
+
+      if (item.type === 'yn') {
+        const yesScore = item.scoreYes ?? 0;
+        const noScore = item.scoreNo ?? 0;
+        const max = Math.max(yesScore, noScore);
+        if (max <= 0) continue;
+        denom += max;
+        if (answer === 'Yes') numer += yesScore;
+        else if (answer === 'No') numer += noScore;
+
+      } else if (item.type === 'rating') {
+        const scores = item.ratingScores ?? {};
+        const vals = Object.values(scores).map(Number);
+        const max = vals.length > 0 ? Math.max(...vals) : 0;
+        if (max <= 0) continue;
+        denom += max;
+        if (answer !== null && answer !== '') numer += scores[Number(answer)] ?? 0;
+
+      } else if (item.type === 'mc') {
+        const choices = item.choices ?? [];
+        if (item.mcMultiSelect) {
+          const total = choices.reduce((s, c) => s + (Number(c.score) || 0), 0);
+          if (total <= 0) continue;
+          denom += total;
+          let ids: string[] = [];
+          try { ids = answer ? JSON.parse(answer as string) : []; } catch { ids = []; }
+          ids.forEach(id => { numer += Number(choices.find(c => c.id === id)?.score) || 0; });
+        } else {
+          const max = Math.max(...choices.map(c => Number(c.score) || 0), 0);
+          if (max <= 0) continue;
+          denom += max;
+          numer += Number(choices.find(c => c.id === answer)?.score) || 0;
+        }
+      }
+    }
+    scoreDisplay = denom > 0 ? `${((numer / denom) * 100).toFixed(2)}%` : '0.00%';
   }
 
   const box: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, padding: '8px 12px' };
