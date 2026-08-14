@@ -488,6 +488,8 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
   const [measInput, setMeasInput] = useState('');
   const [showMeasModal, setShowMeasModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const measInputRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => { if (showMeasModal) measInputRef.current?.focus({ preventScroll: true }); }, [showMeasModal]);
 
   const isNA = naItems.has(item.id);
   const isOOO = oooItems.has(item.id);
@@ -672,7 +674,7 @@ function ItemCard({ item, answer, naItems, oooItems, assignedItems, onAnswer, on
                     <div style={{ background: 'white', borderRadius: 12, padding: 24, width: 280, fontFamily: FONT }}>
                       <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 16 }}>{item.prompt}</div>
                       <div style={{ display: 'flex', alignItems: 'stretch', border: `2px solid ${APP_BLUE}`, borderRadius: 8, marginBottom: 16, overflow: 'hidden' }}>
-                        <input type="number" value={measInput} onChange={e => setMeasInput(e.target.value)} placeholder="0.00" autoFocus style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, border: 'none', outline: 'none', flex: 1, padding: '10px 14px', textAlign: 'right', minWidth: 0 }} />
+                        <input ref={measInputRef} type="number" value={measInput} onChange={e => setMeasInput(e.target.value)} placeholder="0.00" style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, border: 'none', outline: 'none', flex: 1, padding: '10px 14px', textAlign: 'right', minWidth: 0 }} />
                         {item.measUnit && <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderLeft: `1px solid ${BORDER}`, fontSize: 14, fontWeight: 500, color: TEXT_SECONDARY, background: SURFACE_1, whiteSpace: 'nowrap' }}>{item.measUnit}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
