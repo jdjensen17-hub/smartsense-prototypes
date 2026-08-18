@@ -276,6 +276,12 @@ function dcCondLabel(conds?: DCCondition[]) {
 // ── List Schedule ─────────────────────────────────────────────────────────
 
 interface DisplayTime { id: string; hour: number; minute: number; ampm: 'AM' | 'PM'; dueAmt: number; dueUnit: string; expAmt: number; expUnit: string; }
+
+const INITIAL_DISPLAY_TIMES: DisplayTime[] = [
+  { id: 'dt-am', hour: 6, minute: 0, ampm: 'AM', dueAmt: 8, dueUnit: 'hours', expAmt: 1, expUnit: 'hours' },
+  { id: 'dt-noon', hour: 12, minute: 0, ampm: 'PM', dueAmt: 8, dueUnit: 'hours', expAmt: 1, expUnit: 'hours' },
+  { id: 'dt-pm', hour: 5, minute: 0, ampm: 'PM', dueAmt: 8, dueUnit: 'hours', expAmt: 1, expUnit: 'hours' },
+];
 interface MonthRange { id: string; fromMonth: number; fromDay: number; toMonth: number; toDay: number; }
 
 type RepeatMode = 'daily' | 'weekly' | 'monthly' | 'custom';
@@ -311,6 +317,15 @@ function dtConflicts(dts: DisplayTime[]): Map<string, 'due' | 'exp'> {
     }
   }
   return result;
+}
+
+function formatDisplayTime(dt: DisplayTime): string {
+  return `${dt.hour}:${dt.minute.toString().padStart(2, '0')} ${dt.ampm}`;
+}
+
+function formatOffset(amt: number, unit: string): string {
+  const label = amt === 1 ? unit.replace(/s$/, '') : unit;
+  return `${amt} ${label}`;
 }
 
 function schedSummary(dts: DisplayTime[]): string {
@@ -450,8 +465,7 @@ function CreateSettingsSubsection({ allowCreate, setAllowCreate, allowGeo, setAl
   );
 }
 
-function ListScheduleSection() {
-  const [displayTimes, setDisplayTimes] = useState<DisplayTime[]>([]);
+function ListScheduleSection({ displayTimes, setDisplayTimes }: { displayTimes: DisplayTime[]; setDisplayTimes: React.Dispatch<React.SetStateAction<DisplayTime[]>> }) {
 
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('daily');
   const [weekDays, setWeekDays] = useState<number[]>([0,1,2,3,4,5,6]);
@@ -584,9 +598,9 @@ function ListScheduleSection() {
                       <option>AM</option><option>PM</option>
                     </select>
                   </div>
-                  {/* Due after */}
+                  {/* Due in */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRight: `0.5px solid ${T.border}` }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due after</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due in</div>
                     {offsetSel(dt.dueAmt, v => updateDT(dt.id, { dueAmt: v }))}
                     {unitSel(dt.dueUnit, v => updateDT(dt.id, { dueUnit: v }))}
                   </div>
@@ -3057,7 +3071,7 @@ function NotificationSection() {
 }
 
 // ── Settings tab ──────────────────────────────────────────────────────────
-function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission }: { scoringOn: boolean; setScoringOn: (v: boolean) => void; submission: string; setSubmission: (v: string) => void }) {
+function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displayTimes, setDisplayTimes }: { scoringOn: boolean; setScoringOn: (v: boolean) => void; submission: string; setSubmission: (v: string) => void; displayTimes: DisplayTime[]; setDisplayTimes: React.Dispatch<React.SetStateAction<DisplayTime[]>> }) {
   const [submissionAccess, setSubmissionAccess] = useState('anyone-anytime');
   const [listScoreVisible, setListScoreVisible] = useState(true);
   const [itemScoreVisible, setItemScoreVisible] = useState(true);
@@ -3112,8 +3126,8 @@ function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission }: { s
       </SectionHeader>
 
       {/* List schedule */}
-      <SectionHeader label="List schedule" helpTip="Add a display time to the list schedule for the list to automatically display on mobile devices." summary="No schedule configured" defaultOpen={false}>
-        <ListScheduleSection />
+      <SectionHeader label="List schedule" helpTip="Add a display time to the list schedule for the list to automatically display on mobile devices." summary={displayTimes.length ? schedSummary(displayTimes) : 'No schedule configured'} defaultOpen={false}>
+        <ListScheduleSection displayTimes={displayTimes} setDisplayTimes={setDisplayTimes} />
       </SectionHeader>
 
       {/* Role-based access */}
@@ -4509,6 +4523,152 @@ const RestorePrimaryBtn = styled.button({
   '&:hover': { backgroundColor: 'var(--ss-medium-blue)' },
 });
 
+const RestoreNeutralBtn = styled.button({
+  label: 'button-neutral',
+  backgroundColor: 'var(--ss-bg-surface)',
+  color: 'var(--ss-fg-primary)',
+  fontFamily: 'var(--ss-font-sans)',
+  fontSize: 'var(--ss-size-button)',
+  fontWeight: 700,
+  padding: '9px 16px',
+  border: '1px solid var(--ss-border-default)',
+  borderRadius: 'var(--ss-rd-4)',
+  cursor: 'pointer',
+});
+
+const RestoreDangerBtn = styled.button({
+  label: 'button-destructive',
+  backgroundColor: 'var(--ss-danger)',
+  color: 'var(--ss-fg-on-dark)',
+  fontFamily: 'var(--ss-font-sans)',
+  fontSize: 'var(--ss-size-button)',
+  fontWeight: 700,
+  padding: '10px 16px',
+  border: 'none',
+  borderRadius: 'var(--ss-rd-4)',
+  cursor: 'pointer',
+  '&:disabled': {
+    backgroundColor: 'var(--ss-grey-500)',
+    cursor: 'not-allowed',
+  },
+});
+
+const DeactivatePrompt = styled.p({
+  label: 'deactivate-instances-prompt',
+  margin: 0,
+  padding: 'var(--ss-space-6) var(--ss-space-6) var(--ss-space-3)',
+  fontSize: 'var(--ss-size-body)',
+  color: 'var(--ss-fg-primary)',
+});
+
+const DeactivateTableWrap = styled.div({
+  label: 'deactivate-instances-table-wrap',
+  padding: '0 var(--ss-space-6)',
+});
+
+const DeactivateTable = styled.table({
+  label: 'deactivate-instances-table',
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontFamily: 'var(--ss-font-sans)',
+  fontSize: 'var(--ss-size-body)',
+  color: 'var(--ss-fg-primary)',
+});
+
+const DeactivateTh = styled.th({
+  label: 'deactivate-instances-th',
+  textAlign: 'left',
+  fontSize: 'var(--ss-size-body-sm)',
+  fontWeight: 600,
+  color: 'var(--ss-fg-secondary)',
+  padding: 'var(--ss-space-2) var(--ss-space-2)',
+  borderBottom: '1px solid var(--ss-border-default)',
+});
+
+const DeactivateTd = styled.td({
+  label: 'deactivate-instances-td',
+  padding: 'var(--ss-space-2)',
+  borderBottom: '1px solid var(--ss-border-default)',
+});
+
+const DeactivateHelp = styled.p({
+  label: 'deactivate-instances-help',
+  margin: 0,
+  padding: 'var(--ss-space-3) var(--ss-space-6) var(--ss-space-4)',
+  fontSize: 'var(--ss-size-body-sm)',
+  color: 'var(--ss-fg-secondary)',
+  lineHeight: 1.45,
+});
+
+function DeactivateInstancesModal({ displayTimes, onClose, onConfirm }: { displayTimes: DisplayTime[]; onClose: () => void; onConfirm: (ids: string[]) => void }) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const allSelected = displayTimes.length > 0 && selected.size === displayTimes.length;
+  const noneSelected = selected.size === 0;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  function toggle(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <RestoreScrim onClick={onClose} role="presentation">
+      <RestoreDialog role="dialog" aria-modal="true" aria-labelledby="deactivate-instances-title" onClick={e => e.stopPropagation()}>
+        <RestoreHeader>
+          <RestoreTitle id="deactivate-instances-title">Deactivate List Instances</RestoreTitle>
+          <RestoreClose type="button" aria-label="Close" onClick={onClose}>
+            <X size={16} strokeWidth={1.4} color="currentColor" />
+          </RestoreClose>
+        </RestoreHeader>
+        <DeactivatePrompt>Deactivate all lists that were displayed at:</DeactivatePrompt>
+        <DeactivateTableWrap>
+          {displayTimes.length === 0 ? (
+            <span style={{ fontSize: 'var(--ss-size-body)', color: 'var(--ss-fg-secondary)' }}>No display times configured.</span>
+          ) : (
+            <DeactivateTable>
+              <thead>
+                <tr>
+                  <DeactivateTh style={{ width: 28 }}>
+                    <input type="checkbox" checked={allSelected} aria-label="Select all" onChange={e => setSelected(e.target.checked ? new Set(displayTimes.map(dt => dt.id)) : new Set())} style={{ accentColor: 'var(--ss-sky-blue)', width: 14, height: 14 }} />
+                  </DeactivateTh>
+                  <DeactivateTh>Displays at</DeactivateTh>
+                  <DeactivateTh>Due in</DeactivateTh>
+                  <DeactivateTh>Expires after</DeactivateTh>
+                </tr>
+              </thead>
+              <tbody>
+                {displayTimes.map(dt => (
+                  <tr key={dt.id}>
+                    <DeactivateTd>
+                      <input type="checkbox" checked={selected.has(dt.id)} aria-label={formatDisplayTime(dt)} onChange={() => toggle(dt.id)} style={{ accentColor: 'var(--ss-sky-blue)', width: 14, height: 14 }} />
+                    </DeactivateTd>
+                    <DeactivateTd>{formatDisplayTime(dt)}</DeactivateTd>
+                    <DeactivateTd>{formatOffset(dt.dueAmt, dt.dueUnit)}</DeactivateTd>
+                    <DeactivateTd>{formatOffset(dt.expAmt, dt.expUnit)}</DeactivateTd>
+                  </tr>
+                ))}
+              </tbody>
+            </DeactivateTable>
+          )}
+        </DeactivateTableWrap>
+        <DeactivateHelp>Only list instances that have not passed their display time will be deactivated.</DeactivateHelp>
+        <RestoreFooter>
+          <RestoreNeutralBtn type="button" onClick={onClose}>Cancel</RestoreNeutralBtn>
+          <RestoreDangerBtn type="button" disabled={noneSelected} onClick={() => onConfirm([...selected])}>Deactivate</RestoreDangerBtn>
+        </RestoreFooter>
+      </RestoreDialog>
+    </RestoreScrim>
+  );
+}
+
 function RestoreInstancesModal({ onClose, onRestore, onReactivateOnly }: { onClose: () => void; onRestore: () => void; onReactivateOnly: () => void }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
@@ -4616,7 +4776,9 @@ export default function JoltListEditorPage() {
   };
   const [showAddPopover, setShowAddPopover] = useState(false);
   const [templateDeactivated, setTemplateDeactivated] = useState(false);
+  const [displayTimes, setDisplayTimes] = useState<DisplayTime[]>(INITIAL_DISPLAY_TIMES);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [deactivateInstancesOpen, setDeactivateInstancesOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const [kebabOpenId, setKebabOpenId] = useState<string | null>(null);
@@ -4878,7 +5040,7 @@ export default function JoltListEditorPage() {
                       <i className="ti ti-ban" style={{ fontSize: 15, color: T.textDanger, width: 18 }} />Deactivate List Template
                     </div>
                     <div
-                      onClick={() => setHeaderMenuOpen(false)}
+                      onClick={() => { setHeaderMenuOpen(false); setDeactivateInstancesOpen(true); }}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textDanger, cursor: 'pointer' }}
                       onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -4923,7 +5085,7 @@ export default function JoltListEditorPage() {
 
       {activeTab === 'settings' ? (
         <div style={{ flex: 1, overflowY: 'auto', background: T.surface0 }}>
-          <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} submission={submission} setSubmission={setSubmission} />
+          <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} submission={submission} setSubmission={setSubmission} displayTimes={displayTimes} setDisplayTimes={setDisplayTimes} />
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -5030,6 +5192,14 @@ export default function JoltListEditorPage() {
           onClose={() => setRestoreModalOpen(false)}
           onRestore={() => { setTemplateDeactivated(false); setRestoreModalOpen(false); }}
           onReactivateOnly={() => { setTemplateDeactivated(false); setRestoreModalOpen(false); }}
+        />,
+        document.body
+      )}
+      {deactivateInstancesOpen && ReactDOM.createPortal(
+        <DeactivateInstancesModal
+          displayTimes={displayTimes}
+          onClose={() => setDeactivateInstancesOpen(false)}
+          onConfirm={() => setDeactivateInstancesOpen(false)}
         />,
         document.body
       )}
