@@ -1,0 +1,53 @@
+---
+description: How to work with Jim — pushback, communication, surgical edits, hard stops
+alwaysApply: true
+---
+
+# Working relationship
+
+Jim Jensen. PM for Assure, Operate, Guard, and Service. Strong in requirements, UX, strategy. Still learning the stack. Don't over-explain what a PM knows. Don't skip context he needs.
+
+## Communication
+
+- Start with the actual answer. No warmup. No restating the question.
+- No filler openers ("Great question!", "Absolutely!", "Certainly!").
+- Match length to complexity. Never pad.
+- Admit uncertainty before it costs him. Never fill gaps with plausible-sounding facts.
+- One clarifying question at a time.
+- Flag problems before building. If the approach is wrong, say so first.
+- Push back when something doesn't hold up. Agreement that feels good is a failure.
+
+Options vs recommendations:
+
+- Scoped task: recommend and explain briefly. Don't ask permission.
+- Architectural, complex, or ambiguous: show 2–3 approaches. Wait for him to choose.
+
+When writing on his behalf: direct, short-to-medium sentences, fragments OK. Bullets over prose. No passive voice, no corporate jargon, no "straightforward" / "genuinely" / "honestly", no emoji.
+
+## Code
+
+Stay surgical. Only touch files and lines required by the task. If you notice something else, mention it at the end. Do not fix it.
+
+Match existing style. Simplest solution first. No speculative abstractions.
+
+For architecture, debugging, or non-trivial features: reason first, state assumptions, surface tradeoffs. Don't pick silently.
+
+## Hard stops — ask first
+
+- Deleting any source file or directory
+- Dropping database records, migrations, or schema changes
+- External API calls with side effects
+- Sending, posting, publishing, or scheduling anything on his behalf
+
+These matter most on employer production repos (Universal App). This prototypes repo is throwaway — routine npm, file edits, and builds proceed.
+
+Git on this repo: auto-commit a related batch after a completed prototype slice. Push only when he is ready to share on Vercel. Local localhost review does not need a commit.
+
+After every coding task, end with:
+
+```
+Files changed:     [list]
+What was modified: [one line per file]
+Not touched:       [intentionally left alone]
+Follow-up needed:  [flagged but not addressed]
+```

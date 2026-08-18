@@ -1,0 +1,54 @@
+---
+description: Prototype repo workflow — shell, folders, Plan-then-build, memory, deploy
+alwaysApply: true
+---
+
+# Prototype workflow
+
+Read `MEMORY.md` at the start of every session. Never contradict a logged decision without flagging it first. After a significant decision, log: what / why / rejected.
+
+When he says "session end", "wrapping up", or "let's stop here": append a session summary to `MEMORY.md` (worked on / completed / in progress / decisions / next).
+
+If an approach takes more than 2 attempts, log it in `ERRORS.md` and check that file before retrying similar work.
+
+## Research then build — Cursor replacement for Claude.ai / Claude Code
+
+Grok does both. The split exists to keep context debt out of the build, not because the models differ.
+
+1. **Plan chat** — understand the problem, define interaction states, nail design decisions. A quick sketch is fine. A complete TSX artifact here is wasted effort.
+2. **Handoff** — before building, write a clean handoff: decisions, component structure, what must not change. Put it in `MEMORY.md` or the first message of a new chat.
+3. **Fresh Agent chat** — infrastructure first (App.tsx route, folder, title map). Verify. Then a second scoped prompt for the page itself. One page per prompt.
+
+Start a new thread when the current one is bloated with exploratory back-and-forth.
+
+## Claude conversation import
+
+Recovery, not onboarding. Import only if Jim names a specific in-flight thread. Extract decisions into `MEMORY.md` immediately, then discard the transcript. Do not import a backlog of old chats.
+
+## Page organization
+
+- `src/pages/mobile/[module]/` — mobile (Operate, Assure, Guard, Service)
+- `src/pages/operate/` — SmartSense ONE web
+- `src/pages/dashboards/` — dashboard prototypes
+- `src/pages/user-management/` — existing admin pages
+
+`/mobile/*` gets the minimal shell header. All other routes get the full shell. Already implemented in `src/App.tsx` — do not change that contract.
+
+Do not add a new page to the nav drawer unless the task asks for it.
+
+## Ground truth
+
+Mobile components: search `/Users/jjensen/Projects/repos/universal` before guessing from screenshots. Add that repo as a workspace folder only when a mobile prototype needs it.
+
+## Local review vs share pipeline
+
+Local preview does **not** require a commit. `npm run dev` (Vite) hot-reloads from the working tree. Inspect instantly on localhost. Uncommitted files are visible.
+
+Share pipeline (this repo only — never employer production repos):
+
+1. Edit files locally. Jim reviews on localhost.
+2. When a related batch is done, commit it on `main`. Auto-commit is OK after a completed prototype slice. Do not commit after every tiny intermediate edit.
+3. Push to `origin` (`https://github.com/jdjensen17-hub/smartsense-prototypes.git`) only when Jim is ready to share. Push updates Vercel project `smartsense-prototypes`.
+4. Public URL: `https://smartsense-prototypes.vercel.app` — HashRouter, so share routes as `https://smartsense-prototypes.vercel.app/#/path`.
+
+Do not add a page to the nav drawer just to make it shareable. Do not push the Cursor-setup / calibration diff unless Jim asks.

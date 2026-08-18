@@ -2,6 +2,10 @@
 
 **Behavioral Guidelines + Project Context for Claude Code**
 
+Cursor is now the go-forward harness for this repo. Operating contract lives in
+`.cursor/rules/` — do not treat the Claude.ai / Claude Code split below as current.
+Plan chat researches; a fresh Agent chat builds. See `prototype-workflow.mdc`.
+
 ---
 
 ## WHO I AM
@@ -74,17 +78,12 @@ header. Full shell header on all other routes. This is already
 implemented in App.tsx — do not change it.
 
 **Deploying updates:**
-After CC completes any change, push to GitHub to trigger 
-an automatic Vercel deployment:
-
-  git add .
-  git commit -m "describe what changed"
-  git push
+Local preview does not require a commit — Vite hot-reloads localhost.
+Commit a related batch after a completed slice. Push to GitHub only
+when ready to share. Push triggers Vercel:
 
 Public URL: https://smartsense-prototypes.vercel.app
-This URL is permanent — it updates automatically on 
-every push. Share it with collaborators who need to 
-view prototypes without running locally.
+HashRouter — share as `https://smartsense-prototypes.vercel.app/#/path`.
 
 ---
 

@@ -1,0 +1,27 @@
+---
+description: SmartSense ONE design tokens — new platform pages
+globs: src/pages/operate/**/*.tsx,src/pages/assure/**/*.tsx,src/pages/guard/**/*.tsx,src/pages/service/**/*.tsx,src/pages/dashboards/**/*.tsx
+alwaysApply: false
+---
+
+# SmartSense ONE styling
+
+Read `STYLING-S1.md` before styling. Tokens live in `src/design/colors_and_type.css` (imported at app root). Never mix with `@joltup/colors` in the same component.
+
+```ts
+// ✅
+backgroundColor: 'var(--ss-bg-surface)',
+borderRadius: 'var(--ss-rd-4)',
+fontFamily: 'var(--ss-font-sans)',
+
+// ❌
+backgroundColor: '#ffffff',
+```
+
+Allowed hex literals only: `#6b1717` and `#6b3600` (on-white contrast overrides). If a token is missing, stop and flag it. Do not inline a literal.
+
+- Semantic colors (`--ss-danger` / `--ss-warning` / `--ss-success` / `--ss-info`) are status signals, never decoration.
+- Proxima Nova only via `var(--ss-font-sans)`. Never choose Roboto.
+- Badges: `--ss-rd-4`. Pills are for status dots and avatars only.
+- Card shadows stay static. Modal overlay is a solid scrim — no `backdrop-filter: blur()`.
+- Emotion + `label` matching the component name. Lucide icons at 24×24, strokeWidth 1.4 (inline 16).

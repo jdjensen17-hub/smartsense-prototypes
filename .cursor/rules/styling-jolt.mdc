@@ -1,0 +1,22 @@
+---
+description: Jolt design system — legacy admin and mobile pages
+globs: src/pages/user-management/**/*.tsx,src/pages/mobile/**/*.tsx
+alwaysApply: false
+---
+
+# Jolt styling
+
+Read `STYLING.md` before styling. Prefer `@joltup/lists-web-components` before building custom UI. Never mix `--ss-*` tokens into these pages.
+
+```ts
+import colors from '@joltup/colors';
+import styled from '@emotion/styled';
+```
+
+No hardcoded hex, no Tailwind color utilities, no raw RGB. Always include `label` on styled components.
+
+- Static / layout: `colors.grey[100]` etc. from `@joltup/colors`.
+- Hover / active / disabled: `LIST_COMPONENT_COLORS` theme pattern in `STYLING.md`.
+- Use `TRASNPARENT_HOVER` / `TRASNPARENT_ACTIVE` as-is — those typos are in the source constants.
+
+Mobile pages under `src/pages/mobile/` also use the existing mobile shell (`@/components/mobile-shell`) and `SHELL_HEX`. Do not restyle `src/App.tsx` shell chrome to satisfy this rule.

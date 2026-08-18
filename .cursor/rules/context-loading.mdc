@@ -1,0 +1,26 @@
+---
+description: Load parent context docs only when the task needs them
+alwaysApply: true
+---
+
+# Context loading
+
+Parent docs live one level up. Load only what the current task needs. Do not dump them into every chat.
+
+| File | Load when |
+|------|-----------|
+| `../INDEX.md` | You need the map of what exists |
+| `../company.md` | Baseline company / acquisition / enterprise GTM |
+| `../product.md` | Product decisions, PRDs, integration architecture |
+| `../goals.md` | Prioritization for Jim's modules (Assure, Operate, Guard, Service) |
+| `../personas.md` | User-facing work, discovery, roadmap |
+
+Never auto-load `../competitors.md` or `../buyer-personas.md`. Those are reference — open only for competitive or positioning work.
+
+`../INDEX.md` points at `research_backlog.md`, which is missing. Do not invent that file.
+
+These docs were last updated May 2026. Treat them as background, not current strategy. If a task depends on Now/Next/Later, pressure-test with Jim before treating a May claim as gospel.
+
+Do not recommend SMB / self-serve / sub-50-location features. Enterprise GTM, 50+ locations.
+
+Do not treat company-level goals (unified login, AI exception reporting, ARR) as Jim's backlog. His Now is in `../goals.md`: tech debt, Assure GTM support, Org Hierarchy/RBAC.
