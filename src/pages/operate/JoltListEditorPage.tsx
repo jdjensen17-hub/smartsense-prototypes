@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
+import styled from '@emotion/styled';
+import { X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Barcode from 'react-barcode';
 import { ROLE_DEFS } from '../../data/roles';
@@ -1823,7 +1825,15 @@ function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, onC
       {/* Expanded: Flag panel */}
       {expandedPanel === 'flag' && (
         <div style={{ padding: '10px 12px', borderTop: `0.5px solid ${T.border}`, background: T.surface1, borderRadius: '0 0 8px 8px' }}>
-          <FlagPicker
+          {locked ? (c.flagIds ?? []).map(id => {
+            const f = flags.find(x => x.id === id);
+            if (!f) return null;
+            return <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.color, flexShrink: 0, display: 'inline-block' }} />
+              {f.emoji && <span>{f.emoji}</span>}
+              <span style={{ fontSize: 13, color: T.textPrimary }}>{f.name}</span>
+            </div>;
+          }) : <FlagPicker
             selectedIds={c.flagIds ?? []}
             flags={flags}
             onToggle={flagId => {
@@ -1836,7 +1846,7 @@ function MCChoiceRow({ c, idx, locked, scoringOn, flags, onUpdate, onRemove, onC
               const current = c.flagIds ?? [];
               onUpdate?.(c.id, { flagIds: [...current, flag.id] });
             }}
-          />
+          />}
         </div>
       )}
 
@@ -2134,7 +2144,7 @@ function RatingSection({ item, onUpdate, scoringOn }: { item: ListItem; onUpdate
                 <input
                   type="number"
                   value={scores[v] ?? ''}
-                  onFocus={e => { if (scores[v] === undefined) onUpdate({ ratingScores: { ...scores, [v]: 0 } }); e.currentTarget.select(); }}
+                  onFocus={e => e.currentTarget.select()}
                   onChange={e => onUpdate({ ratingScores: { ...scores, [v]: e.target.value === '' ? 0 : Number(e.target.value) } })}
                   style={{ fontFamily: T.font, fontSize: 13, width: '100%', border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '5px 4px', textAlign: 'center', color: T.textPrimary }}
                 />
@@ -4401,6 +4411,132 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
   );
 }
 
+const RestoreScrim = styled.div({
+  label: 'restore-instances-scrim',
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0, 0, 0, 0.40)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 200,
+});
+
+const RestoreDialog = styled.div({
+  label: 'restore-instances-dialog',
+  width: 480,
+  backgroundColor: 'var(--ss-bg-surface)',
+  borderRadius: 'var(--ss-rd-4)',
+  boxShadow: 'var(--ss-shadow-3)',
+  fontFamily: 'var(--ss-font-sans)',
+});
+
+const RestoreHeader = styled.div({
+  label: 'restore-instances-header',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: 'var(--ss-space-4) var(--ss-space-6)',
+  borderBottom: '1px solid var(--ss-border-default)',
+});
+
+const RestoreTitle = styled.h2({
+  label: 'restore-instances-title',
+  margin: 0,
+  fontSize: 'var(--ss-size-h2)',
+  fontWeight: 700,
+  color: 'var(--ss-fg-heading)',
+});
+
+const RestoreClose = styled.button({
+  label: 'restore-instances-close',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 32,
+  height: 32,
+  padding: 0,
+  border: 'none',
+  borderRadius: 'var(--ss-rd-4)',
+  background: 'transparent',
+  color: 'var(--ss-fg-secondary)',
+  cursor: 'pointer',
+  '&:hover': { backgroundColor: 'var(--ss-bg-app)' },
+});
+
+const RestoreBody = styled.p({
+  label: 'restore-instances-body',
+  margin: 0,
+  padding: 'var(--ss-space-6)',
+  fontSize: 'var(--ss-size-body)',
+  lineHeight: 1.5,
+  color: 'var(--ss-fg-primary)',
+});
+
+const RestoreFooter = styled.div({
+  label: 'restore-instances-footer',
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 'var(--ss-space-3)',
+  padding: 'var(--ss-space-4) var(--ss-space-6) var(--ss-space-6)',
+});
+
+const RestoreSecondaryBtn = styled.button({
+  label: 'button-secondary',
+  backgroundColor: 'var(--ss-bg-surface)',
+  color: 'var(--ss-sky-blue)',
+  fontFamily: 'var(--ss-font-sans)',
+  fontSize: 'var(--ss-size-button)',
+  fontWeight: 700,
+  padding: '9px 16px',
+  border: '1px solid var(--ss-sky-blue)',
+  borderRadius: 'var(--ss-rd-4)',
+  cursor: 'pointer',
+  '&:hover': { backgroundColor: 'var(--ss-pale-blue)' },
+});
+
+const RestorePrimaryBtn = styled.button({
+  label: 'button-primary',
+  backgroundColor: 'var(--ss-sky-blue)',
+  color: 'var(--ss-fg-on-dark)',
+  fontFamily: 'var(--ss-font-sans)',
+  fontSize: 'var(--ss-size-button)',
+  fontWeight: 700,
+  padding: '10px 16px',
+  border: 'none',
+  borderRadius: 'var(--ss-rd-4)',
+  cursor: 'pointer',
+  '&:hover': { backgroundColor: 'var(--ss-medium-blue)' },
+});
+
+function RestoreInstancesModal({ onClose, onRestore, onReactivateOnly }: { onClose: () => void; onRestore: () => void; onReactivateOnly: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <RestoreScrim onClick={onClose} role="presentation">
+      <RestoreDialog role="dialog" aria-modal="true" aria-labelledby="restore-instances-title" onClick={e => e.stopPropagation()}>
+        <RestoreHeader>
+          <RestoreTitle id="restore-instances-title">Restore List Instances?</RestoreTitle>
+          <RestoreClose type="button" aria-label="Close" onClick={onClose}>
+            <X size={16} strokeWidth={1.4} color="currentColor" />
+          </RestoreClose>
+        </RestoreHeader>
+        <RestoreBody>
+          Do you also want to <strong>restore list instances</strong> that were removed when this template was deactivated?
+        </RestoreBody>
+        <RestoreFooter>
+          <RestoreSecondaryBtn type="button" onClick={onRestore}>REACTIVATE & RESTORE</RestoreSecondaryBtn>
+          <RestorePrimaryBtn type="button" onClick={onReactivateOnly}>REACTIVATE ONLY</RestorePrimaryBtn>
+        </RestoreFooter>
+      </RestoreDialog>
+    </RestoreScrim>
+  );
+}
+
 // ── Main editor ────────────────────────────────────────────────────────────
 export default function JoltListEditorPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
@@ -4479,6 +4615,10 @@ export default function JoltListEditorPage() {
     setScoringOn(v);
   };
   const [showAddPopover, setShowAddPopover] = useState(false);
+  const [templateDeactivated, setTemplateDeactivated] = useState(false);
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
   const [kebabOpenId, setKebabOpenId] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editingPrompt, setEditingPrompt] = useState('');
@@ -4486,6 +4626,17 @@ export default function JoltListEditorPage() {
   const addBtnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (editingRowId) editInputRef.current?.focus(); }, [editingRowId]);
+
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [headerMenuOpen]);
 
   // Assign a stable color per DC parent
   const dcColors = React.useMemo(() => {
@@ -4679,11 +4830,81 @@ export default function JoltListEditorPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: T.textMuted, fontStyle: 'italic' }}>Changes publish Jul 21 at 12:00 PM</span>
-          <button style={{ background: 'none', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 8px', cursor: 'pointer', color: T.textSecondary, fontSize: 16, display: 'flex', alignItems: 'center' }}><i className="ti ti-dots-vertical" /></button>
-          <button onClick={handlePreview} style={{ background: 'none', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', color: T.textSecondary, fontSize: 13, fontFamily: T.font, display: 'flex', alignItems: 'center', gap: 5 }}><i className="ti ti-eye" style={{ fontSize: 14 }} /> Preview</button>
-          <button style={{ background: T.fillAccent, color: T.onAccent, fontFamily: T.font, fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer' }}>Save</button>
+          <div ref={headerMenuRef} style={{ position: 'relative' }}>
+            <button
+              aria-label="More Options"
+              aria-expanded={headerMenuOpen}
+              onClick={() => setHeaderMenuOpen(v => !v)}
+              style={{ background: headerMenuOpen ? T.surface0 : 'none', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 8px', cursor: 'pointer', color: T.textSecondary, fontSize: 16, display: 'flex', alignItems: 'center' }}
+            >
+              <i className="ti ti-dots-vertical" />
+            </button>
+            {headerMenuOpen && (
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, padding: '6px 0', width: 240, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}>
+                {templateDeactivated ? (
+                  <div
+                    onClick={() => { setHeaderMenuOpen(false); setRestoreModalOpen(true); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textPrimary, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <i className="ti ti-player-play" style={{ fontSize: 15, color: T.textMuted, width: 18 }} />Reactivate List Template
+                  </div>
+                ) : (
+                  <>
+                    {[
+                      { action: 'import-csv', icon: 'ti-file-import', label: 'Import Translation CSV' },
+                      { action: 'export-csv', icon: 'ti-file-export', label: 'Export Translation CSV' },
+                      { action: 'send-all', icon: 'ti-send', label: 'Send List to All Locations' },
+                      { action: 'change-history', icon: 'ti-history', label: 'Change History' },
+                    ].map(kmi => (
+                      <div
+                        key={kmi.action}
+                        onClick={() => setHeaderMenuOpen(false)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textPrimary, cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <i className={`ti ${kmi.icon}`} style={{ fontSize: 15, color: T.textMuted, width: 18 }} />{kmi.label}
+                      </div>
+                    ))}
+                    <div style={{ height: 0.5, background: T.border, margin: '4px 0' }} />
+                    <div
+                      onClick={() => { setTemplateDeactivated(true); setHeaderMenuOpen(false); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textDanger, cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <i className="ti ti-ban" style={{ fontSize: 15, color: T.textDanger, width: 18 }} />Deactivate List Template
+                    </div>
+                    <div
+                      onClick={() => setHeaderMenuOpen(false)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textDanger, cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <i className="ti ti-calendar-off" style={{ fontSize: 15, color: T.textDanger, width: 18 }} />Deactivate List Instances
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          {!templateDeactivated && (
+            <>
+              <button onClick={handlePreview} style={{ background: 'none', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', color: T.textSecondary, fontSize: 13, fontFamily: T.font, display: 'flex', alignItems: 'center', gap: 5 }}><i className="ti ti-eye" style={{ fontSize: 14 }} /> Preview</button>
+              <button style={{ background: T.fillAccent, color: T.onAccent, fontFamily: T.font, fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer' }}>Save & Publish</button>
+            </>
+          )}
         </div>
       </div>
+
+      {templateDeactivated && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 16px', background: T.bgWarning, borderBottom: `0.5px solid #FFD54F`, flexShrink: 0 }}>
+          <i className="ti ti-alert-triangle" style={{ color: T.textWarning, fontSize: 14, marginTop: 1 }} />
+          <span style={{ fontSize: 13, color: T.textWarning, lineHeight: 1.5 }}>This template has been deactivated. Reactivate it to make changes.</span>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', padding: '0 16px', background: T.surface2, borderBottom: `0.5px solid ${T.border}`, flexShrink: 0, alignItems: 'center' }}>
@@ -4804,6 +5025,14 @@ export default function JoltListEditorPage() {
         </div>
       )}
       </div>
+      {restoreModalOpen && ReactDOM.createPortal(
+        <RestoreInstancesModal
+          onClose={() => setRestoreModalOpen(false)}
+          onRestore={() => { setTemplateDeactivated(false); setRestoreModalOpen(false); }}
+          onReactivateOnly={() => { setTemplateDeactivated(false); setRestoreModalOpen(false); }}
+        />,
+        document.body
+      )}
     </div>
   );
 }
