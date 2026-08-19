@@ -4600,7 +4600,7 @@ const DeactivateHelp = styled.p({
   lineHeight: 1.45,
 });
 
-function DeactivateInstancesModal({ displayTimes, onClose, onConfirm }: { displayTimes: DisplayTime[]; onClose: () => void; onConfirm: (ids: string[]) => void }) {
+function DeactivateInstancesModal({ listTemplateName, displayTimes, onClose, onConfirm }: { listTemplateName: string; displayTimes: DisplayTime[]; onClose: () => void; onConfirm: (ids: string[]) => void }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const allSelected = displayTimes.length > 0 && selected.size === displayTimes.length;
   const noneSelected = selected.size === 0;
@@ -4628,7 +4628,7 @@ function DeactivateInstancesModal({ displayTimes, onClose, onConfirm }: { displa
             <X size={16} strokeWidth={1.4} color="currentColor" />
           </RestoreClose>
         </RestoreHeader>
-        <DeactivatePrompt>Deactivate all lists that will display at:</DeactivatePrompt>
+        <DeactivatePrompt>Deactivate all instances of {listTemplateName} that will display at:</DeactivatePrompt>
         <DeactivateTableWrap>
           {displayTimes.length === 0 ? (
             <span style={{ fontSize: 'var(--ss-size-body)', color: 'var(--ss-fg-secondary)' }}>No display times configured.</span>
@@ -4639,7 +4639,7 @@ function DeactivateInstancesModal({ displayTimes, onClose, onConfirm }: { displa
                   <DeactivateTh style={{ width: 28 }}>
                     <input type="checkbox" checked={allSelected} aria-label="Select all" onChange={e => setSelected(e.target.checked ? new Set(displayTimes.map(dt => dt.id)) : new Set())} style={{ accentColor: 'var(--ss-sky-blue)', width: 14, height: 14 }} />
                   </DeactivateTh>
-                  <DeactivateTh>Displays at</DeactivateTh>
+                  <DeactivateTh>Display time</DeactivateTh>
                   <DeactivateTh>Due in</DeactivateTh>
                   <DeactivateTh>Expires after</DeactivateTh>
                 </tr>
@@ -5197,6 +5197,7 @@ export default function JoltListEditorPage() {
       )}
       {deactivateInstancesOpen && ReactDOM.createPortal(
         <DeactivateInstancesModal
+          listTemplateName="Opening Checklist"
           displayTimes={displayTimes}
           onClose={() => setDeactivateInstancesOpen(false)}
           onConfirm={() => setDeactivateInstancesOpen(false)}
