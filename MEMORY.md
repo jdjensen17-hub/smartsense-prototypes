@@ -6,6 +6,14 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-08-19 — Image exception notification event
+
+- **What:** Added "An image exception occurs" as the last Notifications event on `/#/operate/jolt-editor`. Email-only method, preselected and locked. Frequency dropdown: Daily (default) / Weekly. Saved chip: `roles · Email · Daily`.
+- **Why:** Image exceptions are a digest, not a real-time ping. Email is the only channel that fits. Daily is the tighter default.
+- **Rejected:** Showing Push/Text disabled. Helper note like "(Photo items only)". Changing the accordion summary from the hardcoded "No events configured".
+
+---
+
 ## 2026-08-19 — Session end: scheduled template publish
 
 **Worked on:** List Template Editor publish timing (`/#/operate/jolt-editor`). Replaced Save & Publish with autosave + Publish now / Schedule.

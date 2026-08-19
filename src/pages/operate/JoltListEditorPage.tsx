@@ -1103,7 +1103,7 @@ function TagPicker({ options, selected, onChange, placeholder, closeOnSelect = f
     setTimeout(() => inputRef.current?.focus(), 0);
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (ref.current?.contains(t) || dropdownRef.current?.contains(t)) return;
+      if (btnRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', handler);
@@ -2956,7 +2956,7 @@ function DCConditionPanel({ childItem, parentItem, onSave, onUpdate, onRemoveLin
 }
 
 // ── Notification section helpers ──────────────────────────────────────────
-interface NotifRule { id: string; event: string; roles: string[]; methods: string[]; offsetMin?: number; }
+interface NotifRule { id: string; event: string; roles: string[]; methods: string[]; offsetMin?: number; frequency?: 'Daily' | 'Weekly'; }
 
 function NotificationSection() {
   const EVENTS = [
@@ -2965,6 +2965,7 @@ function NotificationSection() {
     { id: 'before-due', label: 'Before list is due' },
     { id: 'overdue', label: 'Item is overdue' },
     { id: 'completed', label: 'List is completed' },
+    { id: 'image-exception', label: 'An image exception occurs' },
   ];
   const [rules, setRules] = useState<NotifRule[]>([]);
   const [addingFor, setAddingFor] = useState<string | null>(null);
@@ -2972,12 +2973,14 @@ function NotificationSection() {
   const [formRoles, setFormRoles] = useState<string[]>([]);
   const [formMethods, setFormMethods] = useState<string[]>([]);
   const [formOffset, setFormOffset] = useState(30);
+  const [formFrequency, setFormFrequency] = useState<'Daily' | 'Weekly'>('Daily');
 
   const openAdd = (evId: string) => {
     setEditingRuleId(null);
     setFormRoles([]);
-    setFormMethods([]);
+    setFormMethods(evId === 'image-exception' ? ['Email'] : []);
     setFormOffset(30);
+    setFormFrequency('Daily');
     setAddingFor(evId);
   };
 
@@ -2987,14 +2990,20 @@ function NotificationSection() {
     setFormRoles(rule.roles);
     setFormMethods(rule.methods);
     setFormOffset(rule.offsetMin ?? 30);
+    setFormFrequency(rule.frequency ?? 'Daily');
   };
 
   const saveRule = (event: string) => {
     if (!formRoles.length || !formMethods.length) return;
+    const extra = event === 'before-due'
+      ? { offsetMin: formOffset, frequency: undefined }
+      : event === 'image-exception'
+        ? { offsetMin: undefined, frequency: formFrequency }
+        : { offsetMin: undefined, frequency: undefined };
     if (editingRuleId) {
-      setRules(prev => prev.map(r => r.id === editingRuleId ? { ...r, roles: formRoles, methods: formMethods, offsetMin: event === 'before-due' ? formOffset : undefined } : r));
+      setRules(prev => prev.map(r => r.id === editingRuleId ? { ...r, roles: formRoles, methods: formMethods, ...extra } : r));
     } else {
-      setRules(prev => [...prev, { id: mkid(), event, roles: formRoles, methods: formMethods, offsetMin: event === 'before-due' ? formOffset : undefined }]);
+      setRules(prev => [...prev, { id: mkid(), event, roles: formRoles, methods: formMethods, ...extra }]);
     }
     setAddingFor(null);
     setEditingRuleId(null);
@@ -3021,7 +3030,7 @@ function NotificationSection() {
             <div key={r.id} onClick={() => openEdit(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.surface0, border: `0.5px solid ${T.border}`, borderRadius: 5, padding: '7px 10px', marginBottom: 4, cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = T.borderStrong)}
               onMouseLeave={e => (e.currentTarget.style.borderColor = T.border)}>
-              <div style={{ fontSize: 12, color: T.textPrimary }}>{r.roles.join(', ')} · {r.methods.join(', ')}{r.offsetMin ? ` · ${r.offsetMin}min before` : ''}</div>
+              <div style={{ fontSize: 12, color: T.textPrimary }}>{r.roles.join(', ')} · {r.methods.join(', ')}{r.offsetMin ? ` · ${r.offsetMin}min before` : ''}{r.frequency ? ` · ${r.frequency}` : ''}</div>
               <button onClick={e => { e.stopPropagation(); setRules(rules.filter(x => x.id !== r.id)); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13 }}><i className="ti ti-trash" /></button>
             </div>
           ))}
@@ -3035,9 +3044,12 @@ function NotificationSection() {
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Method</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {['Push', 'Text', 'Email'].map(m => (
-                      <div key={m} onClick={() => setFormMethods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])}
-                        style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `0.5px solid ${formMethods.includes(m) ? T.fillAccent : T.borderStrong}`, background: formMethods.includes(m) ? T.fillAccent : T.surface2, color: formMethods.includes(m) ? T.onAccent : T.textSecondary }}>
+                    {(ev.id === 'image-exception' ? ['Email'] : ['Push', 'Text', 'Email']).map(m => (
+                      <div key={m} onClick={() => {
+                        if (ev.id === 'image-exception') return;
+                        setFormMethods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+                      }}
+                        style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: ev.id === 'image-exception' ? 'default' : 'pointer', border: `0.5px solid ${formMethods.includes(m) ? T.fillAccent : T.borderStrong}`, background: formMethods.includes(m) ? T.fillAccent : T.surface2, color: formMethods.includes(m) ? T.onAccent : T.textSecondary }}>
                         {m}
                       </div>
                     ))}
@@ -3051,6 +3063,16 @@ function NotificationSection() {
                       {[{label:'15 min',val:15},{label:'30 min',val:30},{label:'1 hour',val:60},{label:'90 min',val:90},{label:'2 hours',val:120},{label:'4 hours',val:240},{label:'6 hours',val:360}].map(o => (
                         <option key={o.val} value={o.val}>{o.label}</option>
                       ))}
+                    </select>
+                  </div>
+                )}
+                {ev.id === 'image-exception' && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Notification frequency</div>
+                    <select value={formFrequency} onChange={e => setFormFrequency(e.target.value as 'Daily' | 'Weekly')}
+                      style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '4px 8px', background: T.surface2, color: T.textPrimary, cursor: 'pointer' }}>
+                      <option value="Daily">Daily</option>
+                      <option value="Weekly">Weekly</option>
                     </select>
                   </div>
                 )}
