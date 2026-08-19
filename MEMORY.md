@@ -6,6 +6,26 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-08-19 — Session end: scheduled template publish
+
+**Worked on:** List Template Editor publish timing (`/#/operate/jolt-editor`). Replaced Save & Publish with autosave + Publish now / Schedule.
+
+**Completed:**
+- Draft autosaves. Unpublished until Publish or Schedule. No default send time. Cancel schedule returns to unpublished.
+- Split Publish: now, or schedule date/time (HQ TZ labeled). Empty pickers until chosen. Time picker opens at 6:00 AM.
+- Status: Saved / Unpublished changes / scheduled accent chip (click to edit) / Published.
+- Header order: status → Publish ▾ → ⓘ → kebab. Tip: “Publish sends changes to locations that use this list. Lists already on devices do not change.”
+- Toolbar: Display criteria, Preview, Columns on the Add item row. Item count and library icon removed. Columns button never blue, no count.
+- Same editor control for standard and publisher accounts. Publisher Tasks not rebuilt.
+
+**Locked:** Subscriber waiting instances stay on next daily gen. Already-on-device lists never update. Ad hoc uses published template only. No 5-minute debounce.
+
+**In progress / next:** New chat — list template notifications (add a new one). Publisher-specific Publish tip when account type can be flipped.
+
+**Pushed:** `74cfb8fa` on `main`. Live at `https://smartsense-prototypes.vercel.app/#/operate/jolt-editor`.
+
+---
+
 ## 2026-08-19 — Unpublished drafts never auto-send
 
 - **What:** Autosaved unpublished changes sit until the user publishes now or sets a schedule. No default send time. Cancel/remove schedule returns to unpublished, it does not pick a new time for them.
