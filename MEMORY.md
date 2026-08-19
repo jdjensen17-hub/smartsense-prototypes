@@ -6,6 +6,22 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-08-19 — Hide the Items grid scrollbar
+
+- **What:** Native scrollbar on the `/#/operate/jolt-editor` Items table scroller is hidden. Wheel/trackpad still scroll. Horizontal overflow is `hidden` unless extra columns are on.
+- **Why:** Chrome reserved a white gutter even when idle. That lane was not an affordance; you already discover scroll by scrolling.
+- **Rejected:** Overlay/auto-hide thumb. Styling the reserved gutter so it looks intentional.
+
+---
+
+## 2026-08-19 — Item side sheet sits below the toolbar
+
+- **What:** On `/#/operate/jolt-editor` Items, the item side sheet starts at the bottom of the toolbar, not the top of the Items pane. Toolbar stays full width. Sheet only shares space with the table.
+- **Why:** Opening an item squeezed Display criteria / Preview / Columns; the buttons shifted and didn't fit.
+- **Rejected:** Overlaying the sheet on the table (toolbar would still be full width, but the table wouldn't shrink). Expanding the editor past `maxWidth: 1026` when the sheet opens.
+
+---
+
 ## 2026-08-19 — Photo item becomes Media + Allow video
 
 - **What:** On `/#/operate/jolt-editor`, Photo is now Media (`ti-photo`). Options section is Media Options. New "Allow video capture" toggle (default off) above upload. MEDIA column group has Allow Video left of Allow Upload; column auto-shows when the toggle or grid checkbox turns on.

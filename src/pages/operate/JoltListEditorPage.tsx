@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import styled from '@emotion/styled';
 import { X } from 'lucide-react';
@@ -149,6 +149,7 @@ const SCORE_GROUPS = ['Food Safety', 'Equipment', 'Sanitation', 'Customer Experi
 const IMPORTANCE_LEVELS = ['Critical', 'Major', 'Minor'];
 const EMPLOYEE_ROLES = ['Manager', 'Supervisor', 'Operator', 'Kitchen Manager', 'Auditor', 'Integrations Admin', 'System Admin', 'IAM Admin'];
 const ASSET_TYPES = ['Inspection Type', 'Equipment'];
+const EXTRA_COL_WIDTH = 110;
 
 const CA_LISTS = [
   { id: 'cal1', title: 'Corrective Action List' },
@@ -2854,7 +2855,6 @@ function AddItemPopover({ onSelect, onClose }: { onSelect: (type: ItemType) => v
           );
         })}
       </div>
-      <div style={{ fontSize: 10, color: T.textMuted, padding: '4px 14px 8px' }}>↑↓ navigate · Enter to select · Esc to cancel</div>
     </div>
   );
 }
@@ -3592,6 +3592,34 @@ const isNACaUnconfigured = (item: ListItem) =>
 
 function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode, dcLinkingId, dcColors, kebabOpenId, shownCols, promptWidth, colValues, onColChange, onUpdate, onCheckbox, onRowClick, onKebab, onKebabClose, onKebabAction, onDCClick, onDCFilterClick, onRemoveDCLink, onSetCondition, dcDebugId, dcDebugUnlinkedId, dcPendingConditionId, dcConditionPanelOpen, flags, caToastId, onCaToast }: RowProps) {
   const [hovered, setHovered] = useState(false);
+  const kebabBtnRef = useRef<HTMLButtonElement>(null);
+  const kebabMenuRef = useRef<HTMLDivElement>(null);
+  const [kebabPos, setKebabPos] = useState<{ top: number; left: number } | null>(null);
+  const kebabOpen = kebabOpenId === item.id;
+
+  useLayoutEffect(() => {
+    if (!kebabOpen) { setKebabPos(null); return; }
+    const r = kebabBtnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setKebabPos({ top: r.bottom - 4, left: Math.max(8, r.right - 190) });
+  }, [kebabOpen]);
+
+  useEffect(() => {
+    if (!kebabOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (kebabBtnRef.current?.contains(t) || kebabMenuRef.current?.contains(t)) return;
+      onKebabClose();
+    };
+    const onScroll = () => onKebabClose();
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [kebabOpen, onKebabClose]);
+
   const isSubtitle = item.type === 'subtitle';
   const meta = TYPE_META[item.type];
   const parent = item.dcParentId ? findItem(items, item.dcParentId) : null;
@@ -4434,11 +4462,11 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
       })}
       {/* Kebab — sticky right */}
       <td style={{ width: 32, padding: '0 4px', position: 'sticky', right: 0, zIndex: 1, background: stickyBg, borderLeft: hovered || isActive ? `0.5px solid ${T.border}` : `0.5px solid ${stickyBg}` }}>
-        <button onClick={(e) => { e.stopPropagation(); onKebab(item.id); }} style={{ width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: T.textSecondary, border: 'none', background: 'none', cursor: 'pointer', opacity: hovered || isActive || kebabOpenId === item.id ? 1 : 0, margin: 'auto' }}>
+        <button ref={kebabBtnRef} onClick={(e) => { e.stopPropagation(); onKebab(item.id); }} style={{ width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: T.textSecondary, border: 'none', background: 'none', cursor: 'pointer', opacity: hovered || isActive || kebabOpen ? 1 : 0, margin: 'auto' }}>
           <i className="ti ti-dots-vertical" />
         </button>
-        {kebabOpenId === item.id && (
-          <div style={{ position: 'absolute', right: 4, top: 'calc(100% - 4px)', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, padding: '6px 0', width: 190, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}>
+        {kebabOpen && kebabPos && ReactDOM.createPortal(
+          <div ref={kebabMenuRef} style={{ position: 'fixed', top: kebabPos.top, left: kebabPos.left, background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, padding: '6px 0', width: 190, zIndex: 9999, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}>
             {[
               { action: 'edit', icon: 'ti-pencil', label: 'Edit prompt' },
               { action: 'change-type', icon: 'ti-refresh', label: 'Change item type' },
@@ -4456,7 +4484,8 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <i className="ti ti-trash" style={{ fontSize: 15, color: T.textDanger, width: 18 }} />Delete item
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </td>
     </tr>
@@ -5008,6 +5037,17 @@ export default function JoltListEditorPage() {
   }, [headerMenuOpen]);
 
   useEffect(() => {
+    if (!showAddPopover) return;
+    function handleClick(e: MouseEvent) {
+      if (addBtnRef.current && !addBtnRef.current.contains(e.target as Node)) {
+        setShowAddPopover(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showAddPopover]);
+
+  useEffect(() => {
     if (templateDeactivated) return;
     const sig = JSON.stringify({ items, scoringOn, submission, displayTimes, flags, colValues });
     if (autosaveSig.current === null) {
@@ -5249,7 +5289,11 @@ export default function JoltListEditorPage() {
 
   return (
     <div style={{ fontFamily: T.font, height: 'calc(100vh - 52px)', background: T.surface0, overflow: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-      <style>{`.mc-tpl-search::placeholder { color: ${T.textSecondary}; }`}</style>
+      <style>{`
+        .mc-tpl-search::placeholder { color: ${T.textSecondary}; }
+        .jolt-items-scroller { scrollbar-width: none; }
+        .jolt-items-scroller::-webkit-scrollbar { display: none; }
+      `}</style>
       <div style={{ width: '100%', maxWidth: 1026, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: T.surface2 }}>
       {/* Editor topbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: T.surface1, borderBottom: `0.5px solid ${T.border}`, flexShrink: 0 }}>
@@ -5406,9 +5450,7 @@ export default function JoltListEditorPage() {
           <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} submission={submission} setSubmission={setSubmission} displayTimes={displayTimes} setDisplayTimes={setDisplayTimes} />
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* Items pane */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Toolbar */}
             <div style={{ background: T.surface1, borderBottom: `0.5px solid ${T.borderStrong}`, padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <input type="checkbox" checked={selectedIds.size === allItems.length && allItems.length > 0} onChange={e => setSelectedIds(e.target.checked ? new Set(allItems.map(i => i.id)) : new Set())} style={{ accentColor: T.fillAccent, width: 13, height: 13 }} />
@@ -5458,8 +5500,9 @@ export default function JoltListEditorPage() {
               </div>
             ))}
 
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
             {/* Table area */}
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }} onClick={e => { if ((e.target as HTMLElement).closest('tr') === null) setKebabOpenId(null); }}>
+            <div className="jolt-items-scroller" style={{ flex: 1, overflowY: 'auto', overflowX: !isDebugMode && effectiveShownCols.size > 0 ? 'auto' : 'hidden', minWidth: 0 }} onClick={e => { if ((e.target as HTMLElement).closest('tr') === null) setKebabOpenId(null); }}>
               {dcConditionState && conditionParentItem && conditionChildItem ? (
                 <div style={{ display: 'flex', height: '100%' }}>
                   <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -5499,13 +5542,13 @@ export default function JoltListEditorPage() {
                 />
               )}
             </div>
-          </div>
 
           {/* Side sheet */}
           {activeItemId && !dcMode && (() => {
             const item = findItem(items, activeItemId);
             return item ? <SideSheet key={activeItemId} item={item} items={items} onClose={() => { setLastActiveItemId(activeItemId); setActiveItemId(null); }} onNavigate={id => setActiveItemId(id)} onUpdate={updateItem} markAs={(colValues[item.id] ?? {})['all-mark-as'] ?? null} onMarkAsChange={v => setColValue(item.id, 'all-mark-as', v)} scoringOn={scoringOn} flags={flags} onCreateFlag={handleCreateFlag} onEnterDCMode={() => { setLastActiveItemId(activeItemId); setActiveItemId(null); setDcMode(true); setDcLinkingId(activeItemId); }} /> : null;
           })()}
+            </div>
         </div>
       )}
       </div>
@@ -5605,7 +5648,7 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
         <col style={{ width: hasCols ? promptWidth : undefined }} />
         <col style={{ width: 32 }} />
         <col style={{ width: 100 }} />
-        {activeCols.map(col => <col key={col.key} style={{ width: 100 }} />)}
+        {activeCols.map(col => <col key={col.key} style={{ width: EXTRA_COL_WIDTH }} />)}
         <col style={{ width: 32 }} />
       </colgroup>
       {activeCols.length > 0 && (
@@ -5675,7 +5718,7 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
             <th style={{ width: 88, padding: '5px 8px', borderLeft: `0.5px solid ${T.border}`, borderTop: `0.5px solid ${T.border}`, fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', verticalAlign: 'middle' }}>Config</th>
             {activeCols.map(col => (
               <th key={col.key} style={{
-                width: 100, padding: '5px 8px',
+                width: EXTRA_COL_WIDTH, padding: '5px 8px',
                 borderLeft: `0.5px solid ${T.border}`,
                 fontSize: 10, fontWeight: 600, color: T.textMuted,
                 textTransform: 'uppercase', letterSpacing: '0.05em',
@@ -5713,7 +5756,7 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
                 </div>
               </td>
               <td style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}` }} />
-              {activeCols.map(col => <td key={col.key} style={{ width: 100, borderLeft: `0.5px solid ${T.border}` }} />)}
+              {activeCols.map(col => <td key={col.key} style={{ width: EXTRA_COL_WIDTH, borderLeft: `0.5px solid ${T.border}` }} />)}
               <td style={{ width: 32, padding: '0 4px' }} />
             </tr>
           ) : (
