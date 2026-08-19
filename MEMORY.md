@@ -10,7 +10,8 @@ it first. Format per decision: **what / why / rejected**.
 
 - **What:** On `/#/operate/jolt-editor`, Photo is now Media (`ti-photo`). Options section is Media Options. New "Allow video capture" toggle (default off) above upload. MEDIA column group has Allow Video left of Allow Upload; column auto-shows when the toggle or grid checkbox turns on.
 - **Why:** Video capture is an option on the same item type, not a new type. Existing upload + detect() column pattern.
-- **Rejected:** Preview Take Video wiring (next slice). Changing the internal type from `'photo'`.
+- **Rejected:** Changing the internal type from `'photo'`.
+- **Preview:** Take Photo always. Take Video between Take Photo and Upload Media when the toggle is on. Buttons stack on the right. Video tap shows a video placeholder. Upload button label is Upload Media.
 
 ## 2026-08-19 — Image exception notification event
 
