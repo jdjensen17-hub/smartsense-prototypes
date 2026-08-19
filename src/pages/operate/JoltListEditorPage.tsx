@@ -77,6 +77,7 @@ interface ListItem {
   mcShowInline?: boolean;
   mcDraftChoices?: MCChoice[];
   photoAllowUpload?: boolean;
+  photoAllowVideo?: boolean;
   employeeRoles?: string[];
   sublistTarget?: string;
   formulaVars?: { name: string; itemId: string }[];
@@ -99,7 +100,7 @@ const TYPE_META: Record<ItemType, { label: string; icon: string }> = {
   free:        { label: 'Free Response',  icon: 'ti-align-left' },
   measurement: { label: 'Measurement',    icon: 'ti-ruler' },
   number:      { label: 'Number',         icon: 'ti-123' },
-  photo:       { label: 'Photo',          icon: 'ti-camera' },
+  photo:       { label: 'Media',          icon: 'ti-photo' },
   qr:          { label: 'QR Code',        icon: 'ti-qrcode' },
   employee:    { label: 'Employee',       icon: 'ti-user' },
   date:        { label: 'Date',           icon: 'ti-calendar' },
@@ -125,7 +126,7 @@ const ALL_TYPES: { type: ItemType; aliases: string[] }[] = [
   { type: 'free',        aliases: ['text','paragraph','write','comment','notes','long'] },
   { type: 'measurement', aliases: ['num','numeric','temperature','temp','range','value'] },
   { type: 'number',      aliases: ['number','integer','count','quantity'] },
-  { type: 'photo',       aliases: ['image','picture','pic','upload','camera'] },
+  { type: 'photo',       aliases: ['image','picture','pic','upload','camera','video','media'] },
   { type: 'qr',          aliases: ['qr','scan','qrcode'] },
   { type: 'employee',    aliases: ['person','staff','worker','name'] },
   { type: 'date',        aliases: ['day','when','calendar'] },
@@ -201,7 +202,7 @@ const INITIAL_ITEMS: ListItem[] = [
   { id: 'item-yn',         prompt: 'Yes/No item',             type: 'yn',          stripe: '', inds: [], allowNA: false },
   { id: 'item-employee',   prompt: 'Employee item',           type: 'employee',    stripe: '', inds: [], allowNA: false },
   { id: 'item-email',      prompt: 'Email item',              type: 'email',       stripe: '', inds: [], allowNA: false },
-  { id: 'item-photo',      prompt: 'Photo item',              type: 'photo',       stripe: '', inds: [], allowNA: false },
+  { id: 'item-photo',      prompt: 'Media item',              type: 'photo',       stripe: '', inds: [], allowNA: false },
   { id: 'item-qr',         prompt: 'QR code item',            type: 'qr',          stripe: '', inds: [], allowNA: false },
   { id: 'item-barcode',    prompt: 'Barcode item',            type: 'barcode',     stripe: '', inds: [], allowNA: false },
   { id: 'item-measurement',prompt: 'Measurement item',        type: 'measurement', stripe: '', inds: [], allowNA: false, measType: 'temperature', measUnit: 'F', measMethods: ['Manual Input'] },
@@ -2768,7 +2769,11 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
           </SsSection>
         )}
         {item.type === 'photo' && (
-          <SsSection label="Photo Options" defaultOpen>
+          <SsSection label="Media Options" defaultOpen>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ fontSize: 13, color: T.textPrimary }}>Allow video capture</div>
+              <Toggle on={!!item.photoAllowVideo} onChange={v => upd({ photoAllowVideo: v })} />
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 13, color: T.textPrimary }}>Allow images to be uploaded from device</div>
               <Toggle on={!!item.photoAllowUpload} onChange={v => upd({ photoAllowUpload: v })} />
@@ -3300,7 +3305,8 @@ const COLUMN_GROUPS: { group: string; cols: ColDef[] }[] = [
   { group: 'Rating', cols: [
     { key: 'rating-range', label: 'Range', types: ['rating'], detect: i => i.ratingMin != null || i.ratingMax != null },
   ]},
-  { group: 'Photo', cols: [
+  { group: 'Media', cols: [
+    { key: 'photo-allow-video',  label: 'Allow Video',  types: ['photo'], detect: i => !!i.photoAllowVideo },
     { key: 'photo-allow-upload', label: 'Allow Upload', types: ['photo'], detect: i => !!i.photoAllowUpload },
   ]},
   { group: 'Employee', cols: [
@@ -4336,6 +4342,15 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
               <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: pillBg, color: T.textAccent }}>
                 {min} – {max}
               </span>
+            </td>
+          );
+        }
+        if (col.key === 'photo-allow-video') {
+          const on = !!item.photoAllowVideo;
+          return (
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); onUpdate(item.id, { photoAllowVideo: !on }); }}>
+              <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
         }
@@ -5608,7 +5623,7 @@ function ItemsTable({ items, selectedIds, activeItemId, lastActiveItemId, cutIds
             const GROUP_LABEL: Record<string, string> = {
               'All': 'General', 'Y/N': 'Y/N', 'M — Measurement': 'Measurement',
               'MC — Multiple Choice': 'Multiple Choice', 'CA — Corrective Action': 'Corrective Action',
-              'Rating': 'Rating', 'Photo': 'Photo', 'Employee': 'Employee',
+              'Rating': 'Rating', 'Media': 'Media', 'Employee': 'Employee',
               'QR / Barcode': 'QR / Barcode', 'Formula': 'Formula', 'Asset': 'Asset', 'Sublist': 'Sublist',
             };
             return (

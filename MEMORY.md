@@ -6,6 +6,12 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-08-19 — Photo item becomes Media + Allow video
+
+- **What:** On `/#/operate/jolt-editor`, Photo is now Media (`ti-photo`). Options section is Media Options. New "Allow video capture" toggle (default off) above upload. MEDIA column group has Allow Video left of Allow Upload; column auto-shows when the toggle or grid checkbox turns on.
+- **Why:** Video capture is an option on the same item type, not a new type. Existing upload + detect() column pattern.
+- **Rejected:** Preview Take Video wiring (next slice). Changing the internal type from `'photo'`.
+
 ## 2026-08-19 — Image exception notification event
 
 - **What:** Added "An image exception occurs" as the last Notifications event on `/#/operate/jolt-editor`. Email-only method, preselected and locked. Frequency dropdown: Daily (default) / Weekly. Saved chip: `roles · Email · Daily`.
