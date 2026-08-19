@@ -4628,7 +4628,7 @@ function DeactivateInstancesModal({ displayTimes, onClose, onConfirm }: { displa
             <X size={16} strokeWidth={1.4} color="currentColor" />
           </RestoreClose>
         </RestoreHeader>
-        <DeactivatePrompt>Deactivate all lists that were displayed at:</DeactivatePrompt>
+        <DeactivatePrompt>Deactivate all lists that will display at:</DeactivatePrompt>
         <DeactivateTableWrap>
           {displayTimes.length === 0 ? (
             <span style={{ fontSize: 'var(--ss-size-body)', color: 'var(--ss-fg-secondary)' }}>No display times configured.</span>

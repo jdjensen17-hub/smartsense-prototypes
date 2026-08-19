@@ -6,6 +6,29 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-08-18 — Session end: Cursor setup + list editor kebab
+
+**Worked on:** Cursor transition, share pipeline, `JoltListEditorPage` header more-options.
+
+**Completed:**
+- Cursor rules in `.cursor/rules/`. Workspace is `prototypes/`.
+- Git habit: localhost needs no commit. Auto-commit a related slice. Push when Jim is ready to share.
+- Header kebab (active): Import/Export Translation CSV, Send List to All Locations, Change History, Deactivate List Template, Deactivate List Instances.
+- Deactivated template: warning banner, kebab is only Reactivate List Template, Preview and Save & Publish hidden.
+- Reactivate opens S1 “Restore List Instances?” modal (Restore vs Only — both just reactivate in the prototype).
+- Deactivate List Instances opens S1 table modal (Displays at / Due in / Expires after). Boxes start unchecked. Already-visible instances are never deactivated in this flow. Confirm currently only closes the modal.
+- Display times lifted from Settings so the kebab can read them. Seeded 6:00 AM, 12:00 PM, 5:00 PM. Settings label is DUE IN.
+
+**In progress / next:** Wire remaining kebab actions (CSV, send-all, change history). Give Restore vs Only a visible difference. Actually apply instance deactivation. Still unlocked: editing items while the template is deactivated.
+
+**Pushed:** through `60bffc26` on `main`. Live at `https://smartsense-prototypes.vercel.app/#/operate/jolt-editor`.
+
+## 2026-08-18 — Deactivate instances never touch already-visible lists
+
+- **What:** Deactivate List Instances only removes upcoming instances for selected display times. Lists generated 24 hours early stay hidden until display time; those not-yet-visible batches can be deactivated. Already-visible instances have a separate flow.
+- **Why:** This kebab action is a pre-display cleanup, not a live-floor recall.
+- **Rejected:** Using this modal to deactivate lists already showing at a location.
+
 ## 2026-08-18 — Cursor replaces Claude Code for prototype builds
 
 - **What:** Ported the CLAUDE.md operating contract into `.cursor/rules/`.
