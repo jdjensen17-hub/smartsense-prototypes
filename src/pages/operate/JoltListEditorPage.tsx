@@ -233,6 +233,8 @@ function indColor(ind: string) {
 function Tooltip({ children, text }: { children: React.ReactNode; text: string }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
+  const openBelow = rect ? rect.top < 88 : false;
+  const left = rect ? Math.min(Math.max(148, rect.left + rect.width / 2), window.innerWidth - 148) : 0;
   return (
     <span ref={ref} style={{ display: 'inline-flex', alignItems: 'center' }}
       onMouseEnter={() => setRect(ref.current?.getBoundingClientRect() ?? null)}
@@ -242,9 +244,9 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       {rect && text && ReactDOM.createPortal(
         <span style={{
           position: 'fixed',
-          top: rect.top - 6,
-          left: rect.left + rect.width / 2,
-          transform: 'translate(-50%, -100%)',
+          top: openBelow ? rect.bottom + 6 : rect.top - 6,
+          left,
+          transform: openBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
           background: '#1C1C1E', color: '#fff', fontSize: 11, fontWeight: 500, lineHeight: 1.5,
           padding: '5px 9px', borderRadius: 6, whiteSpace: 'pre-wrap', maxWidth: 280, zIndex: 9999,
           pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
@@ -3313,7 +3315,6 @@ function ColumnPicker({ shownCols, onChange, scoringOn }: { shownCols: Set<strin
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const count = shownCols.size;
   const toggle = (key: string) => {
     const next = new Set(shownCols);
     next.has(key) ? next.delete(key) : next.add(key);
@@ -3326,14 +3327,14 @@ function ColumnPicker({ shownCols, onChange, scoringOn }: { shownCols: Set<strin
         onClick={() => setOpen(v => !v)}
         style={{
           display: 'flex', alignItems: 'center', gap: 4, height: 28, padding: '0 10px',
-          border: `0.5px solid ${count > 0 ? T.borderAccent : T.borderStrong}`,
-          borderRadius: 5, background: count > 0 ? T.bgAccent : T.surface2,
-          color: count > 0 ? T.textAccent : T.textPrimary,
+          border: `0.5px solid ${T.borderStrong}`,
+          borderRadius: 5, background: T.surface2,
+          color: T.textSecondary,
           fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.font,
         }}
       >
         <i className="ti ti-columns" style={{ fontSize: 14 }} />
-        {`Columns${count > 0 ? ` · ${count} shown` : ''}`}
+        Columns
         <i className="ti ti-chevron-down" style={{ fontSize: 12, marginLeft: 2 }} />
       </button>
 
@@ -4669,6 +4670,168 @@ function DeactivateInstancesModal({ listTemplateName, displayTimes, onClose, onC
   );
 }
 
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+
+function toDateInputValue(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function toTimeInputValue(d: Date) {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function fromDateAndTime(dateStr: string, timeStr: string) {
+  const [y, m, day] = dateStr.split('-').map(Number);
+  const [hh, mm] = timeStr.split(':').map(Number);
+  return new Date(y, m - 1, day, hh, mm, 0, 0);
+}
+
+function tzAbbrev(d: Date) {
+  return new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+    .formatToParts(d)
+    .find(p => p.type === 'timeZoneName')?.value ?? '';
+}
+
+function formatPublishChip(d: Date) {
+  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `Publishes ${datePart} at ${timePart} ${tzAbbrev(d)}`;
+}
+
+function PublishSchedulePanel({
+  initial,
+  hasExistingSchedule,
+  onSchedule,
+  onCancelSchedule,
+}: {
+  initial: Date | null;
+  hasExistingSchedule: boolean;
+  onSchedule: (d: Date) => void;
+  onCancelSchedule: () => void;
+}) {
+  const [dateStr, setDateStr] = useState(initial ? toDateInputValue(initial) : '');
+  const [timeStr, setTimeStr] = useState(initial ? toTimeInputValue(initial) : '');
+  const dateRef = useRef<HTMLInputElement>(null);
+  const timeRef = useRef<HTMLInputElement>(null);
+  const bothSelected = !!dateStr && !!timeStr;
+  const when = bothSelected ? fromDateAndTime(dateStr, timeStr) : null;
+  const valid = !!when && !Number.isNaN(when.getTime()) && when.getTime() > Date.now();
+  const tz = tzAbbrev(when && !Number.isNaN(when.getTime()) ? when : new Date());
+  const title = hasExistingSchedule ? 'Update publish schedule' : 'Schedule when changes go out';
+  const fieldStyle: React.CSSProperties = {
+    position: 'relative', fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`,
+    borderRadius: 5, background: T.surface2, minHeight: 32, display: 'flex', alignItems: 'center',
+  };
+  const nativeInputStyle: React.CSSProperties = {
+    ...fieldStyle, position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%',
+    border: 'none', cursor: 'pointer',
+  };
+  const promptStyle: React.CSSProperties = {
+    padding: '0 8px', pointerEvents: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  };
+
+  function openPicker(el: HTMLInputElement | null) {
+    el?.focus();
+    try { el?.showPicker(); } catch { /* unsupported browsers fall back to focus */ }
+  }
+
+  function openTimePicker() {
+    const el = timeRef.current;
+    if (!el) return;
+    if (!timeStr) el.value = '06:00';
+    openPicker(el);
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-label={title}
+      onClick={e => e.stopPropagation()}
+      style={{
+        position: 'absolute', right: 0, top: 'calc(100% + 4px)', width: 360, zIndex: 100,
+        background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8,
+        padding: 14, boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 12 }}>{title}</div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: bothSelected ? 12 : 14, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+          <span style={{ fontSize: 11, color: T.textSecondary }}>Date</span>
+          <div style={{ ...fieldStyle, cursor: 'pointer' }} onClick={() => openPicker(dateRef.current)}>
+            <span style={{ ...promptStyle, flex: 1, color: dateStr ? T.textPrimary : T.textMuted }}>
+              {dateStr
+                ? fromDateAndTime(dateStr, '00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+                : 'Select date'}
+            </span>
+            <i className="ti ti-calendar" style={{ fontSize: 14, color: T.textMuted, paddingRight: 8, pointerEvents: 'none' }} />
+            <input
+              ref={dateRef}
+              type="date"
+              value={dateStr}
+              min={toDateInputValue(new Date())}
+              aria-label="Select date"
+              onChange={e => setDateStr(e.target.value)}
+              onClick={() => openPicker(dateRef.current)}
+              style={nativeInputStyle}
+            />
+          </div>
+        </div>
+        <div style={{ width: 148, display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: T.textSecondary }}>Time</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ ...fieldStyle, flex: 1, cursor: 'pointer' }} onClick={openTimePicker}>
+              <span style={{ ...promptStyle, flex: 1, color: timeStr ? T.textPrimary : T.textMuted }}>
+                {timeStr
+                  ? fromDateAndTime('1970-01-01', timeStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                  : 'Select time'}
+              </span>
+              <i className="ti ti-clock" style={{ fontSize: 14, color: T.textMuted, paddingRight: 8, pointerEvents: 'none' }} />
+              <input
+                ref={timeRef}
+                type="time"
+                value={timeStr}
+                aria-label="Select time"
+                onChange={e => setTimeStr(e.target.value)}
+                onClick={openTimePicker}
+                style={nativeInputStyle}
+              />
+            </div>
+            <span style={{ fontSize: 12, color: T.textMuted, flexShrink: 0 }}>{tz}</span>
+          </div>
+        </div>
+      </div>
+      {bothSelected && (
+        <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.45, marginBottom: 14 }}>
+          Locations will get the updated template at this time. Lists already on devices do not change.
+        </div>
+      )}
+      {bothSelected && !valid && <div style={{ fontSize: 12, color: T.textDanger, marginBottom: 10 }}>Pick a time in the future.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button
+          type="button"
+          disabled={!valid}
+          onClick={() => { if (when) onSchedule(when); }}
+          style={{
+            background: valid ? T.fillAccent : T.border, color: T.onAccent, fontFamily: T.font,
+            fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 6, border: 'none',
+            cursor: valid ? 'pointer' : 'not-allowed',
+          }}
+        >{hasExistingSchedule ? 'Update schedule' : 'Schedule'}</button>
+        {hasExistingSchedule && (
+          <button
+            type="button"
+            onClick={onCancelSchedule}
+            style={{
+              background: T.surface2, color: T.textDanger, fontFamily: T.font, fontSize: 13,
+              fontWeight: 600, padding: '7px 12px', borderRadius: 6, border: `0.5px solid ${T.borderStrong}`, cursor: 'pointer',
+            }}
+          >Cancel schedule</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RestoreInstancesModal({ onClose, onRestore, onReactivateOnly }: { onClose: () => void; onRestore: () => void; onReactivateOnly: () => void }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
@@ -4781,6 +4944,13 @@ export default function JoltListEditorPage() {
   const [deactivateInstancesOpen, setDeactivateInstancesOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const headerMenuRef = useRef<HTMLDivElement>(null);
+  type SaveStatus = 'saved' | 'saving' | 'unpublished' | 'published';
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+  const [schedulePanelOpen, setSchedulePanelOpen] = useState(false);
+  const autosaveSig = useRef<string | null>(null);
+  const statusChipRef = useRef<HTMLButtonElement>(null);
+  const publishSplitRef = useRef<HTMLDivElement>(null);
   const [kebabOpenId, setKebabOpenId] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editingPrompt, setEditingPrompt] = useState('');
@@ -4800,6 +4970,61 @@ export default function JoltListEditorPage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [headerMenuOpen]);
 
+  useEffect(() => {
+    if (templateDeactivated) return;
+    const sig = JSON.stringify({ items, scoringOn, submission, displayTimes, flags, colValues });
+    if (autosaveSig.current === null) {
+      autosaveSig.current = sig;
+      return;
+    }
+    if (autosaveSig.current === sig) return;
+    autosaveSig.current = sig;
+    setSaveStatus('saving');
+    const t = window.setTimeout(() => setSaveStatus('unpublished'), 600);
+    return () => window.clearTimeout(t);
+  }, [items, scoringOn, submission, displayTimes, flags, colValues, templateDeactivated]);
+
+  useEffect(() => {
+    if (saveStatus !== 'published') return;
+    const t = window.setTimeout(() => setSaveStatus('saved'), 2000);
+    return () => window.clearTimeout(t);
+  }, [saveStatus]);
+
+  useEffect(() => {
+    if (!schedulePanelOpen) return;
+    function handleClick(e: MouseEvent) {
+      const t = e.target as Node;
+      if (publishSplitRef.current?.contains(t) || statusChipRef.current?.contains(t)) return;
+      setSchedulePanelOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setSchedulePanelOpen(false); }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [schedulePanelOpen]);
+
+  const handlePublishNow = () => {
+    setScheduledAt(null);
+    setSchedulePanelOpen(false);
+    setSaveStatus('published');
+  };
+
+  const handleSchedule = (d: Date) => {
+    setScheduledAt(d);
+    setSchedulePanelOpen(false);
+  };
+
+  const handleCancelSchedule = () => {
+    setScheduledAt(null);
+    setSchedulePanelOpen(false);
+    setSaveStatus('unpublished');
+  };
+
+  const canPublish = saveStatus === 'unpublished' || saveStatus === 'saving' || scheduledAt !== null;
+
   // Assign a stable color per DC parent
   const dcColors = React.useMemo(() => {
     const parentIds = [...new Set(items.filter(i => i.dcParentId).map(i => i.dcParentId!))];
@@ -4809,7 +5034,6 @@ export default function JoltListEditorPage() {
   }, [items]);
 
   const allItems = items;
-  const totalItems = items.length;
 
   function updateItem(id: string, updates: Partial<ListItem>) {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
@@ -4979,6 +5203,13 @@ export default function JoltListEditorPage() {
   const debugBannerMsg = `Debugging: "${debugItem?.prompt ?? ''}"`;
   const isDebugMode = dcMode && !!dcDebugId;
 
+  const statusLabel = scheduledAt
+    ? formatPublishChip(scheduledAt)
+    : saveStatus === 'saving' ? 'Saving…'
+    : saveStatus === 'published' ? 'Published'
+    : saveStatus === 'unpublished' ? 'Unpublished changes'
+    : 'Saved';
+
   return (
     <div style={{ fontFamily: T.font, height: 'calc(100vh - 52px)', background: T.surface0, overflow: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
       <style>{`.mc-tpl-search::placeholder { color: ${T.textSecondary}; }`}</style>
@@ -4991,7 +5222,69 @@ export default function JoltListEditorPage() {
           <span style={{ background: T.bgAccent, color: T.textAccent, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4 }}>11 locations</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: T.textMuted, fontStyle: 'italic' }}>Changes publish Jul 21 at 12:00 PM</span>
+          {!templateDeactivated && (
+              <button
+                ref={statusChipRef}
+                type="button"
+                disabled={!scheduledAt}
+                onClick={() => { if (scheduledAt) setSchedulePanelOpen(true); }}
+                style={scheduledAt ? {
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 11, fontFamily: T.font, fontWeight: 500, border: 'none',
+                  background: T.bgAccent, color: T.textAccent, padding: '3px 8px', borderRadius: 4,
+                  cursor: 'pointer', textAlign: 'left',
+                } : {
+                  fontSize: 11, fontFamily: T.font, border: 'none', background: 'none', padding: 0,
+                  color: saveStatus === 'published' ? T.textAccent : T.textMuted,
+                  fontStyle: saveStatus === 'unpublished' ? 'italic' : 'normal',
+                  cursor: 'default', textAlign: 'right', maxWidth: 220,
+                }}
+              >
+                {scheduledAt && <i className="ti ti-calendar" style={{ fontSize: 13 }} />}
+                {statusLabel}
+              </button>
+          )}
+          {!templateDeactivated && (
+              <div ref={publishSplitRef} style={{ position: 'relative', display: 'flex', alignItems: 'stretch' }}>
+                <button
+                  type="button"
+                  disabled={!canPublish}
+                  onClick={handlePublishNow}
+                  style={{
+                    background: canPublish ? T.fillAccent : T.border, color: T.onAccent, fontFamily: T.font,
+                    fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: '6px 0 0 6px', border: 'none',
+                    cursor: canPublish ? 'pointer' : 'not-allowed', opacity: canPublish ? 1 : 0.55,
+                  }}
+                >Publish</button>
+                <button
+                  type="button"
+                  disabled={!canPublish}
+                  aria-label="Schedule publish"
+                  aria-expanded={schedulePanelOpen}
+                  onClick={() => setSchedulePanelOpen(v => !v)}
+                  style={{
+                    background: canPublish ? T.fillAccent : T.border, color: T.onAccent, fontFamily: T.font,
+                    padding: '7px 8px', borderRadius: '0 6px 6px 0', border: 'none',
+                    borderLeft: '1px solid rgba(255,255,255,0.35)',
+                    cursor: canPublish ? 'pointer' : 'not-allowed', opacity: canPublish ? 1 : 0.55,
+                    display: 'flex', alignItems: 'center',
+                  }}
+                ><i className="ti ti-chevron-down" style={{ fontSize: 14 }} /></button>
+                {schedulePanelOpen && (
+                  <PublishSchedulePanel
+                    initial={scheduledAt}
+                    hasExistingSchedule={!!scheduledAt}
+                    onSchedule={handleSchedule}
+                    onCancelSchedule={handleCancelSchedule}
+                  />
+                )}
+              </div>
+          )}
+          {!templateDeactivated && (
+            <Tooltip text="Publish sends changes to locations that use this list. Lists already on devices do not change.">
+              <i className="ti ti-info-circle" aria-label="About publishing" style={{ fontSize: 16, color: T.textMuted, cursor: 'default', flexShrink: 0 }} />
+            </Tooltip>
+          )}
           <div ref={headerMenuRef} style={{ position: 'relative' }}>
             <button
               aria-label="More Options"
@@ -5032,7 +5325,7 @@ export default function JoltListEditorPage() {
                     ))}
                     <div style={{ height: 0.5, background: T.border, margin: '4px 0' }} />
                     <div
-                      onClick={() => { setTemplateDeactivated(true); setHeaderMenuOpen(false); }}
+                      onClick={() => { setTemplateDeactivated(true); setHeaderMenuOpen(false); setSchedulePanelOpen(false); }}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textDanger, cursor: 'pointer' }}
                       onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -5052,12 +5345,6 @@ export default function JoltListEditorPage() {
               </div>
             )}
           </div>
-          {!templateDeactivated && (
-            <>
-              <button onClick={handlePreview} style={{ background: 'none', border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', color: T.textSecondary, fontSize: 13, fontFamily: T.font, display: 'flex', alignItems: 'center', gap: 5 }}><i className="ti ti-eye" style={{ fontSize: 14 }} /> Preview</button>
-              <button style={{ background: T.fillAccent, color: T.onAccent, fontFamily: T.font, fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer' }}>Save & Publish</button>
-            </>
-          )}
         </div>
       </div>
 
@@ -5075,12 +5362,6 @@ export default function JoltListEditorPage() {
             {tab === 'items' ? 'Items' : 'Settings'}
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: 6 }}>
-          <Btn onClick={() => { if (dcPendingConditionId && !findItem(items, dcPendingConditionId)?.dcConditions?.length) removeDCLink(dcPendingConditionId); setDcMode(v => !v); setDcLinkingId(null); setDcConditionState(null); setDcDebugId(null); setDcDebugUnlinkedId(null); setDcPendingConditionId(null); }} style={dcMode ? { background: '#FFF8E1', color: '#5D4037', borderColor: '#FFD54F' } : {}}>
-            <i className="ti ti-filter" /> {dcMode ? 'Exit display criteria' : 'Display criteria'}
-          </Btn>
-          <ColumnPicker shownCols={effectiveShownCols} onChange={setShownCols} scoringOn={scoringOn} />
-        </div>
       </div>
 
       {activeTab === 'settings' ? (
@@ -5111,11 +5392,15 @@ export default function JoltListEditorPage() {
                 <i className="ti ti-clipboard" /> Paste below
               </Btn>
               <div style={{ flex: 1 }} />
-              <span style={{ fontSize: 12, color: T.textMuted, padding: '0 8px' }}>{totalItems} items</span>
-              <button style={{ fontSize: 15, color: T.textMuted, padding: '4px 6px', borderRadius: 4, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Question bank">
-                <i className="ti ti-books" />
-              </button>
-              <div style={{ width: 32, flexShrink: 0 }} />
+              <Btn onClick={() => { if (dcPendingConditionId && !findItem(items, dcPendingConditionId)?.dcConditions?.length) removeDCLink(dcPendingConditionId); setDcMode(v => !v); setDcLinkingId(null); setDcConditionState(null); setDcDebugId(null); setDcDebugUnlinkedId(null); setDcPendingConditionId(null); }} style={dcMode ? { background: '#FFF8E1', color: '#5D4037', borderColor: '#FFD54F' } : {}}>
+                <i className="ti ti-filter" /> {dcMode ? 'Exit display criteria' : 'Display criteria'}
+              </Btn>
+              {!templateDeactivated && (
+                <Btn onClick={handlePreview}>
+                  <i className="ti ti-eye" /> Preview
+                </Btn>
+              )}
+              <ColumnPicker shownCols={effectiveShownCols} onChange={setShownCols} scoringOn={scoringOn} />
             </div>
 
             {/* DC banner */}

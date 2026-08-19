@@ -6,6 +6,22 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-08-19 — Unpublished drafts never auto-send
+
+- **What:** Autosaved unpublished changes sit until the user publishes now or sets a schedule. No default send time. Cancel/remove schedule returns to unpublished, it does not pick a new time for them.
+- **Why:** A pre-filled date/time plus “locations get the template at this time” reads as “this will happen if I do nothing.” That recreates the Publisher Tasks surprise.
+- **Rejected:** Defaulting the picker to tomorrow 6:00 AM. Auto-publishing after N days.
+
+---
+
+## 2026-08-19 — Publish explanation is an info icon, not a button hover
+
+- **What:** Do not put “what Publish does” on hover of the Publish button. When the header cluster is cleaned up, use an info icon + HelpTip, with separate copy for standard vs publisher accounts. Standard: pushes to locations that use the list. Publisher: own locations now; subscribers on next daily list generation. Already-on-device lists do not change.
+- **Why:** Hover-on-primary-button is a weak place for high-stakes explanation (tablet, click-vs-read). Header is already overloaded.
+- **Rejected:** Tooltip on the Publish button itself as the sole explanation.
+
+---
+
 ## 2026-08-18 — Session end: Cursor setup + list editor kebab
 
 **Worked on:** Cursor transition, share pipeline, `JoltListEditorPage` header more-options.
