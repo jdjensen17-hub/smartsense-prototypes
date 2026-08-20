@@ -3134,7 +3134,7 @@ function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displ
   const [allowMultiCopy, setAllowMultiCopy] = useState(false);
 
   return (
-    <div style={{ padding: '16px 16px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
+    <div style={{ padding: '16px 16px', maxWidth: 720, width: '100%', flexShrink: 0 }}>
       {/* List submission */}
       <SectionHeader label="List submission" helpTip="Decide whether this list should be completed like a form (everything at once) or allow items to be submitted as completed." summary={submission === 'items-anytime' ? 'Items can be submitted when complete' : 'List must be fully complete to submit'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -5465,7 +5465,7 @@ export default function JoltListEditorPage() {
       </div>
 
       {activeTab === 'settings' ? (
-        <div style={{ flex: 1, overflowY: 'auto', background: T.surface0 }}>
+        <div style={{ flex: 1, overflowY: 'auto', background: T.surface2, display: 'flex', justifyContent: 'center' }}>
           <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} submission={submission} setSubmission={setSubmission} displayTimes={displayTimes} setDisplayTimes={setDisplayTimes} />
         </div>
       ) : (
