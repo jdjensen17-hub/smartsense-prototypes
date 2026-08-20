@@ -6,6 +6,14 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-08-20 — PDF attachment on list email notifications
+
+- **What:** On `/#/operate/jolt-editor` Settings → Notifications, "List is displayed" and "List is completed" show a toggle when Email is selected: "Attach a PDF copy of the report to the email". Default off. Hidden if Email is deselected. Saved chip appends ` · PDF` when on.
+- **Why:** Those two events produce a report; email is the only method that can carry a file.
+- **Rejected:** Offering the toggle on Push/Text, or on other events. Defaulting it on.
+
+---
+
 ## 2026-08-19 — Hide the Items grid scrollbar
 
 - **What:** Native scrollbar on the `/#/operate/jolt-editor` Items table scroller is hidden. Wheel/trackpad still scroll. Horizontal overflow is `hidden` unless extra columns are on.

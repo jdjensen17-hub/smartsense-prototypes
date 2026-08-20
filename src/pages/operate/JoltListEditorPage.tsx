@@ -2961,7 +2961,7 @@ function DCConditionPanel({ childItem, parentItem, onSave, onUpdate, onRemoveLin
 }
 
 // ── Notification section helpers ──────────────────────────────────────────
-interface NotifRule { id: string; event: string; roles: string[]; methods: string[]; offsetMin?: number; frequency?: 'Daily' | 'Weekly'; }
+interface NotifRule { id: string; event: string; roles: string[]; methods: string[]; offsetMin?: number; frequency?: 'Daily' | 'Weekly'; attachPdf?: boolean; }
 
 function NotificationSection() {
   const EVENTS = [
@@ -2972,6 +2972,7 @@ function NotificationSection() {
     { id: 'completed', label: 'List is completed' },
     { id: 'image-exception', label: 'An image exception occurs' },
   ];
+  const PDF_EVENTS = new Set(['displayed', 'completed']);
   const [rules, setRules] = useState<NotifRule[]>([]);
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
@@ -2979,6 +2980,7 @@ function NotificationSection() {
   const [formMethods, setFormMethods] = useState<string[]>([]);
   const [formOffset, setFormOffset] = useState(30);
   const [formFrequency, setFormFrequency] = useState<'Daily' | 'Weekly'>('Daily');
+  const [formAttachPdf, setFormAttachPdf] = useState(false);
 
   const openAdd = (evId: string) => {
     setEditingRuleId(null);
@@ -2986,6 +2988,7 @@ function NotificationSection() {
     setFormMethods(evId === 'image-exception' ? ['Email'] : []);
     setFormOffset(30);
     setFormFrequency('Daily');
+    setFormAttachPdf(false);
     setAddingFor(evId);
   };
 
@@ -2996,15 +2999,20 @@ function NotificationSection() {
     setFormMethods(rule.methods);
     setFormOffset(rule.offsetMin ?? 30);
     setFormFrequency(rule.frequency ?? 'Daily');
+    setFormAttachPdf(!!rule.attachPdf);
   };
 
   const saveRule = (event: string) => {
     if (!formRoles.length || !formMethods.length) return;
     const extra = event === 'before-due'
-      ? { offsetMin: formOffset, frequency: undefined }
+      ? { offsetMin: formOffset, frequency: undefined, attachPdf: undefined }
       : event === 'image-exception'
-        ? { offsetMin: undefined, frequency: formFrequency }
-        : { offsetMin: undefined, frequency: undefined };
+        ? { offsetMin: undefined, frequency: formFrequency, attachPdf: undefined }
+        : {
+            offsetMin: undefined,
+            frequency: undefined,
+            attachPdf: PDF_EVENTS.has(event) && formMethods.includes('Email') ? formAttachPdf : undefined,
+          };
     if (editingRuleId) {
       setRules(prev => prev.map(r => r.id === editingRuleId ? { ...r, roles: formRoles, methods: formMethods, ...extra } : r));
     } else {
@@ -3014,6 +3022,7 @@ function NotificationSection() {
     setEditingRuleId(null);
     setFormRoles([]);
     setFormMethods([]);
+    setFormAttachPdf(false);
   };
 
   return (
@@ -3035,7 +3044,7 @@ function NotificationSection() {
             <div key={r.id} onClick={() => openEdit(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.surface0, border: `0.5px solid ${T.border}`, borderRadius: 5, padding: '7px 10px', marginBottom: 4, cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = T.borderStrong)}
               onMouseLeave={e => (e.currentTarget.style.borderColor = T.border)}>
-              <div style={{ fontSize: 12, color: T.textPrimary }}>{r.roles.join(', ')} · {r.methods.join(', ')}{r.offsetMin ? ` · ${r.offsetMin}min before` : ''}{r.frequency ? ` · ${r.frequency}` : ''}</div>
+              <div style={{ fontSize: 12, color: T.textPrimary }}>{r.roles.join(', ')} · {r.methods.join(', ')}{r.offsetMin ? ` · ${r.offsetMin}min before` : ''}{r.frequency ? ` · ${r.frequency}` : ''}{r.attachPdf ? ' · PDF' : ''}</div>
               <button onClick={e => { e.stopPropagation(); setRules(rules.filter(x => x.id !== r.id)); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13 }}><i className="ti ti-trash" /></button>
             </div>
           ))}
@@ -3052,7 +3061,11 @@ function NotificationSection() {
                     {(ev.id === 'image-exception' ? ['Email'] : ['Push', 'Text', 'Email']).map(m => (
                       <div key={m} onClick={() => {
                         if (ev.id === 'image-exception') return;
-                        setFormMethods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+                        setFormMethods(prev => {
+                          const next = prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m];
+                          if (!next.includes('Email')) setFormAttachPdf(false);
+                          return next;
+                        });
                       }}
                         style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: ev.id === 'image-exception' ? 'default' : 'pointer', border: `0.5px solid ${formMethods.includes(m) ? T.fillAccent : T.borderStrong}`, background: formMethods.includes(m) ? T.fillAccent : T.surface2, color: formMethods.includes(m) ? T.onAccent : T.textSecondary }}>
                         {m}
@@ -3091,6 +3104,12 @@ function NotificationSection() {
                   Done
                 </button>
               </div>
+              {PDF_EVENTS.has(ev.id) && formMethods.includes('Email') && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 27 }}>
+                  <span style={{ fontSize: 13, color: T.textPrimary }}>Attach a PDF copy of the report to the email</span>
+                  <Toggle on={formAttachPdf} onChange={setFormAttachPdf} />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -3115,7 +3134,7 @@ function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displ
   const [allowMultiCopy, setAllowMultiCopy] = useState(false);
 
   return (
-    <div style={{ padding: '16px 16px', maxWidth: 720 }}>
+    <div style={{ padding: '16px 16px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
       {/* List submission */}
       <SectionHeader label="List submission" helpTip="Decide whether this list should be completed like a form (everything at once) or allow items to be submitted as completed." summary={submission === 'items-anytime' ? 'Items can be submitted when complete' : 'List must be fully complete to submit'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
