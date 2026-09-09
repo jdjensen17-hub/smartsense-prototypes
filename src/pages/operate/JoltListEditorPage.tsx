@@ -332,6 +332,11 @@ function formatOffset(amt: number, unit: string): string {
   return `${amt} ${label}`;
 }
 
+/** Prototype: first slot (6:00 AM) already displayed; next-day gen hasn't run. */
+function hasNoUndisplayedInstances(_dt: DisplayTime, index: number): boolean {
+  return index === 0;
+}
+
 function schedSummary(dts: DisplayTime[]): string {
   if (dts.length === 0) return '';
   const times = dts.map(dt => {
@@ -4688,7 +4693,8 @@ const DeactivateHelp = styled.p({
 
 function DeactivateInstancesModal({ listTemplateName, displayTimes, onClose, onConfirm }: { listTemplateName: string; displayTimes: DisplayTime[]; onClose: () => void; onConfirm: (ids: string[]) => void }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const allSelected = displayTimes.length > 0 && selected.size === displayTimes.length;
+  const selectableTimes = displayTimes.filter((dt, i) => !hasNoUndisplayedInstances(dt, i));
+  const allSelected = selectableTimes.length > 0 && selected.size === selectableTimes.length;
   const noneSelected = selected.size === 0;
 
   useEffect(() => {
@@ -4698,6 +4704,8 @@ function DeactivateInstancesModal({ listTemplateName, displayTimes, onClose, onC
   }, [onClose]);
 
   function toggle(id: string) {
+    const index = displayTimes.findIndex(dt => dt.id === id);
+    if (index < 0 || hasNoUndisplayedInstances(displayTimes[index], index)) return;
     setSelected(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -4723,7 +4731,7 @@ function DeactivateInstancesModal({ listTemplateName, displayTimes, onClose, onC
               <thead>
                 <tr>
                   <DeactivateTh style={{ width: 28 }}>
-                    <input type="checkbox" checked={allSelected} aria-label="Select all" onChange={e => setSelected(e.target.checked ? new Set(displayTimes.map(dt => dt.id)) : new Set())} style={{ accentColor: 'var(--ss-sky-blue)', width: 14, height: 14 }} />
+                    <input type="checkbox" checked={allSelected} disabled={selectableTimes.length === 0} aria-label="Select all" onChange={e => setSelected(e.target.checked ? new Set(selectableTimes.map(dt => dt.id)) : new Set())} style={{ accentColor: 'var(--ss-sky-blue)', width: 14, height: 14 }} />
                   </DeactivateTh>
                   <DeactivateTh>Display time</DeactivateTh>
                   <DeactivateTh>Due in</DeactivateTh>
@@ -4731,16 +4739,25 @@ function DeactivateInstancesModal({ listTemplateName, displayTimes, onClose, onC
                 </tr>
               </thead>
               <tbody>
-                {displayTimes.map(dt => (
-                  <tr key={dt.id}>
-                    <DeactivateTd>
-                      <input type="checkbox" checked={selected.has(dt.id)} aria-label={formatDisplayTime(dt)} onChange={() => toggle(dt.id)} style={{ accentColor: 'var(--ss-sky-blue)', width: 14, height: 14 }} />
-                    </DeactivateTd>
-                    <DeactivateTd>{formatDisplayTime(dt)}</DeactivateTd>
-                    <DeactivateTd>{formatOffset(dt.dueAmt, dt.dueUnit)}</DeactivateTd>
-                    <DeactivateTd>{formatOffset(dt.expAmt, dt.expUnit)}</DeactivateTd>
-                  </tr>
-                ))}
+                {displayTimes.map((dt, i) => {
+                  const empty = hasNoUndisplayedInstances(dt, i);
+                  return (
+                    <tr key={dt.id}>
+                      <DeactivateTd>
+                        <input type="checkbox" checked={selected.has(dt.id)} disabled={empty} aria-label={formatDisplayTime(dt)} onChange={() => toggle(dt.id)} style={{ accentColor: 'var(--ss-sky-blue)', width: 14, height: 14, cursor: empty ? 'not-allowed' : undefined }} />
+                      </DeactivateTd>
+                      <DeactivateTd>{formatDisplayTime(dt)}</DeactivateTd>
+                      {empty ? (
+                        <DeactivateTd colSpan={2} style={{ color: 'var(--ss-fg-secondary)' }}>No undisplayed lists to deactivate.</DeactivateTd>
+                      ) : (
+                        <>
+                          <DeactivateTd>{formatOffset(dt.dueAmt, dt.dueUnit)}</DeactivateTd>
+                          <DeactivateTd>{formatOffset(dt.expAmt, dt.expUnit)}</DeactivateTd>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </DeactivateTable>
           )}

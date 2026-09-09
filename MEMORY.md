@@ -6,6 +6,14 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-09-09 — Empty-instance row in Deactivate List Instances
+
+- **What:** When a display time exists but nothing is left to deactivate, the modal keeps the row. Checkbox disabled. Due in / Expires after replaced by "No undisplayed lists to deactivate." spanning those two columns. Select-all skips that row. Empty-schedule copy ("No display times configured.") is unchanged.
+- **Why:** 6:00 AM already displayed and tomorrow's generation hasn't run is a real gap. Treating it as "no display times" hides a configured slot.
+- **Rejected:** Live clock check. Prototype always uses the first display-time row (seeded 6:00 AM) as the empty slot.
+
+---
+
 ## 2026-08-20 — PDF attachment on list email notifications
 
 - **What:** On `/#/operate/jolt-editor` Settings → Notifications, "List is displayed" and "List is completed" show a toggle when Email is selected: "Attach a PDF copy of the report to the email". Default off. Hidden if Email is deselected. Saved chip appends ` · PDF` when on.
