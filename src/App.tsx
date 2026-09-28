@@ -19,6 +19,7 @@ import JoltListPreviewPage from '@/pages/operate/JoltListPreviewPage';
 import LabelTemplatesPage from '@/pages/operate/LabelTemplatesPage';
 import CreateListPage from '@/pages/operate/CreateListPage';
 import MCTemplatesPage from '@/pages/operate/MCTemplatesPage';
+import InformationLibraryPage from '@/pages/information/InformationLibraryPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -33,6 +34,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/licenses':            'License Assignment',
   '/admin/distribution':        'Distribution',
   '/admin/org-import':          'Org Hierarchy Import',
+  '/information':               'Information Library',
   '/operate/lists':             'List Completion',
   '/mobile/operate/pdf-search': 'PDF Search — Operate',
   '/operate/jolt-editor':       'Jolt List Editor',
@@ -231,6 +233,18 @@ function Shell({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
+          <NavLink to="/information" end onClick={() => setDrawerOpen(false)}
+            className="mt-1 flex w-full items-center rounded px-3 py-2 text-sm font-semibold transition-colors"
+            style={({ isActive }) => ({
+              backgroundColor: isActive ? '#5CA6D9' : 'transparent',
+              color: isActive ? '#ffffff' : '#35353B',
+              textDecoration: 'none',
+            })}
+            onMouseEnter={e => { if (e.currentTarget.style.color !== 'rgb(255, 255, 255)') e.currentTarget.style.backgroundColor = '#F7F7FA'; }}
+            onMouseLeave={e => { if (e.currentTarget.style.color !== 'rgb(255, 255, 255)') e.currentTarget.style.backgroundColor = 'transparent'; }}>
+            Information
+          </NavLink>
+
           <button onClick={() => setOperateOpen(v => !v)}
             className="mt-1 flex w-full items-center justify-between rounded px-3 py-2 text-sm font-semibold transition-colors"
             style={{ color: '#35353B', background: 'transparent', border: 'none', cursor: 'pointer' }}
@@ -318,6 +332,7 @@ export default function App() {
           <Route path="/admin/licenses"      element={<LicenseAssignmentPage />} />
           <Route path="/admin/distribution" element={<DistributionPage />} />
           <Route path="/admin/org-import"   element={<OrgHierarchyImportPage />} />
+          <Route path="/information" element={<InformationLibraryPage />} />
           <Route path="/operate/lists" element={<ListCompletionPage />} />
           <Route path="/operate/jolt-editor" element={<JoltListEditorPage />} />
           <Route path="/operate/jolt-preview" element={<JoltListPreviewPage />} />

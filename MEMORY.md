@@ -6,6 +6,22 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-09-28 — Information Library is one page with in-memory state
+
+- **What:** `/#/information` is a seeded author library. Category → subcategory → file. Tree filters the table. Upload, custom text file, permissions, viewers, and delete are states of that page. Office and URL rows download or open a link. Viewers are placeholders. Drag reorder is not in this slice. Shell and drawer order stay as already built.
+- **Why:** The HTML mocks are states of one screen. Separate routes would not share a library you can add to.
+- **Rejected:** A route per mock file. Copying the mock drawer (Information under Operate). Rebuilding the top bar.
+
+---
+
+## 2026-09-25 — Information is a leaf in the nav, not an accordion
+
+- **What:** Drawer order is Admin, Information, Operate. Information is a single link to `/#/information`. Header title is Information Library. Page is a Coming soon placeholder at `src/pages/information/InformationLibraryPage.tsx`. No child items.
+- **Why:** The module has one destination for now. Admin and Operate expand because they have children. Information does not.
+- **Rejected:** An Information accordion with a Library child. Putting the item anywhere other than between Admin and Operate.
+
+---
+
 ## 2026-09-09 — Empty-instance row in Deactivate List Instances
 
 - **What:** When a display time exists but nothing is left to deactivate, the modal keeps the row. Checkbox disabled. Due in / Expires after replaced by "No undisplayed lists to deactivate." spanning those two columns. Select-all skips that row. Empty-schedule copy ("No display times configured.") is unchanged.
