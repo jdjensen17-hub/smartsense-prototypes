@@ -1,6 +1,6 @@
-export type FileType = 'PDF' | 'JPG' | 'PNG' | 'MP4' | 'XLSX' | 'DOCX' | 'URL' | 'Custom';
+export type FileType = 'PDF' | 'JPG' | 'PNG' | 'MP4' | 'XLSX' | 'DOCX' | 'Custom';
 
-export type ViewAudience = 'everyone' | 'roles' | 'people';
+export type ViewAudience = 'everyone' | 'roles';
 
 export interface RoleAccess {
   id: string;
@@ -16,16 +16,20 @@ export interface LibraryFile {
   categoryId: string;
   subcategoryId: string;
   updated: string;
-  url?: string;
   content?: string;
-  audience: ViewAudience;
-  roles: RoleAccess[];
-  allowDownload: boolean;
+  size: number;
 }
 
 export interface Subcategory {
   id: string;
   name: string;
+  audience: ViewAudience;
+  roles: RoleAccess[];
+  scopeId: string;
+}
+
+export function emptySubcategory(id: string, name: string): Subcategory {
+  return { id, name, audience: 'everyone', roles: defaultRoles(), scopeId: 't_root' };
 }
 
 export interface Category {
@@ -34,7 +38,7 @@ export interface Category {
   subcategories: Subcategory[];
 }
 
-export const FILE_TYPES: FileType[] = ['PDF', 'JPG', 'PNG', 'MP4', 'XLSX', 'DOCX', 'URL', 'Custom'];
+export const FILE_TYPES: FileType[] = ['PDF', 'JPG', 'PNG', 'MP4', 'XLSX', 'DOCX', 'Custom'];
 
 export const OFFICE_TYPES: FileType[] = ['XLSX', 'DOCX'];
 
@@ -47,25 +51,32 @@ export function defaultRoles(): RoleAccess[] {
   ];
 }
 
-export function roleNote(enabled: boolean, allowDownload: boolean) {
-  if (!enabled) return 'No access';
-  return allowDownload ? 'Can view and download' : 'Can view';
+export function roleNote(enabled: boolean) {
+  return enabled ? 'Can view' : 'No access';
 }
 
 export function formatUpdated(iso: string) {
-  const [year, month, day] = iso.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+  const [datePart, timePart] = iso.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour = 0, minute = 0] = (timePart ?? '00:00').split(':').map(Number);
+  const dateLabel = new Date(year, month - 1, day).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
+  const hour12 = hour % 12 || 12;
+  const minuteLabel = String(minute).padStart(2, '0');
+  const suffix = hour < 12 ? 'AM' : 'PM';
+  return `${dateLabel}, ${hour12}:${minuteLabel}${suffix} EST`;
 }
 
 export function todayIso() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
+  const hour = String(now.getHours()).padStart(2, '0');
+  const minute = String(now.getMinutes()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}T${hour}:${minute}`;
 }
 
 export function typeFromFileName(name: string): FileType | null {
@@ -82,6 +93,10 @@ export function typeFromFileName(name: string): FileType | null {
   }
 }
 
+export function textBytes(content: string) {
+  return new TextEncoder().encode(content).length;
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -93,34 +108,32 @@ export const SEED_CATEGORIES: Category[] = [
     id: 'cat-corporate',
     name: 'Corporate best practices',
     subcategories: [
-      { id: 'sub-handbooks', name: 'Handbooks' },
-      { id: 'sub-policies', name: 'Policies' },
+      emptySubcategory('sub-handbooks', 'Handbooks'),
+      emptySubcategory('sub-policies', 'Policies'),
     ],
   },
   {
     id: 'cat-quick',
     name: 'Quick start guides',
     subcategories: [
-      { id: 'sub-onboarding', name: 'Onboarding' },
-      { id: 'sub-equipment', name: 'Equipment' },
+      emptySubcategory('sub-onboarding', 'Onboarding'),
+      emptySubcategory('sub-equipment', 'Equipment'),
     ],
   },
   {
     id: 'cat-ops',
     name: 'Operations',
     subcategories: [
-      { id: 'sub-sheets', name: 'Spreadsheets' },
-      { id: 'sub-checks', name: 'Checklists' },
+      emptySubcategory('sub-sheets', 'Spreadsheets'),
+      emptySubcategory('sub-checks', 'Checklists'),
     ],
   },
 ];
 
-function seedFile(partial: Omit<LibraryFile, 'audience' | 'roles' | 'allowDownload'> & Partial<Pick<LibraryFile, 'audience' | 'roles' | 'allowDownload'>>): LibraryFile {
+function seedFile(partial: Omit<LibraryFile, 'size'> & { size?: number }): LibraryFile {
   return {
-    audience: 'everyone',
-    roles: defaultRoles(),
-    allowDownload: true,
     ...partial,
+    size: partial.type === 'Custom' ? textBytes(partial.content ?? '') : (partial.size ?? 0),
   };
 }
 
@@ -131,8 +144,8 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'PDF',
     categoryId: 'cat-corporate',
     subcategoryId: 'sub-handbooks',
-    updated: '2026-09-12',
-    audience: 'roles',
+    updated: '2026-09-12T09:14',
+    size: 2_516_582,
   }),
   seedFile({
     id: 'file-onboarding',
@@ -140,7 +153,8 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'PDF',
     categoryId: 'cat-corporate',
     subcategoryId: 'sub-handbooks',
-    updated: '2026-08-02',
+    updated: '2026-08-02T15:40',
+    size: 911_360,
   }),
   seedFile({
     id: 'file-culture',
@@ -148,7 +162,7 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'Custom',
     categoryId: 'cat-corporate',
     subcategoryId: 'sub-handbooks',
-    updated: '2026-07-09',
+    updated: '2026-07-09T11:05',
     content: 'We train before we rush. Shift leads own the floor. Escalate safety issues before serving guests.',
   }),
   seedFile({
@@ -157,16 +171,8 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'PDF',
     categoryId: 'cat-corporate',
     subcategoryId: 'sub-policies',
-    updated: '2026-06-18',
-  }),
-  seedFile({
-    id: 'file-brand',
-    name: 'Brand asset portal',
-    type: 'URL',
-    categoryId: 'cat-corporate',
-    subcategoryId: 'sub-policies',
-    updated: '2026-07-30',
-    url: 'https://example.com/brand',
+    updated: '2026-06-18T08:22',
+    size: 430_080,
   }),
   seedFile({
     id: 'file-frontage',
@@ -174,7 +180,8 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'JPG',
     categoryId: 'cat-quick',
     subcategoryId: 'sub-onboarding',
-    updated: '2026-09-08',
+    updated: '2026-09-08T13:27',
+    size: 3_250_944,
   }),
   seedFile({
     id: 'file-pos',
@@ -182,7 +189,8 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'MP4',
     categoryId: 'cat-quick',
     subcategoryId: 'sub-equipment',
-    updated: '2026-08-28',
+    updated: '2026-08-28T10:03',
+    size: 50_331_648,
   }),
   seedFile({
     id: 'file-inventory',
@@ -190,7 +198,8 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'XLSX',
     categoryId: 'cat-ops',
     subcategoryId: 'sub-sheets',
-    updated: '2026-08-14',
+    updated: '2026-08-14T14:16',
+    size: 88_064,
   }),
   seedFile({
     id: 'file-closing',
@@ -198,7 +207,8 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'DOCX',
     categoryId: 'cat-ops',
     subcategoryId: 'sub-checks',
-    updated: '2026-08-01',
+    updated: '2026-08-01T17:55',
+    size: 55_296,
   }),
   seedFile({
     id: 'file-opening',
@@ -206,7 +216,7 @@ export const SEED_FILES: LibraryFile[] = [
     type: 'Custom',
     categoryId: 'cat-ops',
     subcategoryId: 'sub-checks',
-    updated: '2026-07-22',
+    updated: '2026-07-22T06:41',
     content: 'Before unlock\n\nConfirm overnight temp logs are complete.\nCheck lobby lights and the open sign.\nVerify the safe count with dual control.\n\nEscalate issues to the shift lead before serving guests.',
   }),
 ];

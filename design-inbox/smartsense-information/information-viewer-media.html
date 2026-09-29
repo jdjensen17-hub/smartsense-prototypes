@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Media viewer · SmartSense ONE</title>
+  <link rel="stylesheet" href="colors_and_type.css" />
+  <link rel="stylesheet" href="mock-shell.css" />
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+</head>
+<body>
+<div class="ss-app">
+  <header class="ss-topbar" role="banner">
+    <button type="button" class="ss-hamburger" aria-label="Open navigation" aria-expanded="false">
+      <i data-lucide="menu" width="18" height="18" stroke-width="1.4"></i>
+    </button>
+    <div class="ss-brand">
+      <span class="ss-brand-mark" aria-hidden="true">S</span>
+      SmartSense ONE
+    </div>
+    <span class="ss-topbar-divider" aria-hidden="true"></span>
+    <span class="ss-topbar-title">Information</span>
+    <div class="ss-topbar-spacer"></div>
+    <span class="ss-topbar-avatar" title="Jim Jensen" aria-label="Account">
+      <i data-lucide="user" width="16" height="16" stroke-width="1.4"></i>
+    </span>
+  </header>
+
+  <div class="ss-main">
+
+    <div class="ss-page" aria-hidden="true" style="pointer-events:none; opacity:0.45;">
+      <div class="ss-toolbar">
+        <div class="ss-search-wrap" style="margin-left:0;">
+          <i data-lucide="search" width="16" height="16" stroke-width="1.4"></i>
+          <input type="search" placeholder="Search library" disabled />
+        </div>
+      </div>
+      <div class="ss-library">
+        <aside class="ss-tree-pane"><div class="ss-tree-header"><span class="ss-tree-header-title">Library</span></div>
+          <div class="ss-tree-body"><p class="ss-quiet" style="padding:12px;margin:0;font-size:12px;">Corporate best practices…</p></div>
+        </aside>
+        <section class="ss-content-pane"><div class="ss-table-wrap"><p class="ss-muted" style="padding:24px;">File table behind modal</p></div></section>
+      </div>
+    </div>
+    <div class="ss-scrim" role="dialog" aria-modal="true" aria-labelledby="media-title">
+      <div class="ss-modal ss-modal-xl">
+        <div class="ss-modal-header accent">
+          <h2 class="ss-modal-title" id="media-title">POS register walkthrough</h2>
+          <div class="ss-flex ss-gap-1">
+            <button type="button" class="ss-icon-btn" aria-label="Download"><i data-lucide="download" width="18" height="18" stroke-width="1.4"></i></button>
+            <a class="ss-icon-btn" href="information.html" aria-label="Close"><i data-lucide="x" width="18" height="18" stroke-width="1.4"></i></a>
+          </div>
+        </div>
+        <div class="ss-modal-body" style="background:var(--ss-bg-app); display:flex; flex-direction:column; gap:16px; align-items:center;">
+          <div class="ss-media-placeholder" role="img" aria-label="Video player placeholder">
+            <button type="button" class="ss-fab" style="position:static;" aria-label="Play"><i data-lucide="play" width="22" height="22" stroke-width="1.4"></i></button>
+            <div style="font-size:13px;font-weight:700;">Video player · MP4</div>
+            <div style="font-size:11px;opacity:0.8;">0:00 / 4:12</div>
+          </div>
+          <p class="ss-muted" style="margin:0;font-size:12px;text-align:center;max-width:480px;">
+            Images use the same modal chrome with an image stage (see alternate block below). Office files skip viewer and offer download.
+          </p>
+          <div class="ss-image-placeholder" role="img" aria-label="Image preview placeholder">
+            <i data-lucide="image" width="36" height="36" stroke-width="1.4"></i>
+            <div style="font-weight:700;">Image modal · JPG</div>
+            <div style="font-size:11px;">Store frontage photo</div>
+          </div>
+        </div>
+        <div class="ss-modal-footer">
+          <a class="ss-btn ss-btn-neutral" href="information.html">Close</a>
+          <a class="ss-btn ss-btn-secondary" href="information-permissions.html">Permissions</a>
+          <button type="button" class="ss-btn ss-btn-primary"><i data-lucide="download" width="14" height="14" stroke-width="1.4"></i> Download</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>lucide.createIcons();</script>
+
+</body>
+</html>

@@ -6,9 +6,75 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-09-29 — Session handoff
+
+- **Worked on:** `/#/information` polish, then where Connect Microsoft belongs.
+- **Completed:** Subcategory permissions (scope tree, everyone default, no people, no download toggle). File grip moves a file to another subcategory. Row tools removed; kebab only. Office kebab says Download. Category and subcategory kebabs. Subcategory icons indented under the parent. Status bar at the bottom of the categories column (count and formatted size). Viewer detail line includes size. Floating plus button removed.
+- **Completed (build thread):** Admin → Integrations at `/#/admin/integrations`. Microsoft connect, site list, and disconnect are in-memory only. `/#/information` was not changed.
+- **In progress:** Nothing.
+- **Next:** Author linking and the mobile open flow stay out of this slice. Do not push until asked.
+
+---
+
+## 2026-09-29 — Connect Microsoft lives under Admin Integrations
+
+- **What:** Connect Microsoft is a tenant integration, not an Information Library control. Admin → Integrations is a catalog of cards. Connected cards first. Each card has a name, one sentence on what the customer uses it for, and a status (Not connected, Connected, or Needs setup). Clicking a card opens that integration’s own screen. Microsoft’s screen is the admin workflow from the PRD: Connect, site allowlist, Disconnect. Card copy: “Link SharePoint and OneDrive files to checklist items. Store teams open them in the app without a Microsoft login.” Source: Confluence “PRD: Cloud Drive Content Integration for Checklists” (`6186205214`, tiny link `HgC6cAE`). The 2026-09-29 SS1 screenshot shows Admin → Integrations with “Integrations marketplace is coming soon.” This prototype has no Integrations route yet. Build it in `App.tsx` under Admin. Do not rebuild the shell to match that screenshot. Do not use Admin → Distribution (that page is location rules).
+- **Why:** One Microsoft connection per customer tenant. A privileged admin consents once. Authors later attach either a library file or a cloud file on a checklist item. The library stays a separate source.
+- **Rejected:** Connect Microsoft on `/#/information`. A store or marketplace. Expanding every integration inline on the catalog. Author linking and mobile open in the first slice.
+
+---
+
+## 2026-09-29 — Integrations prototype slice
+
+- **What:** `/#/admin/integrations` sits in the existing Admin accordion, after Distribution. Shell title is Integrations. Cards group as Connected, then Needs setup, then Not connected. An empty group is omitted, so a catalog with nothing connected does not show an empty Connected heading. Microsoft is the only flow: Not connected, consent Accept or Deny, Connected with no sites, add and remove sites, Connected and ready, Disconnect back to Not connected. Deny keeps no connection. State lasts for the browser session. Placeholder cards — Google Drive (Connected), Dropbox (Needs setup), Box (Not connected) — use the same card and open a screen with no connect flow, so the grid and groups show before Microsoft is connected.
+- **Why:** Hiding an empty Connected group means grouping stays invisible if every card starts Not connected.
+- **Rejected:** A real OAuth redirect. Seeding Microsoft as already connected. Connect controls on the placeholders. Admin → Distribution. Copying the production SS1 nav from the 2026-09-29 screenshot.
+
+---
+
+## 2026-09-28 — Permissions belong to subcategories
+
+- **What:** On `/#/information`, view permissions are stored on the subcategory. Edit permissions is enabled only when a subcategory is selected. The modal title is “Edit subcategory permissions.” Sections, in order: Distribution scope (org tree from `nodes` in the People scope picker; default Acme Foods, collapsed to that node; choosing a node collapses the tree to the selection; one node, a parent covers its children), Who can view (everyone in that scope, or selected roles), Roles with access. File rows and parent categories do not have their own permissions.
+- **Why:** Legacy Jolt applies permissions to subcategories, not to individual files or parent categories.
+- **Rejected:** Keeping Edit permissions tied to the selected file. A permissions action on the file row or in the viewer. A “Selected people” audience. An “Allow download” toggle. Legacy Jolt does not support person-level permissions or a download permission.
+
+---
+
+## 2026-09-28 — New subcategory lives on the category row
+
+- **What:** The Categories column is 300px. Its header folder-plus always creates a category. Each category and subcategory row has a kebab. Category actions are New subcategory, Rename, and Delete. Subcategory actions are Rename and Delete. A status bar pins to the bottom of the column when a row is selected and shows that selection’s file count and total size. The folder list scrolls above it. The bottom New category button and the Files-header New subcategory button are gone. File table columns: kebab 40px, Updated 200px, Type 130px. The Category column is 240px so the name column takes the remaining width. Row view, edit, and delete live in the kebab only.
+- **Why:** Two category-create controls, and New subcategory sat on the file toolbar away from the tree. A single icon whose action changed with selection would create the wrong thing. 300px is the room the category name needs once row actions are showing.
+- **Rejected:** A 3-state header icon (new category / new subcategory / disabled with a sub-subcategory tooltip).
+
+---
+
+## 2026-09-28 — Type filter sits in the file header
+
+- **What:** The Sort dropdown and the Files header Sort A–Z button are gone. Sorting is the column headers only. Search and the Type dropdown sit on the right of the blue toolbar. Search is immediately left of Type. Type has no visible label. The white heading row (All files, file count, breadcrumb) is gone.
+- **Why:** Sort and Type sat above the tree and felt disconnected from the table they control. Column headers already sort. Search and Type both filter that table, so they belong next to the file heading.
+- **Rejected:** Keeping a name-only Sort dropdown. Leaving Search in a toolbar above the library. A “Type” label on the dropdown.
+
+---
+
+## 2026-09-28 — Information grid sorts from the column headers
+
+- **What:** On `/#/information`, Name, Type, Category, and Updated sort by clicking the header. Click again to flip direction. Name, Type, and Category start A–Z. Updated starts newest first. The Sort dropdown and the Files header Sort A–Z button were removed the same day — see “Type filter sits in the file header.”
+- **Why:** “Updated” in the Sort dropdown fought the Files strip and did not match how the grid is read.
+- **Rejected:** Leaving Updated in the dropdown. A separate updated sort that the column headers do not show.
+
+---
+
+## 2026-09-28 — No URL entries in the information library
+
+- **What:** Upload has no URL / link field. URL is not a file type. The Brand asset portal seed row is gone.
+- **Why:** Legacy Jolt does not let an author add a public URL as a library entry.
+- **Rejected:** Keeping the optional link field from the HTML mock.
+
+---
+
 ## 2026-09-28 — Information Library is one page with in-memory state
 
-- **What:** `/#/information` is a seeded author library. Category → subcategory → file. Tree filters the table. Upload, custom text file, permissions, viewers, and delete are states of that page. Office and URL rows download or open a link. Viewers are placeholders. Drag reorder is not in this slice. Shell and drawer order stay as already built.
+- **What:** `/#/information` is a seeded author library. Category → subcategory → file. Tree filters the table. Upload, custom text file, permissions, viewers, and delete are states of that page. Office rows download. Viewers are placeholders. Dragging a grip moves a file onto another subcategory. Reordering rows in the list is not in this slice. Shell and drawer order stay as already built. URL entries were removed the same day — see “No URL entries in the information library.”
 - **Why:** The HTML mocks are states of one screen. Separate routes would not share a library you can add to.
 - **Rejected:** A route per mock file. Copying the mock drawer (Information under Operate). Rebuilding the top bar.
 

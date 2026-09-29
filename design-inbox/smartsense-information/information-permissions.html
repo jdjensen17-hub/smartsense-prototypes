@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Edit permissions · SmartSense ONE</title>
+  <link rel="stylesheet" href="colors_and_type.css" />
+  <link rel="stylesheet" href="mock-shell.css" />
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+</head>
+<body>
+<div class="ss-app">
+  <header class="ss-topbar" role="banner">
+    <button type="button" class="ss-hamburger" aria-label="Open navigation" aria-expanded="false">
+      <i data-lucide="menu" width="18" height="18" stroke-width="1.4"></i>
+    </button>
+    <div class="ss-brand">
+      <span class="ss-brand-mark" aria-hidden="true">S</span>
+      SmartSense ONE
+    </div>
+    <span class="ss-topbar-divider" aria-hidden="true"></span>
+    <span class="ss-topbar-title">Information</span>
+    <div class="ss-topbar-spacer"></div>
+    <span class="ss-topbar-avatar" title="Jim Jensen" aria-label="Account">
+      <i data-lucide="user" width="16" height="16" stroke-width="1.4"></i>
+    </span>
+  </header>
+
+  <div class="ss-main">
+
+    <div class="ss-page" aria-hidden="true" style="pointer-events:none; opacity:0.45;">
+      <div class="ss-toolbar">
+        <div class="ss-search-wrap" style="margin-left:0;">
+          <i data-lucide="search" width="16" height="16" stroke-width="1.4"></i>
+          <input type="search" placeholder="Search library" disabled />
+        </div>
+      </div>
+      <div class="ss-library">
+        <aside class="ss-tree-pane"><div class="ss-tree-header"><span class="ss-tree-header-title">Library</span></div>
+          <div class="ss-tree-body"><p class="ss-quiet" style="padding:12px;margin:0;font-size:12px;">Corporate best practices…</p></div>
+        </aside>
+        <section class="ss-content-pane"><div class="ss-table-wrap"><p class="ss-muted" style="padding:24px;">File table behind modal</p></div></section>
+      </div>
+    </div>
+    <div class="ss-scrim" role="dialog" aria-modal="true" aria-labelledby="perm-title">
+      <div class="ss-modal">
+        <div class="ss-modal-header accent">
+          <h2 class="ss-modal-title" id="perm-title">Edit file permissions</h2>
+          <a class="ss-icon-btn" href="information-category.html" aria-label="Close"><i data-lucide="x" width="18" height="18" stroke-width="1.4"></i></a>
+        </div>
+        <div class="ss-modal-body">
+          <p class="ss-muted" style="margin:0 0 16px;">
+            <strong style="color:var(--ss-fg-primary);">Employee handbook 2026</strong>
+            · PDF · Corporate best practices / Handbooks
+          </p>
+          <div class="ss-form-field">
+            <label class="ss-form-label">Who can view</label>
+            <select class="ss-select">
+              <option>Everyone at this tenant</option>
+              <option>Selected roles</option>
+              <option>Selected people</option>
+            </select>
+          </div>
+          <div class="ss-form-field">
+            <label class="ss-form-label">Roles with access</label>
+            <div class="ss-perm-list">
+              <div class="ss-perm-row">
+                <span class="ss-perm-avatar">GM</span>
+                <div class="ss-perm-meta">
+                  <div class="ss-perm-name">General manager</div>
+                  <div class="ss-perm-role">Can view and download</div>
+                </div>
+                <button type="button" class="ss-toggle on" aria-pressed="true" aria-label="Toggle General manager"></button>
+              </div>
+              <div class="ss-perm-row">
+                <span class="ss-perm-avatar">SL</span>
+                <div class="ss-perm-meta">
+                  <div class="ss-perm-name">Shift lead</div>
+                  <div class="ss-perm-role">Can view and download</div>
+                </div>
+                <button type="button" class="ss-toggle on" aria-pressed="true" aria-label="Toggle Shift lead"></button>
+              </div>
+              <div class="ss-perm-row">
+                <span class="ss-perm-avatar">TM</span>
+                <div class="ss-perm-meta">
+                  <div class="ss-perm-name">Team member</div>
+                  <div class="ss-perm-role">Can view</div>
+                </div>
+                <button type="button" class="ss-toggle on" aria-pressed="true" aria-label="Toggle Team member"></button>
+              </div>
+              <div class="ss-perm-row">
+                <span class="ss-perm-avatar" style="background:var(--ss-grey-600);">CT</span>
+                <div class="ss-perm-meta">
+                  <div class="ss-perm-name">Contractor</div>
+                  <div class="ss-perm-role">No access</div>
+                </div>
+                <button type="button" class="ss-toggle" aria-pressed="false" aria-label="Toggle Contractor"></button>
+              </div>
+            </div>
+          </div>
+          <div class="ss-form-field" style="margin-bottom:0;">
+            <label class="ss-form-label">Allow download <span class="opt">(viewers)</span></label>
+            <button type="button" class="ss-toggle on" aria-pressed="true" aria-label="Allow download"></button>
+            <p class="ss-help">Office types always offer download as the primary action.</p>
+          </div>
+        </div>
+        <div class="ss-modal-footer">
+          <a class="ss-btn ss-btn-neutral" href="information-category.html">Cancel</a>
+          <button type="button" class="ss-btn ss-btn-primary">Save permissions</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>lucide.createIcons();</script>
+
+</body>
+</html>

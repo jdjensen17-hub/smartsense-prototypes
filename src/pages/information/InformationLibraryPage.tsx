@@ -1,30 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import styled from '@emotion/styled';
 import {
-  ArrowDownAZ, ChevronDown, ChevronRight, Download, ExternalLink, Eye,
+  Building2, ChevronDown, ChevronRight, ChevronUp, Download, Eye,
   FilePen, FileText, Film, Folder, FolderOpen, FolderPlus, GripVertical,
-  Image, Library, Link, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw,
+  Image, Library, Lock, MapPin, MoreVertical, Pencil, Play, RefreshCw,
   Search, Sheet, Trash2, Upload, X,
 } from 'lucide-react';
 import {
-  defaultRoles, FILE_TYPES, formatBytes, formatUpdated, OFFICE_TYPES, roleNote,
+  defaultRoles, emptySubcategory, FILE_TYPES, formatBytes, formatUpdated, OFFICE_TYPES, roleNote, textBytes,
   SEED_CATEGORIES, SEED_FILES, todayIso, typeFromFileName,
-  type Category, type FileType, type LibraryFile, type RoleAccess, type ViewAudience,
+  type Category, type FileType, type LibraryFile, type RoleAccess, type Subcategory, type ViewAudience,
 } from './libraryData';
+import { nodes, type OrgNode } from '@/components/people/ScopePickerScreen';
 
-type SortKey = 'az' | 'za' | 'updated';
+type SortColumn = 'name' | 'type' | 'category' | 'updated';
+type SortDir = 'asc' | 'desc';
 
 type Dialog =
   | { kind: 'upload'; replaceFileId?: string }
   | { kind: 'custom'; fileId?: string; thenPermissions?: boolean }
-  | { kind: 'permissions'; fileId: string }
+  | { kind: 'permissions'; categoryId: string; subcategoryId: string }
   | { kind: 'viewer'; fileId: string }
   | { kind: 'category'; categoryId?: string }
   | { kind: 'subcategory'; categoryId: string; subcategoryId?: string }
   | { kind: 'edit'; fileId: string }
   | { kind: 'delete'; kindTarget: 'file' | 'category' | 'subcategory'; id: string; categoryId?: string };
 
-type MenuState = { fileId: string; top: number; right: number };
+type MenuState = { top: number; right: number } & (
+  | { kind: 'file'; fileId: string }
+  | { kind: 'category'; categoryId: string }
+  | { kind: 'subcategory'; categoryId: string; subcategoryId: string }
+);
 
 const iconProps = { strokeWidth: 1.4 } as const;
 
@@ -37,9 +43,12 @@ export default function InformationLibraryPage() {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<FileType | 'all'>('all');
-  const [sort, setSort] = useState<SortKey>('az');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [dragFileId, setDragFileId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,7 +76,7 @@ export default function InformationLibraryPage() {
       categoryId: category.id,
       label: `${category.name} / ${sub.name}`,
     })),
-  ), [categories]);
+  ).sort((a, b) => a.label.localeCompare(b.label)), [categories]);
 
   const visibleFiles = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -78,27 +87,48 @@ export default function InformationLibraryPage() {
       if (needle && !file.name.toLowerCase().includes(needle)) return false;
       return true;
     });
+    const categoryLabel = (file: LibraryFile) => {
+      const category = categories.find(item => item.id === file.categoryId);
+      const sub = category?.subcategories.find(item => item.id === file.subcategoryId);
+      return `${category?.name ?? ''} · ${sub?.name ?? ''}`;
+    };
     next.sort((a, b) => {
-      if (sort === 'updated') return b.updated.localeCompare(a.updated);
-      const byName = a.name.localeCompare(b.name);
-      return sort === 'za' ? -byName : byName;
+      let primary = a.name.localeCompare(b.name);
+      if (sortColumn === 'type') primary = a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
+      if (sortColumn === 'category') primary = categoryLabel(a).localeCompare(categoryLabel(b)) || a.name.localeCompare(b.name);
+      if (sortColumn === 'updated') primary = a.updated.localeCompare(b.updated) || a.name.localeCompare(b.name);
+      return sortDir === 'desc' ? -primary : primary;
     });
     return next;
-  }, [files, query, selectedCategoryId, selectedSubcategoryId, sort, typeFilter]);
+  }, [categories, files, query, selectedCategoryId, selectedSubcategoryId, sortColumn, sortDir, typeFilter]);
 
-  const selectedCategory = categories.find(category => category.id === selectedCategoryId) ?? null;
-  const selectedSubcategory = selectedCategory?.subcategories.find(sub => sub.id === selectedSubcategoryId) ?? null;
   const place = (file: LibraryFile) => {
     const category = categories.find(item => item.id === file.categoryId);
     const sub = category?.subcategories.find(item => item.id === file.subcategoryId);
     return { category: category?.name ?? '', sub: sub?.name ?? '' };
   };
 
-  function countInCategory(categoryId: string) {
-    return files.filter(file => file.categoryId === categoryId).length;
+  function toggleColumn(column: SortColumn) {
+    if (sortColumn === column) {
+      setSortDir(dir => dir === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortColumn(column);
+    setSortDir(column === 'updated' ? 'desc' : 'asc');
   }
-  function countInSubcategory(subcategoryId: string) {
-    return files.filter(file => file.subcategoryId === subcategoryId).length;
+
+  function renderSortHeader(column: SortColumn, label: string, width?: number) {
+    const active = sortColumn === column;
+    return (
+      <th aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'} style={width ? { width } : undefined}>
+        <HeaderSort type="button" data-active={active} onClick={() => toggleColumn(column)}>
+          {label}
+          {active && (sortDir === 'asc'
+            ? <ChevronUp size={14} {...iconProps} aria-hidden="true" />
+            : <ChevronDown size={14} {...iconProps} aria-hidden="true" />)}
+        </HeaderSort>
+      </th>
+    );
   }
 
   function selectCategory(categoryId: string) {
@@ -126,10 +156,6 @@ export default function InformationLibraryPage() {
   }
 
   function openFile(file: LibraryFile) {
-    if (file.type === 'URL' && file.url) {
-      window.open(file.url, '_blank', 'noopener,noreferrer');
-      return;
-    }
     if (OFFICE_TYPES.includes(file.type)) {
       downloadPlaceholder(file);
       return;
@@ -145,6 +171,15 @@ export default function InformationLibraryPage() {
 
   function saveFiles(next: LibraryFile[]) {
     setFiles(next);
+  }
+
+  function moveFile(fileId: string, categoryId: string, subcategoryId: string) {
+    setFiles(current => current.map(file => {
+      if (file.id !== fileId || file.subcategoryId === subcategoryId) return file;
+      return { ...file, categoryId, subcategoryId };
+    }));
+    setDragFileId(null);
+    setDropTargetId(null);
   }
 
   function removeTarget(target: Dialog & { kind: 'delete' }) {
@@ -168,51 +203,25 @@ export default function InformationLibraryPage() {
     setDialog(null);
   }
 
-  const heading = selectedSubcategory?.name ?? selectedCategory?.name ?? 'All files';
-  const headingCount = visibleFiles.length === 1 ? '1 file' : `${visibleFiles.length} files`;
-  const showCategoryColumn = !selectedCategoryId;
-  const selectedVisible = visibleFiles.some(file => file.id === selectedFileId);
   const emptyLibrary = categories.length === 0;
+  const statusCategory = categories.find(category => category.id === selectedCategoryId) ?? null;
+  const statusSub = statusCategory?.subcategories.find(sub => sub.id === selectedSubcategoryId) ?? null;
+  const statusFiles = files.filter(file => statusSub
+    ? file.subcategoryId === statusSub.id
+    : statusCategory
+      ? file.categoryId === statusCategory.id
+      : false);
+  const statusBytes = statusFiles.reduce((sum, file) => sum + file.size, 0);
+  const menuFile = menu?.kind === 'file' ? files.find(item => item.id === menu.fileId) ?? null : null;
+  const menuDownloads = menuFile != null && OFFICE_TYPES.includes(menuFile.type);
 
   return (
     <Page>
-      {!emptyLibrary && (
-        <Toolbar>
-          <Field>
-            <FieldLabel>Sort</FieldLabel>
-            <FilterSelect aria-label="Sort" value={sort} onChange={e => setSort(e.target.value as SortKey)}>
-              <option value="az">Name A–Z</option>
-              <option value="za">Name Z–A</option>
-              <option value="updated">Updated</option>
-            </FilterSelect>
-          </Field>
-          <Field>
-            <FieldLabel>Type</FieldLabel>
-            <FilterSelect aria-label="Type" value={typeFilter} onChange={e => setTypeFilter(e.target.value as FileType | 'all')}>
-              <option value="all">All types</option>
-              {FILE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-            </FilterSelect>
-          </Field>
-          <SearchWrap>
-            <Search size={16} {...iconProps} />
-            <SearchInput
-              type="search"
-              placeholder="Search library"
-              aria-label="Search library"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-            />
-          </SearchWrap>
-        </Toolbar>
-      )}
-
       <LibraryCard>
         <TreePane aria-label="Categories">
           <TreeHeader>
-            <AllFilesButton type="button" aria-pressed={!selectedCategoryId} data-selected={!selectedCategoryId} onClick={showAll}>
-              Library
-            </AllFilesButton>
-            <IconButton type="button" aria-label="New category" onClick={() => setDialog({ kind: 'category' })}>
+            <CategoriesLabel>Categories</CategoriesLabel>
+            <IconButton type="button" aria-label="New Category" title="New Category" onClick={() => setDialog({ kind: 'category' })}>
               <FolderPlus size={16} {...iconProps} />
             </IconButton>
           </TreeHeader>
@@ -223,7 +232,13 @@ export default function InformationLibraryPage() {
               const categorySelected = selectedCategoryId === category.id && !selectedSubcategoryId;
               return (
                 <div key={category.id}>
-                  <TreeRow data-selected={categorySelected}>
+                  <TreeRow
+                    data-selected={categorySelected}
+                    onDragEnter={() => {
+                      if (!dragFileId) return;
+                      setExpandedIds(ids => ids.includes(category.id) ? ids : [...ids, category.id]);
+                    }}
+                  >
                     <ChevronButton type="button" data-expanded={expanded} aria-label={expanded ? `Collapse ${category.name}` : `Expand ${category.name}`} onClick={() => toggleExpanded(category.id)}>
                       <ChevronRight size={14} {...iconProps} />
                     </ChevronButton>
@@ -231,39 +246,67 @@ export default function InformationLibraryPage() {
                       <Folder size={16} {...iconProps} />
                       <span>{category.name}</span>
                     </TreeLabel>
-                    <Count>{countInCategory(category.id)}</Count>
-                    {categorySelected && (
-                      <>
-                        <IconButton type="button" aria-label={`Rename ${category.name}`} onClick={() => setDialog({ kind: 'category', categoryId: category.id })}>
-                          <Pencil size={14} {...iconProps} />
-                        </IconButton>
-                        <IconButton type="button" aria-label={`Delete ${category.name}`} onClick={() => setDialog({ kind: 'delete', kindTarget: 'category', id: category.id })}>
-                          <X size={14} {...iconProps} />
-                        </IconButton>
-                      </>
-                    )}
+                    <IconButton
+                      type="button"
+                      data-compact="true"
+                      aria-label={`Actions for ${category.name}`}
+                      aria-expanded={menu?.kind === 'category' && menu.categoryId === category.id}
+                      onClick={e => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const position = { top: rect.bottom + 4, right: window.innerWidth - rect.right };
+                        setMenu(current => current?.kind === 'category' && current.categoryId === category.id ? null : { kind: 'category', categoryId: category.id, ...position });
+                      }}
+                    >
+                      <MoreVertical size={14} {...iconProps} />
+                    </IconButton>
                   </TreeRow>
                   {expanded && (
                     <SubList>
                       {category.subcategories.map(sub => {
                         const subSelected = selectedSubcategoryId === sub.id;
                         return (
-                          <TreeRow key={sub.id} data-selected={subSelected}>
+                          <TreeRow
+                            key={sub.id}
+                            data-selected={subSelected}
+                            data-drop={dropTargetId === sub.id ? 'true' : undefined}
+                            onDragOver={e => {
+                              if (!dragFileId) return;
+                              const file = files.find(item => item.id === dragFileId);
+                              if (!file || file.subcategoryId === sub.id) {
+                                e.dataTransfer.dropEffect = 'none';
+                                return;
+                              }
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              setDropTargetId(current => current === sub.id ? current : sub.id);
+                            }}
+                            onDragLeave={e => {
+                              const next = e.relatedTarget;
+                              if (next instanceof Node && e.currentTarget.contains(next)) return;
+                              setDropTargetId(current => current === sub.id ? null : current);
+                            }}
+                            onDrop={e => {
+                              e.preventDefault();
+                              if (dragFileId) moveFile(dragFileId, category.id, sub.id);
+                            }}
+                          >
                             <TreeLabel type="button" onClick={() => selectSubcategory(category.id, sub.id)}>
                               {subSelected ? <FolderOpen size={14} {...iconProps} /> : <Folder size={14} {...iconProps} />}
                               <span>{sub.name}</span>
                             </TreeLabel>
-                            <Count>{countInSubcategory(sub.id)}</Count>
-                            {subSelected && (
-                              <>
-                                <IconButton type="button" aria-label={`Rename ${sub.name}`} onClick={() => setDialog({ kind: 'subcategory', categoryId: category.id, subcategoryId: sub.id })}>
-                                  <Pencil size={14} {...iconProps} />
-                                </IconButton>
-                                <IconButton type="button" aria-label={`Delete ${sub.name}`} onClick={() => setDialog({ kind: 'delete', kindTarget: 'subcategory', id: sub.id, categoryId: category.id })}>
-                                  <X size={14} {...iconProps} />
-                                </IconButton>
-                              </>
-                            )}
+                            <IconButton
+                              type="button"
+                              data-compact="true"
+                              aria-label={`Actions for ${sub.name}`}
+                              aria-expanded={menu?.kind === 'subcategory' && menu.subcategoryId === sub.id}
+                              onClick={e => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const position = { top: rect.bottom + 4, right: window.innerWidth - rect.right };
+                                setMenu(current => current?.kind === 'subcategory' && current.subcategoryId === sub.id ? null : { kind: 'subcategory', categoryId: category.id, subcategoryId: sub.id, ...position });
+                              }}
+                            >
+                              <MoreVertical size={14} {...iconProps} />
+                            </IconButton>
                           </TreeRow>
                         );
                       })}
@@ -273,19 +316,19 @@ export default function InformationLibraryPage() {
               );
             })}
           </TreeBody>
-          <TreeFooter>
-            <ActionButton type="button" tone="ghost" block onClick={() => setDialog({ kind: 'category' })}>
-              <FolderPlus size={16} {...iconProps} />
-              New category
-            </ActionButton>
-          </TreeFooter>
+          {statusCategory && (
+            <TreeStatus>
+              <TreeStatusName>{statusSub ? `${statusCategory.name} / ${statusSub.name}` : statusCategory.name}</TreeStatusName>
+              <TreeStatusMeta>{statusFiles.length === 1 ? '1 file' : `${statusFiles.length} files`} · {formatBytes(statusBytes)}</TreeStatusMeta>
+            </TreeStatus>
+          )}
         </TreePane>
 
         {emptyLibrary ? (
           <EmptyPane>
             <EmptyIcon aria-hidden="true"><Library size={24} {...iconProps} /></EmptyIcon>
             <EmptyTitle>Build your information library</EmptyTitle>
-            <EmptyBody>Create a category, then add subcategories and files. Upload PDFs, images, video, Office docs, links, or author a custom page.</EmptyBody>
+            <EmptyBody>Create a category, then add subcategories and files. Upload PDFs, images, video, Office docs, or author a custom page.</EmptyBody>
             <EmptyActions>
               <ActionButton type="button" tone="secondary" onClick={() => setDialog({ kind: 'category' })}>
                 <FolderPlus size={16} {...iconProps} />
@@ -300,7 +343,6 @@ export default function InformationLibraryPage() {
         ) : (
           <ContentPane aria-label="Files">
             <FilesToolbar>
-              <FilesLabel>Files</FilesLabel>
               <ActionButton type="button" tone="primary" onClick={() => setDialog({ kind: 'upload' })}>
                 <Upload size={16} {...iconProps} />
                 Upload
@@ -309,46 +351,26 @@ export default function InformationLibraryPage() {
                 <FilePen size={16} {...iconProps} />
                 Create custom
               </ActionButton>
-              <ActionButton type="button" tone="secondary" disabled={!selectedVisible} onClick={() => selectedFileId && setDialog({ kind: 'permissions', fileId: selectedFileId })}>
+              <ActionButton type="button" tone="secondary" disabled={!selectedSubcategoryId} onClick={() => selectedCategoryId && selectedSubcategoryId && setDialog({ kind: 'permissions', categoryId: selectedCategoryId, subcategoryId: selectedSubcategoryId })}>
                 <Lock size={16} {...iconProps} />
                 Edit permissions
               </ActionButton>
-              <ActionButton type="button" tone="neutral" onClick={() => setSort(current => current === 'az' ? 'za' : 'az')}>
-                <ArrowDownAZ size={16} {...iconProps} />
-                {sort === 'za' ? 'Sort Z–A' : 'Sort A–Z'}
-              </ActionButton>
               <Spacer />
-              <ActionButton
-                type="button"
-                tone="ghost"
-                disabled={categories.length === 0}
-                onClick={() => setDialog({ kind: 'subcategory', categoryId: selectedCategoryId ?? categories[0].id })}
-              >
-                <FolderPlus size={16} {...iconProps} />
-                New subcategory
-              </ActionButton>
+              <SearchWrap>
+                <Search size={16} {...iconProps} />
+                <SearchInput
+                  type="search"
+                  placeholder="Search library"
+                  aria-label="Search library"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                />
+              </SearchWrap>
+              <FilterSelect aria-label="Type" value={typeFilter} onChange={e => setTypeFilter(e.target.value as FileType | 'all')}>
+                <option value="all">All types</option>
+                {FILE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+              </FilterSelect>
             </FilesToolbar>
-            <ContentMeta>
-              <div>
-                {(selectedCategory || selectedSubcategory) && (
-                  <Breadcrumb aria-label="Breadcrumb">
-                    <BreadcrumbButton type="button" onClick={showAll}>Library</BreadcrumbButton>
-                    <ChevronRight size={12} {...iconProps} />
-                    {selectedSubcategory && selectedCategory ? (
-                      <>
-                        <BreadcrumbButton type="button" onClick={() => selectCategory(selectedCategory.id)}>{selectedCategory.name}</BreadcrumbButton>
-                        <ChevronRight size={12} {...iconProps} />
-                        <span>{selectedSubcategory.name}</span>
-                      </>
-                    ) : (
-                      <span>{selectedCategory?.name}</span>
-                    )}
-                  </Breadcrumb>
-                )}
-                <ContentTitle>{heading}</ContentTitle>
-                <ContentSub>{headingCount}</ContentSub>
-              </div>
-            </ContentMeta>
             <TableWrap>
               {visibleFiles.length === 0 ? (
                 <NoMatches>No files match this view.</NoMatches>
@@ -356,49 +378,57 @@ export default function InformationLibraryPage() {
                 <Table>
                   <thead>
                     <tr>
-                      <th style={{ width: 'var(--ss-space-8)' }} />
-                      <th>Name</th>
-                      <th>Type</th>
-                      {showCategoryColumn && <th>Category</th>}
-                      <th>Updated</th>
-                      <th aria-label="Actions" style={{ width: 'calc(var(--ss-space-8) * 4)' }} />
+                      <th style={{ width: 32 }} />
+                      {renderSortHeader('name', 'Name')}
+                      {renderSortHeader('type', 'Type', 130)}
+                      {renderSortHeader('category', 'Category', 240)}
+                      {renderSortHeader('updated', 'Updated', 200)}
+                      <th aria-label="More" style={{ width: 40, padding: 0 }} />
                     </tr>
                   </thead>
                   <tbody>
                     {visibleFiles.map(file => {
                       const located = place(file);
-                      const office = OFFICE_TYPES.includes(file.type);
-                      const link = file.type === 'URL';
                       return (
-                        <Row key={file.id} data-selected={selectedFileId === file.id} onClick={() => setSelectedFileId(file.id)}>
-                          <td><Grip aria-hidden="true"><GripVertical size={14} {...iconProps} /></Grip></td>
+                        <Row key={file.id} data-selected={selectedFileId === file.id} data-dragging={dragFileId === file.id ? 'true' : undefined} onClick={() => setSelectedFileId(file.id)}>
                           <td>
+                            <Grip
+                              type="button"
+                              draggable
+                              aria-label={`Move ${file.name}`}
+                              title="Drag to another subcategory"
+                              onDragStart={e => {
+                                e.dataTransfer.setData('text/plain', file.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                                setDragFileId(file.id);
+                              }}
+                              onDragEnd={() => {
+                                setDragFileId(null);
+                                setDropTargetId(null);
+                              }}
+                            >
+                              <GripVertical size={14} {...iconProps} />
+                            </Grip>
+                          </td>
+                          <td style={{ overflow: 'hidden' }}>
                             <FileName>
                               <FileIcon aria-hidden="true">{fileIcon(file.type)}</FileIcon>
                               <NameButton type="button" onClick={e => { e.stopPropagation(); openFile(file); }}>{file.name}</NameButton>
                             </FileName>
                           </td>
                           <td><TypeBadge>{file.type}</TypeBadge></td>
-                          {showCategoryColumn && <MutedCell>{located.category} · {located.sub}</MutedCell>}
+                          <MutedCell>{located.category} · {located.sub}</MutedCell>
                           <MutedCell>{formatUpdated(file.updated)}</MutedCell>
-                          <td>
+                          <td style={{ padding: 0, textAlign: 'center' }}>
                             <RowActions onClick={e => e.stopPropagation()}>
-                              <IconButton type="button" aria-label={link ? 'Open link' : office ? 'Download' : 'View'} onClick={() => openFile(file)}>
-                                {link ? <ExternalLink size={14} {...iconProps} /> : office ? <Download size={14} {...iconProps} /> : <Eye size={14} {...iconProps} />}
-                              </IconButton>
-                              <IconButton type="button" aria-label="Edit" onClick={() => openEdit(file)}>
-                                <Pencil size={14} {...iconProps} />
-                              </IconButton>
-                              <IconButton type="button" aria-label="Delete" onClick={() => setDialog({ kind: 'delete', kindTarget: 'file', id: file.id })}>
-                                <X size={14} {...iconProps} />
-                              </IconButton>
                               <IconButton
                                 type="button"
                                 aria-label="More"
-                                aria-expanded={menu?.fileId === file.id}
+                                aria-expanded={menu?.kind === 'file' && menu.fileId === file.id}
                                 onClick={e => {
                                   const rect = e.currentTarget.getBoundingClientRect();
-                                  setMenu(menu?.fileId === file.id ? null : {
+                                  setMenu(menu?.kind === 'file' && menu.fileId === file.id ? null : {
+                                    kind: 'file',
                                     fileId: file.id,
                                     top: rect.bottom + 4,
                                     right: window.innerWidth - rect.right,
@@ -420,23 +450,17 @@ export default function InformationLibraryPage() {
         )}
       </LibraryCard>
 
-      <Fab type="button" aria-label="Upload or create" onClick={() => setDialog({ kind: 'upload' })}>
-        <Plus size={24} {...iconProps} />
-      </Fab>
-
-      {menu && (
+      {menu?.kind === 'file' && (
         <Menu ref={menuRef} role="menu" style={{ top: menu.top, right: menu.right }}>
-          <MenuItem type="button" role="menuitem" onClick={() => { const file = files.find(item => item.id === menu.fileId); setMenu(null); if (file) openFile(file); }}>
-            <Eye size={14} {...iconProps} /> View file
+          <MenuItem type="button" role="menuitem" onClick={() => { setMenu(null); if (menuFile) openFile(menuFile); }}>
+            {menuDownloads ? <Download size={14} {...iconProps} /> : <Eye size={14} {...iconProps} />}
+            {menuDownloads ? 'Download' : 'View file'}
           </MenuItem>
           <MenuItem type="button" role="menuitem" onClick={() => { const file = files.find(item => item.id === menu.fileId); if (file) openEdit(file); }}>
             <Pencil size={14} {...iconProps} /> Edit
           </MenuItem>
           <MenuItem type="button" role="menuitem" onClick={() => { setDialog({ kind: 'upload', replaceFileId: menu.fileId }); setMenu(null); }}>
             <RefreshCw size={14} {...iconProps} /> Replace file
-          </MenuItem>
-          <MenuItem type="button" role="menuitem" onClick={() => { setDialog({ kind: 'permissions', fileId: menu.fileId }); setMenu(null); }}>
-            <Lock size={14} {...iconProps} /> Permissions
           </MenuItem>
           <MenuDivider />
           <MenuItem type="button" role="menuitem" data-danger="true" onClick={() => { setDialog({ kind: 'delete', kindTarget: 'file', id: menu.fileId }); setMenu(null); }}>
@@ -445,10 +469,37 @@ export default function InformationLibraryPage() {
         </Menu>
       )}
 
+      {menu?.kind === 'category' && (
+        <Menu ref={menuRef} role="menu" style={{ top: menu.top, right: menu.right }}>
+          <MenuItem type="button" role="menuitem" onClick={() => { setDialog({ kind: 'subcategory', categoryId: menu.categoryId }); setMenu(null); }}>
+            <FolderPlus size={14} {...iconProps} /> New subcategory
+          </MenuItem>
+          <MenuItem type="button" role="menuitem" onClick={() => { setDialog({ kind: 'category', categoryId: menu.categoryId }); setMenu(null); }}>
+            <Pencil size={14} {...iconProps} /> Rename
+          </MenuItem>
+          <MenuDivider />
+          <MenuItem type="button" role="menuitem" data-danger="true" onClick={() => { setDialog({ kind: 'delete', kindTarget: 'category', id: menu.categoryId }); setMenu(null); }}>
+            <Trash2 size={14} {...iconProps} /> Delete
+          </MenuItem>
+        </Menu>
+      )}
+
+      {menu?.kind === 'subcategory' && (
+        <Menu ref={menuRef} role="menu" style={{ top: menu.top, right: menu.right }}>
+          <MenuItem type="button" role="menuitem" onClick={() => { setDialog({ kind: 'subcategory', categoryId: menu.categoryId, subcategoryId: menu.subcategoryId }); setMenu(null); }}>
+            <Pencil size={14} {...iconProps} /> Rename
+          </MenuItem>
+          <MenuDivider />
+          <MenuItem type="button" role="menuitem" data-danger="true" onClick={() => { setDialog({ kind: 'delete', kindTarget: 'subcategory', id: menu.subcategoryId, categoryId: menu.categoryId }); setMenu(null); }}>
+            <Trash2 size={14} {...iconProps} /> Delete
+          </MenuItem>
+        </Menu>
+      )}
+
       {dialog?.kind === 'upload' && (
         <UploadDialog
           destinations={destinations}
-          initialSubcategoryId={selectedSubcategoryId ?? destinations.find(item => item.categoryId === selectedCategoryId)?.subcategoryId ?? destinations[0]?.subcategoryId ?? ''}
+          initialSubcategoryId={selectedSubcategoryId ?? destinations.find(item => item.categoryId === selectedCategoryId)?.subcategoryId ?? ''}
           replaceFile={dialog.replaceFileId ? files.find(file => file.id === dialog.replaceFileId) ?? null : null}
           onClose={() => setDialog(null)}
           onNeedCategory={() => setDialog({ kind: 'category' })}
@@ -458,7 +509,7 @@ export default function InformationLibraryPage() {
             if (dialog.replaceFileId && items[0]) {
               const next = items[0];
               setFiles(current => current.map(file => file.id === dialog.replaceFileId
-                ? { ...file, name: next.name, type: next.type, updated: todayIso() }
+                ? { ...file, name: next.name, type: next.type, size: next.size, updated: todayIso() }
                 : file));
             } else {
               const created: LibraryFile[] = items.map(item => ({
@@ -467,11 +518,8 @@ export default function InformationLibraryPage() {
                 type: item.type,
                 categoryId: destination.categoryId,
                 subcategoryId,
+                size: item.size,
                 updated: todayIso(),
-                url: item.url,
-                audience: 'everyone',
-                roles: defaultRoles(),
-                allowDownload: true,
               }));
               setFiles(current => [...created, ...current]);
               if (created[0]) setSelectedFileId(created[0].id);
@@ -486,7 +534,7 @@ export default function InformationLibraryPage() {
         <CustomDialog
           destinations={destinations}
           file={dialog.fileId ? files.find(item => item.id === dialog.fileId) ?? null : null}
-          initialSubcategoryId={selectedSubcategoryId ?? destinations[0]?.subcategoryId ?? ''}
+          initialSubcategoryId={selectedSubcategoryId ?? destinations.find(item => item.categoryId === selectedCategoryId)?.subcategoryId ?? ''}
           onClose={() => setDialog(null)}
           onSave={(draft, thenPermissions) => {
             const destination = destinations.find(item => item.subcategoryId === draft.subcategoryId);
@@ -500,32 +548,27 @@ export default function InformationLibraryPage() {
               subcategoryId: draft.subcategoryId,
               updated: todayIso(),
               content: draft.content,
-              audience: dialog.fileId ? (files.find(item => item.id === dialog.fileId)?.audience ?? 'everyone') : 'everyone',
-              roles: dialog.fileId ? (files.find(item => item.id === dialog.fileId)?.roles ?? defaultRoles()) : defaultRoles(),
-              allowDownload: dialog.fileId ? (files.find(item => item.id === dialog.fileId)?.allowDownload ?? true) : true,
+              size: textBytes(draft.content),
             };
             setFiles(current => dialog.fileId
               ? current.map(file => file.id === id ? nextFile : file)
               : [nextFile, ...current]);
             selectSubcategory(destination.categoryId, draft.subcategoryId);
             setSelectedFileId(id);
-            setDialog(thenPermissions ? { kind: 'permissions', fileId: id } : null);
+            setDialog(thenPermissions ? { kind: 'permissions', categoryId: destination.categoryId, subcategoryId: draft.subcategoryId } : null);
           }}
         />
       )}
 
       {dialog?.kind === 'permissions' && (
         <PermissionsDialog
-          file={files.find(item => item.id === dialog.fileId) ?? null}
-          placeLabel={(() => {
-            const file = files.find(item => item.id === dialog.fileId);
-            if (!file) return '';
-            const located = place(file);
-            return `${located.category} / ${located.sub}`;
-          })()}
+          subcategory={categories.find(category => category.id === dialog.categoryId)?.subcategories.find(sub => sub.id === dialog.subcategoryId) ?? null}
+          categoryName={categories.find(category => category.id === dialog.categoryId)?.name ?? ''}
           onClose={() => setDialog(null)}
           onSave={next => {
-            saveFiles(files.map(file => file.id === next.id ? { ...next, updated: todayIso() } : file));
+            setCategories(current => current.map(category => category.id === dialog.categoryId
+              ? { ...category, subcategories: category.subcategories.map(sub => sub.id === next.id ? next : sub) }
+              : category));
             setDialog(null);
           }}
         />
@@ -541,7 +584,6 @@ export default function InformationLibraryPage() {
             return `${located.category} / ${located.sub}`;
           })()}
           onClose={() => setDialog(null)}
-          onPermissions={() => setDialog({ kind: 'permissions', fileId: dialog.fileId })}
         />
       )}
 
@@ -554,7 +596,7 @@ export default function InformationLibraryPage() {
             const destination = destinations.find(item => item.subcategoryId === draft.subcategoryId);
             if (!destination || !dialog || dialog.kind !== 'edit') return;
             setFiles(current => current.map(file => file.id === dialog.fileId
-              ? { ...file, name: draft.name, url: draft.url, categoryId: destination.categoryId, subcategoryId: draft.subcategoryId, updated: todayIso() }
+              ? { ...file, name: draft.name, categoryId: destination.categoryId, subcategoryId: draft.subcategoryId, updated: todayIso() }
               : file));
             selectSubcategory(destination.categoryId, draft.subcategoryId);
             setDialog(null);
@@ -587,7 +629,7 @@ export default function InformationLibraryPage() {
               } else {
                 const id = crypto.randomUUID();
                 setCategories(current => current.map(category => category.id === categoryId
-                  ? { ...category, subcategories: [...category.subcategories, { id, name }] }
+                  ? { ...category, subcategories: [...category.subcategories, emptySubcategory(id, name)] }
                   : category));
                 selectSubcategory(categoryId, id);
               }
@@ -613,7 +655,6 @@ function fileIcon(type: FileType) {
   if (type === 'JPG' || type === 'PNG') return <Image size={14} {...iconProps} />;
   if (type === 'MP4') return <Film size={14} {...iconProps} />;
   if (type === 'XLSX') return <Sheet size={14} {...iconProps} />;
-  if (type === 'URL') return <Link size={14} {...iconProps} />;
   if (type === 'Custom') return <FilePen size={14} {...iconProps} />;
   return <FileText size={14} {...iconProps} />;
 }
@@ -657,12 +698,11 @@ function UploadDialog({
   replaceFile: LibraryFile | null;
   onClose: () => void;
   onNeedCategory: () => void;
-  onUpload: (subcategoryId: string, items: { name: string; type: FileType; url?: string }[]) => void;
+  onUpload: (subcategoryId: string, items: { name: string; type: FileType }[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [subcategoryId, setSubcategoryId] = useState(replaceFile?.subcategoryId ?? initialSubcategoryId);
   const [picked, setPicked] = useState<{ name: string; type: FileType; size: number }[]>([]);
-  const [url, setUrl] = useState('');
   const [error, setError] = useState('');
 
   function addFiles(list: FileList | null) {
@@ -678,13 +718,12 @@ function UploadDialog({
     setError(skipped ? 'Skipped files that are not PDF, JPG, PNG, MP4, XLSX, or DOCX.' : '');
   }
 
-  const link = url.trim();
-  const canSave = Boolean(subcategoryId) && (picked.length > 0 || (!replaceFile && link.length > 0));
+  const canSave = Boolean(subcategoryId) && picked.length > 0;
   const label = replaceFile
     ? 'Replace'
     : picked.length > 0
       ? `Upload ${picked.length} file${picked.length === 1 ? '' : 's'}`
-      : link ? 'Add link' : 'Upload';
+      : 'Upload';
 
   return (
     <Scrim role="presentation" onMouseDown={onClose}>
@@ -703,9 +742,10 @@ function UploadDialog({
             <>
               <FormField>
                 <FormLabel>Destination <Req>*</Req></FormLabel>
-                <TextInput as="select" aria-label="Destination" value={subcategoryId} disabled={Boolean(replaceFile)} onChange={e => setSubcategoryId(e.target.value)}>
+                <SelectInput aria-label="Destination" value={subcategoryId} disabled={Boolean(replaceFile)} onChange={e => setSubcategoryId(e.target.value)}>
+                  {!replaceFile && <option value="">Select a category</option>}
                   {destinations.map(item => <option key={item.subcategoryId} value={item.subcategoryId}>{item.label}</option>)}
-                </TextInput>
+                </SelectInput>
               </FormField>
               <Dropzone
                 role="button"
@@ -731,13 +771,6 @@ function UploadDialog({
                   </IconButton>
                 </FileChip>
               ))}
-              {!replaceFile && (
-                <FormField>
-                  <FormLabel>Or add a URL / link <Opt>(optional)</Opt></FormLabel>
-                  <TextInput type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} />
-                  <Help>Link entries open externally. They are not stored as downloads.</Help>
-                </FormField>
-              )}
             </>
           )}
         </ModalBody>
@@ -749,15 +782,7 @@ function UploadDialog({
               tone="primary"
               disabled={!canSave}
               onClick={() => {
-                const items: { name: string; type: FileType; url?: string }[] = picked.map(file => ({ name: file.name, type: file.type }));
-                if (!replaceFile && link) {
-                  items.push({
-                    name: link.replace(/^https?:\/\//, ''),
-                    type: 'URL',
-                    url: link.startsWith('http') ? link : `https://${link}`,
-                  });
-                }
-                onUpload(subcategoryId, items);
+                onUpload(subcategoryId, picked.map(file => ({ name: file.name, type: file.type })));
               }}
             >
               {label}
@@ -797,9 +822,10 @@ function CustomDialog({
           </FormField>
           <FormField>
             <FormLabel>Destination <Req>*</Req></FormLabel>
-            <TextInput as="select" aria-label="Destination" value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)}>
+            <SelectInput aria-label="Destination" value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)}>
+              {!file && <option value="">Select a category</option>}
               {destinations.map(item => <option key={item.subcategoryId} value={item.subcategoryId}>{item.label}</option>)}
-            </TextInput>
+            </SelectInput>
           </FormField>
           <FormField>
             <FormLabel>Content <Req>*</Req></FormLabel>
@@ -823,35 +849,145 @@ function CustomDialog({
   );
 }
 
-function PermissionsDialog({
-  file, placeLabel, onClose, onSave,
+function scopeById(id: string) {
+  return nodes.find(node => node.id === id);
+}
+
+function scopeChildren(parentId: string) {
+  return nodes.filter(node => node.parentId === parentId).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function isTenantScope(scope: OrgNode | undefined) {
+  return !scope || scope.parentId === null;
+}
+
+function everyoneOption(scopeId: string) {
+  const scope = scopeById(scopeId);
+  if (isTenantScope(scope)) return 'Everyone at this tenant';
+  return `Everyone in ${scope?.name}`;
+}
+
+function everyoneHelp(scopeId: string) {
+  const scope = scopeById(scopeId);
+  if (isTenantScope(scope)) return 'Everyone at the tenant can view files in this subcategory.';
+  return `Everyone in ${scope?.name} can view files in this subcategory.`;
+}
+
+function containsSelection(nodeId: string, selectedId: string) {
+  let current = scopeById(selectedId);
+  while (current?.parentId) {
+    if (current.parentId === nodeId) return true;
+    current = scopeById(current.parentId);
+  }
+  return false;
+}
+
+function ScopeLabel({ node }: { node: OrgNode }) {
+  return (
+    <>
+      {node.kind === 'location' ? <MapPin size={14} {...iconProps} /> : <Building2 size={14} {...iconProps} />}
+      <ScopeLevel>{node.levelName}</ScopeLevel>
+      <ScopeName>{node.name}</ScopeName>
+      {node.externalId && <ScopeExt>{node.externalId}</ScopeExt>}
+    </>
+  );
+}
+
+function ScopeNode({
+  node, depth, selectedId, onSelect,
 }: {
-  file: LibraryFile | null;
-  placeLabel: string;
-  onClose: () => void;
-  onSave: (file: LibraryFile) => void;
+  node: OrgNode;
+  depth: number;
+  selectedId: string;
+  onSelect: (id: string) => void;
 }) {
-  const [audience, setAudience] = useState<ViewAudience>(file?.audience ?? 'everyone');
-  const [roles, setRoles] = useState<RoleAccess[]>(file?.roles ?? defaultRoles());
-  const [allowDownload, setAllowDownload] = useState(file?.allowDownload ?? true);
-  if (!file) return null;
+  const kids = scopeChildren(node.id);
+  const [expanded, setExpanded] = useState(() => node.parentId === null || containsSelection(node.id, selectedId));
+  const selected = selectedId === node.id;
+
+  return (
+    <div>
+      <ScopeRow data-selected={selected ? 'true' : undefined} style={{ paddingLeft: depth * 16 + 8 }}>
+        <ScopeTwist
+          type="button"
+          aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
+          aria-expanded={kids.length > 0 ? expanded : undefined}
+          data-hidden={kids.length === 0 ? 'true' : undefined}
+          onClick={() => kids.length > 0 && setExpanded(value => !value)}
+        >
+          <ChevronRight size={14} {...iconProps} style={{ transform: expanded ? 'rotate(90deg)' : undefined }} />
+        </ScopeTwist>
+        <ScopePick type="button" aria-pressed={selected} onClick={() => onSelect(node.id)}>
+          <ScopeLabel node={node} />
+        </ScopePick>
+      </ScopeRow>
+      {expanded && kids.map(child => (
+        <ScopeNode key={child.id} node={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
+
+function DistributionScope({ scopeId, onSelect }: { scopeId: string; onSelect: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const tenantId = nodes.find(node => node.parentId === null)?.id ?? 't_root';
+  const root = scopeById(tenantId);
+  const selected = scopeById(scopeId) ?? root;
+  if (!root || !selected) return null;
+
+  return (
+    <ScopeTree role="tree" aria-label="Distribution scope">
+      {open ? (
+        <ScopeNode node={root} depth={0} selectedId={scopeId} onSelect={id => { onSelect(id); setOpen(false); }} />
+      ) : (
+        <ScopeRow data-selected="true" style={{ paddingLeft: 8 }}>
+          <ScopeTwist type="button" aria-label={`Expand ${selected.name}`} aria-expanded={false} onClick={() => setOpen(true)}>
+            <ChevronRight size={14} {...iconProps} />
+          </ScopeTwist>
+          <ScopePick type="button" aria-pressed onClick={() => setOpen(true)}>
+            <ScopeLabel node={selected} />
+          </ScopePick>
+        </ScopeRow>
+      )}
+    </ScopeTree>
+  );
+}
+
+function PermissionsDialog({
+  subcategory, categoryName, onClose, onSave,
+}: {
+  subcategory: Subcategory | null;
+  categoryName: string;
+  onClose: () => void;
+  onSave: (subcategory: Subcategory) => void;
+}) {
+  const tenantId = nodes.find(node => node.parentId === null)?.id ?? 't_root';
+  const [scopeId, setScopeId] = useState(subcategory?.scopeId ?? tenantId);
+  const [audience, setAudience] = useState<ViewAudience>(subcategory?.audience ?? 'everyone');
+  const [roles, setRoles] = useState<RoleAccess[]>(subcategory?.roles ?? defaultRoles());
+  const root = scopeById(tenantId);
+  if (!subcategory || !root) return null;
 
   return (
     <Scrim role="presentation" onMouseDown={onClose}>
       <Modal role="dialog" aria-modal="true" aria-labelledby="perm-title" onMouseDown={e => e.stopPropagation()}>
-        <ModalHeader data-accent="true">
-          <ModalTitle id="perm-title">Edit file permissions</ModalTitle>
+        <ModalHeader>
+          <ModalTitle id="perm-title">Edit subcategory permissions</ModalTitle>
           <HeaderClose type="button" aria-label="Close" onClick={onClose}><X size={16} {...iconProps} /></HeaderClose>
         </ModalHeader>
         <ModalBody>
-          <PermLead><strong>{file.name}</strong> · {file.type} · {placeLabel}</PermLead>
+          <PermLead><strong>{categoryName} / {subcategory.name}</strong></PermLead>
+          <FormField>
+            <FormLabel>Distribution scope</FormLabel>
+            <DistributionScope scopeId={scopeId} onSelect={setScopeId} />
+          </FormField>
           <FormField>
             <FormLabel>Who can view</FormLabel>
-            <TextInput as="select" aria-label="Who can view" value={audience} onChange={e => setAudience(e.target.value as ViewAudience)}>
-              <option value="everyone">Everyone at this tenant</option>
+            <SelectInput aria-label="Who can view" value={audience} onChange={e => setAudience(e.target.value as ViewAudience)}>
+              <option value="everyone">{everyoneOption(scopeId)}</option>
               <option value="roles">Selected roles</option>
-              <option value="people">Selected people</option>
-            </TextInput>
+            </SelectInput>
+            {audience === 'everyone' && <Help>{everyoneHelp(scopeId)}</Help>}
           </FormField>
           {audience === 'roles' && (
             <FormField>
@@ -862,7 +998,7 @@ function PermissionsDialog({
                     <Avatar data-off={!role.enabled}>{role.initials}</Avatar>
                     <PermMeta>
                       <PermName>{role.name}</PermName>
-                      <PermNote>{roleNote(role.enabled, allowDownload)}</PermNote>
+                      <PermNote>{roleNote(role.enabled)}</PermNote>
                     </PermMeta>
                     <Toggle type="button" aria-pressed={role.enabled} aria-label={`Toggle ${role.name}`} on={role.enabled} onClick={() => setRoles(current => current.map(item => item.id === role.id ? { ...item, enabled: !item.enabled } : item))} />
                   </PermRow>
@@ -870,17 +1006,10 @@ function PermissionsDialog({
               </PermList>
             </FormField>
           )}
-          {audience === 'people' && <Help>Choosing individual people is not in this prototype. The choice is saved on the file and does not hide it.</Help>}
-          {audience === 'everyone' && <Help>Everyone at the tenant can view this file. This does not hide the file in the library.</Help>}
-          <FormField>
-            <FormLabel>Allow download <Opt>(viewers)</Opt></FormLabel>
-            <Toggle type="button" aria-pressed={allowDownload} aria-label="Allow download" on={allowDownload} onClick={() => setAllowDownload(value => !value)} />
-            <Help>Office types always offer download as the primary action.</Help>
-          </FormField>
         </ModalBody>
         <ModalFooter>
           <ActionButton type="button" tone="neutral" onClick={onClose}>Cancel</ActionButton>
-          <ActionButton type="button" tone="primary" onClick={() => onSave({ ...file, audience, roles, allowDownload })}>Save permissions</ActionButton>
+          <ActionButton type="button" tone="primary" onClick={() => onSave({ ...subcategory, audience, roles, scopeId })}>Save permissions</ActionButton>
         </ModalFooter>
       </Modal>
     </Scrim>
@@ -888,26 +1017,24 @@ function PermissionsDialog({
 }
 
 function ViewerDialog({
-  file, placeLabel, onClose, onPermissions,
+  file, placeLabel, onClose,
 }: {
   file: LibraryFile | null;
   placeLabel: string;
   onClose: () => void;
-  onPermissions: () => void;
 }) {
   const [zoom, setZoom] = useState(100);
   if (!file) return null;
-  const media = file.type === 'JPG' || file.type === 'PNG' || file.type === 'MP4';
 
   return (
     <Scrim role="presentation" onMouseDown={onClose}>
       <Modal role="dialog" aria-modal="true" aria-labelledby="viewer-title" data-wide="true" onMouseDown={e => e.stopPropagation()}>
-        <ModalHeader data-accent={media ? 'true' : undefined}>
+        <ModalHeader>
           <ModalTitle id="viewer-title">{file.name}</ModalTitle>
           <HeaderClose type="button" aria-label="Close" onClick={onClose}><X size={16} {...iconProps} /></HeaderClose>
         </ModalHeader>
         <ModalBody>
-          <ViewerKicker>{file.type} · {placeLabel}</ViewerKicker>
+          <ViewerKicker>{file.type} · {formatBytes(file.size)} · {placeLabel}</ViewerKicker>
           {file.type === 'Custom' ? (
             <CustomStage>{file.content}</CustomStage>
           ) : file.type === 'MP4' ? (
@@ -934,10 +1061,6 @@ function ViewerDialog({
           )}
           <Spacer />
           <ActionButton type="button" tone="neutral" onClick={onClose}>Close</ActionButton>
-          <ActionButton type="button" tone="secondary" onClick={onPermissions}>
-            <Lock size={16} {...iconProps} />
-            Permissions
-          </ActionButton>
           <ActionButton type="button" tone="primary" onClick={() => downloadPlaceholder(file)}>
             <Download size={16} {...iconProps} />
             Download
@@ -954,13 +1077,12 @@ function EditFileDialog({
   file: LibraryFile | null;
   destinations: { subcategoryId: string; label: string }[];
   onClose: () => void;
-  onSave: (draft: { name: string; subcategoryId: string; url?: string }) => void;
+  onSave: (draft: { name: string; subcategoryId: string }) => void;
 }) {
   const [name, setName] = useState(file?.name ?? '');
   const [subcategoryId, setSubcategoryId] = useState(file?.subcategoryId ?? '');
-  const [url, setUrl] = useState(file?.url ?? '');
   if (!file) return null;
-  const ready = name.trim().length > 0 && Boolean(subcategoryId) && (file.type !== 'URL' || url.trim().length > 0);
+  const ready = name.trim().length > 0 && Boolean(subcategoryId);
 
   return (
     <Scrim role="presentation" onMouseDown={onClose}>
@@ -976,20 +1098,14 @@ function EditFileDialog({
           </FormField>
           <FormField>
             <FormLabel>Destination <Req>*</Req></FormLabel>
-            <TextInput as="select" aria-label="Destination" value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)}>
+            <SelectInput aria-label="Destination" value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)}>
               {destinations.map(item => <option key={item.subcategoryId} value={item.subcategoryId}>{item.label}</option>)}
-            </TextInput>
+            </SelectInput>
           </FormField>
-          {file.type === 'URL' && (
-            <FormField>
-              <FormLabel>URL <Req>*</Req></FormLabel>
-              <TextInput type="url" value={url} onChange={e => setUrl(e.target.value)} />
-            </FormField>
-          )}
         </ModalBody>
         <ModalFooter>
           <ActionButton type="button" tone="neutral" onClick={onClose}>Cancel</ActionButton>
-          <ActionButton type="button" tone="primary" disabled={!ready} onClick={() => onSave({ name: name.trim(), subcategoryId, url: file.type === 'URL' ? url.trim() : undefined })}>
+          <ActionButton type="button" tone="primary" disabled={!ready} onClick={() => onSave({ name: name.trim(), subcategoryId })}>
             Save
           </ActionButton>
         </ModalFooter>
@@ -1027,9 +1143,9 @@ function NameDialog({
           {creatingSub && (
             <FormField>
               <FormLabel>Category <Req>*</Req></FormLabel>
-              <TextInput as="select" aria-label="Category" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+              <SelectInput aria-label="Category" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
                 {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </TextInput>
+              </SelectInput>
             </FormField>
           )}
           <FormField>
@@ -1079,28 +1195,16 @@ const Page = styled.div({
   color: 'var(--ss-fg-primary)',
 });
 
-const Toolbar = styled.div({
-  label: 'library-toolbar',
-  display: 'flex',
-  alignItems: 'flex-end',
-  gap: 'var(--ss-space-3)',
-  paddingBottom: 'var(--ss-space-3)',
-  flexShrink: 0,
-});
-
-const Field = styled.label({
-  label: 'library-field',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--ss-space-1)',
-});
-
-const FieldLabel = styled.span({
-  label: 'library-field-label',
-  fontSize: 'var(--ss-size-body-sm)',
-  fontWeight: 600,
-  color: 'var(--ss-fg-tertiary)',
-});
+const selectChevron = {
+  appearance: 'none' as const,
+  WebkitAppearance: 'none' as const,
+  MozAppearance: 'none' as const,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ba0b0' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+  backgroundSize: '14px 14px',
+  paddingRight: 32,
+};
 
 const FilterSelect = styled.select({
   label: 'library-filter',
@@ -1111,9 +1215,10 @@ const FilterSelect = styled.select({
   fontSize: 'var(--ss-size-body-sm)',
   fontWeight: 600,
   color: 'var(--ss-fg-primary)',
-  background: 'var(--ss-bg-surface)',
+  backgroundColor: 'var(--ss-bg-surface)',
   border: '1px solid var(--ss-border-default)',
   borderRadius: 'var(--ss-rd-4)',
+  ...selectChevron,
   '&:focus-visible': { outline: '2px solid var(--ss-sky-blue)', outlineOffset: '2px' },
 });
 
@@ -1122,7 +1227,6 @@ const SearchWrap = styled.div({
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--ss-space-2)',
-  marginLeft: 'auto',
   height: 'var(--ss-space-8)',
   minWidth: 'calc(var(--ss-space-8) * 7)',
   padding: '0 var(--ss-space-3)',
@@ -1159,7 +1263,7 @@ const LibraryCard = styled.div({
 
 const TreePane = styled.aside({
   label: 'library-tree',
-  width: 'calc(var(--ss-space-8) * 8)',
+  width: 300,
   flexShrink: 0,
   display: 'flex',
   flexDirection: 'column',
@@ -1177,20 +1281,16 @@ const TreeHeader = styled.div({
   borderBottom: '1px solid var(--ss-border-default)',
 });
 
-const AllFilesButton = styled.button({
-  label: 'library-all-files',
-  border: 'none',
-  background: 'transparent',
+const CategoriesLabel = styled.span({
+  label: 'library-categories-label',
   padding: 'var(--ss-space-1) var(--ss-space-2)',
-  borderRadius: 'var(--ss-rd-4)',
   fontFamily: 'var(--ss-font-sans)',
   fontSize: 'var(--ss-size-body-sm)',
   fontWeight: 700,
   letterSpacing: 'var(--ss-tracking-banner)',
   textTransform: 'uppercase',
   color: 'var(--ss-fg-secondary)',
-  cursor: 'pointer',
-  '&[data-selected="true"]': { background: 'var(--ss-pale-blue)', color: 'var(--ss-dark-blue)' },
+  cursor: 'default',
 });
 
 const TreeBody = styled.div({
@@ -1200,10 +1300,29 @@ const TreeBody = styled.div({
   padding: 'var(--ss-space-1)',
 });
 
-const TreeFooter = styled.div({
-  label: 'library-tree-footer',
-  padding: 'var(--ss-space-2)',
+const TreeStatus = styled.div({
+  label: 'library-tree-status',
+  flexShrink: 0,
+  padding: 'var(--ss-space-2) var(--ss-space-3)',
   borderTop: '1px solid var(--ss-border-default)',
+  background: 'var(--ss-bg-app)',
+});
+
+const TreeStatusName = styled.div({
+  label: 'library-tree-status-name',
+  fontSize: 'var(--ss-size-body-sm)',
+  fontWeight: 700,
+  color: 'var(--ss-fg-primary)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+});
+
+const TreeStatusMeta = styled.div({
+  label: 'library-tree-status-meta',
+  marginTop: 'var(--ss-space-1)',
+  fontSize: 'var(--ss-size-body-sm)',
+  color: 'var(--ss-fg-secondary)',
 });
 
 const TreeRow = styled.div({
@@ -1213,6 +1332,7 @@ const TreeRow = styled.div({
   gap: 'var(--ss-space-1)',
   borderRadius: 'var(--ss-rd-4)',
   '&[data-selected="true"]': { background: 'var(--ss-pale-blue)' },
+  '&[data-drop="true"]': { boxShadow: 'inset 0 0 0 1px var(--ss-sky-blue)' },
 });
 
 const ChevronButton = styled.button({
@@ -1254,14 +1374,7 @@ const TreeLabel = styled.button({
 
 const SubList = styled.div({
   label: 'library-subcategories',
-  paddingLeft: 'var(--ss-space-6)',
-});
-
-const Count = styled.span({
-  label: 'library-count',
-  fontSize: 'var(--ss-size-special)',
-  fontWeight: 400,
-  color: 'var(--ss-fg-tertiary)',
+  paddingLeft: 'calc(var(--ss-space-6) + var(--ss-space-1) + var(--ss-space-3))',
 });
 
 const EmptyTree = styled.p({
@@ -1292,59 +1405,7 @@ const FilesToolbar = styled.div({
   borderBottom: '1px solid var(--ss-light-blue)',
 });
 
-const FilesLabel = styled.span({
-  label: 'library-files-label',
-  fontSize: 'var(--ss-size-body-sm)',
-  fontWeight: 700,
-  color: 'var(--ss-dark-blue)',
-  textTransform: 'uppercase',
-  letterSpacing: 'var(--ss-tracking-banner)',
-  marginRight: 'var(--ss-space-1)',
-});
-
 const Spacer = styled.span({ label: 'library-spacer', flex: 1 });
-
-const ContentMeta = styled.div({
-  label: 'library-meta',
-  padding: 'var(--ss-space-2) var(--ss-space-3)',
-  borderBottom: '1px solid var(--ss-border-default)',
-});
-
-const Breadcrumb = styled.nav({
-  label: 'library-breadcrumb',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--ss-space-1)',
-  fontSize: 'var(--ss-size-body-sm)',
-  color: 'var(--ss-fg-secondary)',
-});
-
-const BreadcrumbButton = styled.button({
-  label: 'library-breadcrumb-link',
-  border: 'none',
-  background: 'transparent',
-  padding: 0,
-  color: 'var(--ss-fg-link)',
-  fontFamily: 'var(--ss-font-sans)',
-  fontSize: 'var(--ss-size-body-sm)',
-  fontWeight: 700,
-  cursor: 'pointer',
-});
-
-const ContentTitle = styled.h1({
-  label: 'library-heading',
-  margin: 'var(--ss-space-1) 0 0',
-  fontSize: 'var(--ss-size-body)',
-  fontWeight: 700,
-  color: 'var(--ss-fg-heading)',
-});
-
-const ContentSub = styled.p({
-  label: 'library-subheading',
-  margin: 'var(--ss-space-1) 0 0',
-  fontSize: 'var(--ss-size-body-sm)',
-  color: 'var(--ss-fg-secondary)',
-});
 
 const TableWrap = styled.div({
   label: 'library-table-wrap',
@@ -1352,9 +1413,30 @@ const TableWrap = styled.div({
   overflow: 'auto',
 });
 
+const HeaderSort = styled.button({
+  label: 'library-sort-header',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--ss-space-1)',
+  margin: 0,
+  padding: 0,
+  border: 'none',
+  background: 'transparent',
+  fontFamily: 'var(--ss-font-sans)',
+  fontSize: 'var(--ss-size-body-sm)',
+  fontWeight: 700,
+  color: 'var(--ss-fg-secondary)',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  '&[data-active="true"]': { color: 'var(--ss-sky-blue)' },
+  '&:hover': { color: 'var(--ss-sky-blue)' },
+  '&:focus-visible': { outline: '2px solid var(--ss-sky-blue)', outlineOffset: '2px' },
+});
+
 const Table = styled.table({
   label: 'library-table',
   width: '100%',
+  tableLayout: 'fixed',
   borderCollapse: 'collapse',
   fontSize: 'var(--ss-size-body-sm)',
   '& th': {
@@ -1385,11 +1467,15 @@ const Row = styled.tr({
   cursor: 'pointer',
   '&:hover': { background: 'var(--ss-bg-app)' },
   '&[data-selected="true"]': { background: 'var(--ss-pale-blue)' },
+  '&[data-dragging="true"]': { opacity: 0.55 },
 });
 
 const MutedCell = styled.td({
   label: 'library-muted-cell',
   color: 'var(--ss-fg-secondary)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 });
 
 const FileName = styled.div({
@@ -1424,6 +1510,10 @@ const NameButton = styled.button({
   color: 'var(--ss-fg-primary)',
   cursor: 'pointer',
   textAlign: 'left',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
   '&:hover': { color: 'var(--ss-sky-blue)' },
 });
 
@@ -1440,17 +1530,22 @@ const TypeBadge = styled.span({
   textTransform: 'uppercase',
 });
 
-const Grip = styled.span({
+const Grip = styled.button({
   label: 'library-grip',
   display: 'inline-flex',
+  padding: 0,
+  border: 'none',
+  background: 'transparent',
   color: 'var(--ss-fg-tertiary)',
+  cursor: 'grab',
+  '&:active': { cursor: 'grabbing' },
 });
 
 const RowActions = styled.div({
   label: 'library-row-actions',
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'flex-end',
+  justifyContent: 'center',
 });
 
 const IconButton = styled.button({
@@ -1466,6 +1561,10 @@ const IconButton = styled.button({
   borderRadius: 'var(--ss-rd-4)',
   cursor: 'pointer',
   padding: 0,
+  '&[data-compact="true"]': {
+    width: 'var(--ss-space-6)',
+    height: 'var(--ss-space-6)',
+  },
   '&:hover': { background: 'var(--ss-bg-app)', color: 'var(--ss-fg-primary)' },
 });
 
@@ -1494,26 +1593,6 @@ const ActionButton = styled.button<{ tone: 'primary' | 'secondary' | 'neutral' |
   '&:disabled': { opacity: 0.45, cursor: 'not-allowed' },
   '&:focus-visible': { outline: '2px solid var(--ss-sky-blue)', outlineOffset: '2px' },
 }));
-
-const Fab = styled.button({
-  label: 'library-fab',
-  position: 'absolute',
-  right: 'var(--ss-space-4)',
-  bottom: 'var(--ss-space-4)',
-  zIndex: 5,
-  width: 'calc(var(--ss-space-8) + var(--ss-space-2))',
-  height: 'calc(var(--ss-space-8) + var(--ss-space-2))',
-  borderRadius: 'var(--ss-rd-pill)',
-  border: 'none',
-  background: 'var(--ss-sky-blue)',
-  color: 'var(--ss-fg-on-dark)',
-  boxShadow: 'var(--ss-shadow-fab)',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  '&:hover': { background: 'var(--ss-medium-blue)' },
-});
 
 const EmptyPane = styled.div({
   label: 'library-empty',
@@ -1609,7 +1688,6 @@ const ModalHeader = styled.div({
   flexShrink: 0,
   background: 'var(--ss-dark-blue)',
   color: 'var(--ss-fg-on-dark)',
-  '&[data-accent="true"]': { background: 'var(--ss-sky-blue)' },
 });
 
 const ModalTitle = styled.h2({
@@ -1667,8 +1745,6 @@ const FormLabel = styled.label({
 });
 
 const Req = styled.span({ label: 'library-required', color: 'var(--ss-danger)' });
-const Opt = styled.span({ label: 'library-optional', fontWeight: 400, color: 'var(--ss-fg-tertiary)' });
-
 const TextInput = styled.input({
   label: 'library-input',
   width: '100%',
@@ -1678,11 +1754,28 @@ const TextInput = styled.input({
   fontSize: 'var(--ss-size-body)',
   fontWeight: 400,
   color: 'var(--ss-fg-primary)',
-  background: 'var(--ss-bg-surface)',
+  backgroundColor: 'var(--ss-bg-surface)',
   border: '1px solid var(--ss-border-default)',
   borderRadius: 'var(--ss-rd-4)',
   '&:focus': { borderColor: 'var(--ss-border-focus)', boxShadow: 'var(--ss-shadow-focus)', outline: 'none' },
-  '&:disabled': { background: 'var(--ss-bg-app)', color: 'var(--ss-fg-secondary)' },
+  '&:disabled': { backgroundColor: 'var(--ss-bg-app)', color: 'var(--ss-fg-secondary)' },
+});
+
+const SelectInput = styled.select({
+  label: 'library-select',
+  width: '100%',
+  height: 'var(--ss-space-8)',
+  padding: '0 var(--ss-space-3)',
+  fontFamily: 'var(--ss-font-sans)',
+  fontSize: 'var(--ss-size-body)',
+  fontWeight: 400,
+  color: 'var(--ss-fg-primary)',
+  backgroundColor: 'var(--ss-bg-surface)',
+  border: '1px solid var(--ss-border-default)',
+  borderRadius: 'var(--ss-rd-4)',
+  ...selectChevron,
+  '&:focus': { borderColor: 'var(--ss-border-focus)', boxShadow: 'var(--ss-shadow-focus)', outline: 'none' },
+  '&:disabled': { backgroundColor: 'var(--ss-bg-app)', color: 'var(--ss-fg-secondary)' },
 });
 
 const TextArea = styled.textarea({
@@ -1771,6 +1864,80 @@ const ChipSize = styled.span({
   color: 'var(--ss-fg-tertiary)',
 });
 
+const ScopeTree = styled.div({
+  label: 'library-scope-tree',
+  maxHeight: 280,
+  overflowY: 'auto',
+  border: '1px solid var(--ss-border-default)',
+  borderRadius: 'var(--ss-rd-4)',
+  padding: 'var(--ss-space-1) 0',
+});
+
+const ScopeRow = styled.div({
+  label: 'library-scope-row',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--ss-space-1)',
+  minHeight: 32,
+  paddingRight: 'var(--ss-space-2)',
+  color: 'var(--ss-fg-primary)',
+  '&:hover': { background: 'var(--ss-pale-blue)' },
+});
+
+const ScopeTwist = styled.button({
+  label: 'library-scope-twist',
+  width: 20,
+  height: 20,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  border: 'none',
+  background: 'transparent',
+  color: 'inherit',
+  cursor: 'pointer',
+  '&[data-hidden="true"]': { visibility: 'hidden' },
+});
+
+const ScopePick = styled.button({
+  label: 'library-scope-pick',
+  flex: 1,
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 'var(--ss-space-2)',
+  minWidth: 0,
+  padding: '6px 0',
+  border: 'none',
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
+});
+
+const ScopeLevel = styled.span({
+  label: 'library-scope-level',
+  flexShrink: 0,
+  fontSize: 'var(--ss-size-body-sm)',
+  color: 'var(--ss-fg-tertiary)',
+});
+
+const ScopeName = styled.span({
+  label: 'library-scope-name',
+  fontSize: 'var(--ss-size-body-sm)',
+  fontWeight: 600,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+});
+
+const ScopeExt = styled.span({
+  label: 'library-scope-ext',
+  flexShrink: 0,
+  fontSize: 'var(--ss-size-body-sm)',
+  color: 'var(--ss-fg-tertiary)',
+});
+
 const PermLead = styled.p({
   label: 'library-perm-lead',
   margin: '0 0 var(--ss-space-4)',
@@ -1831,12 +1998,12 @@ const Toggle = styled.button<{ on: boolean }>(({ on }) => ({
     content: '""',
     position: 'absolute',
     top: 'var(--ss-space-1)',
-    left: 'var(--ss-space-1)',
+    left: on ? 'auto' : 'var(--ss-space-1)',
+    right: on ? 'var(--ss-space-1)' : 'auto',
     width: 'var(--ss-space-4)',
     height: 'var(--ss-space-4)',
     borderRadius: 'var(--ss-rd-pill)',
     background: 'var(--ss-white)',
-    transform: on ? 'translateX(var(--ss-space-4))' : 'none',
   },
 }));
 

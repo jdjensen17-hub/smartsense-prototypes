@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload files · SmartSense ONE</title>
+  <link rel="stylesheet" href="colors_and_type.css" />
+  <link rel="stylesheet" href="mock-shell.css" />
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+</head>
+<body>
+<div class="ss-app">
+  <header class="ss-topbar" role="banner">
+    <button type="button" class="ss-hamburger" aria-label="Open navigation" aria-expanded="false">
+      <i data-lucide="menu" width="18" height="18" stroke-width="1.4"></i>
+    </button>
+    <div class="ss-brand">
+      <span class="ss-brand-mark" aria-hidden="true">S</span>
+      SmartSense ONE
+    </div>
+    <span class="ss-topbar-divider" aria-hidden="true"></span>
+    <span class="ss-topbar-title">Information</span>
+    <div class="ss-topbar-spacer"></div>
+    <span class="ss-topbar-avatar" title="Jim Jensen" aria-label="Account">
+      <i data-lucide="user" width="16" height="16" stroke-width="1.4"></i>
+    </span>
+  </header>
+
+  <div class="ss-main">
+
+    <div class="ss-page" aria-hidden="true" style="pointer-events:none; opacity:0.45;">
+      <div class="ss-toolbar">
+        <div class="ss-search-wrap" style="margin-left:0;">
+          <i data-lucide="search" width="16" height="16" stroke-width="1.4"></i>
+          <input type="search" placeholder="Search library" disabled />
+        </div>
+      </div>
+      <div class="ss-library">
+        <aside class="ss-tree-pane"><div class="ss-tree-header"><span class="ss-tree-header-title">Library</span></div>
+          <div class="ss-tree-body"><p class="ss-quiet" style="padding:12px;margin:0;font-size:12px;">Corporate best practices…</p></div>
+        </aside>
+        <section class="ss-content-pane"><div class="ss-table-wrap"><p class="ss-muted" style="padding:24px;">File table behind modal</p></div></section>
+      </div>
+    </div>
+    <div class="ss-scrim" role="dialog" aria-modal="true" aria-labelledby="upload-title">
+      <div class="ss-modal ss-modal-lg">
+        <div class="ss-modal-header">
+          <h2 class="ss-modal-title" id="upload-title">Upload your own file(s)</h2>
+          <a class="ss-icon-btn" href="information.html" aria-label="Close"><i data-lucide="x" width="18" height="18" stroke-width="1.4"></i></a>
+        </div>
+        <div class="ss-modal-body">
+          <div class="ss-form-field">
+            <label class="ss-form-label">Destination <span class="req">*</span></label>
+            <select class="ss-select" aria-label="Category and subcategory">
+              <option>Corporate best practices / Handbooks</option>
+              <option>Corporate best practices / Policies</option>
+              <option>Quick start guides / Onboarding</option>
+              <option>Operations / Spreadsheets</option>
+            </select>
+          </div>
+          <div class="ss-dropzone" tabindex="0" role="button" aria-label="Choose files to upload">
+            <i data-lucide="upload-cloud" width="32" height="32" stroke-width="1.4"></i>
+            <div class="ss-dropzone-title">Drop files here or browse</div>
+            <div class="ss-dropzone-sub">PDF, JPG, PNG, MP4, XLSX, DOCX · up to 100 MB each</div>
+            <button type="button" class="ss-btn ss-btn-secondary" style="margin-top:8px;">Browse files</button>
+          </div>
+          <div class="ss-file-chip">
+            <span class="ss-file-icon"><i data-lucide="file-text" width="14" height="14" stroke-width="1.4"></i></span>
+            <span class="ss-file-chip-name">Food_safety_policy_v3.pdf</span>
+            <span class="ss-file-chip-size">2.4 MB</span>
+            <button type="button" class="ss-icon-btn" aria-label="Remove"><i data-lucide="x" width="14" height="14" stroke-width="1.4"></i></button>
+          </div>
+          <div class="ss-file-chip">
+            <span class="ss-file-icon"><i data-lucide="image" width="14" height="14" stroke-width="1.4"></i></span>
+            <span class="ss-file-chip-name">register_labels.jpg</span>
+            <span class="ss-file-chip-size">840 KB</span>
+            <button type="button" class="ss-icon-btn" aria-label="Remove"><i data-lucide="x" width="14" height="14" stroke-width="1.4"></i></button>
+          </div>
+          <div class="ss-form-field" style="margin-top:16px; margin-bottom:0;">
+            <label class="ss-form-label">Or add a URL / link <span class="opt">(optional)</span></label>
+            <input class="ss-input" type="url" placeholder="https://…" />
+            <p class="ss-help">Link entries open externally; they are not stored as downloads.</p>
+          </div>
+        </div>
+        <div class="ss-modal-footer">
+          <a class="ss-btn ss-btn-neutral" href="information.html">Cancel</a>
+          <button type="button" class="ss-btn ss-btn-primary">Upload 2 files</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>lucide.createIcons();</script>
+
+</body>
+</html>

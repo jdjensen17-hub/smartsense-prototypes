@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Handbooks · SmartSense ONE</title>
+  <link rel="stylesheet" href="colors_and_type.css" />
+  <link rel="stylesheet" href="mock-shell.css" />
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+</head>
+<body>
+<div class="ss-app">
+  <header class="ss-topbar" role="banner">
+    <button type="button" class="ss-hamburger" aria-label="Open navigation" aria-expanded="false">
+      <i data-lucide="menu" width="18" height="18" stroke-width="1.4"></i>
+    </button>
+    <div class="ss-brand">
+      <span class="ss-brand-mark" aria-hidden="true">S</span>
+      SmartSense ONE
+    </div>
+    <span class="ss-topbar-divider" aria-hidden="true"></span>
+    <span class="ss-topbar-title">Information</span>
+    <div class="ss-topbar-spacer"></div>
+    <span class="ss-topbar-avatar" title="Jim Jensen" aria-label="Account">
+      <i data-lucide="user" width="16" height="16" stroke-width="1.4"></i>
+    </span>
+  </header>
+
+  <div class="ss-main">
+
+    <div class="ss-page">
+
+      <div class="ss-toolbar">
+        <div class="ss-field-group">
+          <span class="ss-field-label">Sort</span>
+          <button type="button" class="ss-filter-control">
+            <span>Name A–Z</span>
+            <i data-lucide="chevron-down" width="14" height="14" stroke-width="1.4"></i>
+          </button>
+        </div>
+        <div class="ss-field-group">
+          <span class="ss-field-label">Type</span>
+          <button type="button" class="ss-filter-control">
+            <span>All types</span>
+            <i data-lucide="chevron-down" width="14" height="14" stroke-width="1.4"></i>
+          </button>
+        </div>
+        <div class="ss-search-wrap">
+          <i data-lucide="search" width="16" height="16" stroke-width="1.4"></i>
+          <input type="search" placeholder="Search library" aria-label="Search library" />
+        </div>
+      </div>
+      <div class="ss-library">
+
+        <aside class="ss-tree-pane" aria-label="Categories">
+          <div class="ss-tree-header">
+            <span class="ss-tree-header-title">Library</span>
+            <button type="button" class="ss-icon-btn" aria-label="New category"><i data-lucide="folder-plus" width="16" height="16" stroke-width="1.4"></i></button>
+          </div>
+          <div class="ss-tree-body">
+            <div>
+              <a class="ss-tree-row expanded selected" href="information-category.html">
+                <i class="ss-tree-chevron" data-lucide="chevron-right" width="14" height="14" stroke-width="1.4"></i>
+                <i data-lucide="folder-open" width="16" height="16" stroke-width="1.4"></i>
+                <span>Corporate best practices</span>
+                <span class="ss-tree-count">8</span>
+              </a>
+              <div class="ss-tree-subs">
+                <a class="ss-tree-sub selected" href="information-category.html" aria-current="true"><i data-lucide="folder-open" width="14" height="14" stroke-width="1.4"></i> Handbooks <span class="ss-tree-count">3</span></a>
+                <a class="ss-tree-sub" href="information-category.html"><i data-lucide="folder" width="14" height="14" stroke-width="1.4"></i> Policies <span class="ss-tree-count">5</span></a>
+              </div>
+            </div>
+            <div>
+              <a class="ss-tree-row" href="information-category.html">
+                <i class="ss-tree-chevron" data-lucide="chevron-right" width="14" height="14" stroke-width="1.4"></i>
+                <i data-lucide="folder" width="16" height="16" stroke-width="1.4"></i>
+                <span>Quick start guides</span>
+                <span class="ss-tree-count">6</span>
+              </a>
+            </div>
+            <div>
+              <a class="ss-tree-row" href="information-category.html">
+                <i class="ss-tree-chevron" data-lucide="chevron-right" width="14" height="14" stroke-width="1.4"></i>
+                <i data-lucide="folder" width="16" height="16" stroke-width="1.4"></i>
+                <span>Operations</span>
+                <span class="ss-tree-count">4</span>
+              </a>
+            </div>
+          </div>
+          <div class="ss-tree-footer">
+            <button type="button" class="ss-btn ss-btn-ghost" style="width:100%; justify-content:flex-start;">
+              <i data-lucide="folder-plus" width="16" height="16" stroke-width="1.4"></i>
+              New category
+            </button>
+          </div>
+        </aside>
+        <section class="ss-content-pane" aria-label="Handbooks files">
+          <div class="ss-files-toolbar">
+            <span class="ss-files-toolbar-label">Files</span>
+            <a class="ss-btn ss-btn-primary" href="information-upload.html"><i data-lucide="upload" width="14" height="14" stroke-width="1.4"></i> Upload</a>
+            <a class="ss-btn ss-btn-secondary" href="information-create-custom.html"><i data-lucide="file-pen" width="14" height="14" stroke-width="1.4"></i> Create custom</a>
+            <a class="ss-btn ss-btn-secondary" href="information-permissions.html"><i data-lucide="lock" width="14" height="14" stroke-width="1.4"></i> Edit permissions</a>
+            <button type="button" class="ss-btn ss-btn-neutral"><i data-lucide="arrow-down-a-z" width="14" height="14" stroke-width="1.4"></i> Sort A–Z</button>
+            <button type="button" class="ss-btn ss-btn-ghost ss-ml-auto"><i data-lucide="folder-plus" width="14" height="14" stroke-width="1.4"></i> New subcategory</button>
+          </div>
+          <div class="ss-content-meta">
+            <div>
+              <nav class="ss-breadcrumb" aria-label="Breadcrumb">
+                <a href="information.html">Library</a>
+                <span class="ss-breadcrumb-sep"><i data-lucide="chevron-right" width="12" height="12" stroke-width="1.4"></i></span>
+                <span>Corporate best practices</span>
+                <span class="ss-breadcrumb-sep"><i data-lucide="chevron-right" width="12" height="12" stroke-width="1.4"></i></span>
+                <span>Handbooks</span>
+              </nav>
+              <h1 class="ss-content-meta-title" style="margin-top:4px;">Handbooks</h1>
+              <p class="ss-content-meta-sub">3 files · drag to reorder or move between subcategories</p>
+            </div>
+          </div>
+          <div class="ss-table-wrap">
+            <table class="ss-table">
+              <thead>
+                <tr>
+                  <th style="width:28px;"></th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Updated</th>
+                  <th style="width:160px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="selected">
+                  <td><span class="ss-drag-handle"><i data-lucide="grip-vertical" width="14" height="14" stroke-width="1.4"></i></span></td>
+                  <td><div class="ss-file-name"><span class="ss-file-icon"><i data-lucide="file-text" width="14" height="14" stroke-width="1.4"></i></span><a href="information-viewer-pdf.html">Employee handbook 2026</a></div></td>
+                  <td><span class="ss-type-badge">PDF</span></td>
+                  <td class="ss-muted">Sep 12, 2026</td>
+                  <td>
+                    <div class="ss-row-actions">
+                      <a class="ss-icon-btn" href="information-viewer-pdf.html" aria-label="View"><i data-lucide="eye" width="14" height="14" stroke-width="1.4"></i></a>
+                      <button type="button" class="ss-icon-btn" aria-label="Edit"><i data-lucide="pencil" width="14" height="14" stroke-width="1.4"></i></button>
+                      <a class="ss-icon-btn" href="information-permissions.html" aria-label="Permissions"><i data-lucide="lock" width="14" height="14" stroke-width="1.4"></i></a>
+                      <div class="ss-menu-anchor">
+                        <button type="button" class="ss-icon-btn" aria-label="More" aria-expanded="true"><i data-lucide="more-vertical" width="14" height="14" stroke-width="1.4"></i></button>
+                        <div class="ss-menu" role="menu">
+                          <a class="ss-menu-item" href="information-viewer-pdf.html"><i data-lucide="eye" width="14" height="14" stroke-width="1.4"></i> View file</a>
+                          <button type="button" class="ss-menu-item"><i data-lucide="pencil" width="14" height="14" stroke-width="1.4"></i> Edit</button>
+                          <button type="button" class="ss-menu-item"><i data-lucide="refresh-cw" width="14" height="14" stroke-width="1.4"></i> Replace file</button>
+                          <a class="ss-menu-item" href="information-permissions.html"><i data-lucide="lock" width="14" height="14" stroke-width="1.4"></i> Permissions</a>
+                          <div class="ss-menu-divider"></div>
+                          <button type="button" class="ss-menu-item danger"><i data-lucide="trash-2" width="14" height="14" stroke-width="1.4"></i> Delete</button>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="ss-drag-handle"><i data-lucide="grip-vertical" width="14" height="14" stroke-width="1.4"></i></span></td>
+                  <td><div class="ss-file-name"><span class="ss-file-icon"><i data-lucide="file-text" width="14" height="14" stroke-width="1.4"></i></span><a href="information-viewer-pdf.html">Manager onboarding guide</a></div></td>
+                  <td><span class="ss-type-badge">PDF</span></td>
+                  <td class="ss-muted">Aug 2, 2026</td>
+                  <td><div class="ss-row-actions">
+                    <a class="ss-icon-btn" href="information-viewer-pdf.html" aria-label="View"><i data-lucide="eye" width="14" height="14" stroke-width="1.4"></i></a>
+                    <button type="button" class="ss-icon-btn" aria-label="Edit"><i data-lucide="pencil" width="14" height="14" stroke-width="1.4"></i></button>
+                    <button type="button" class="ss-icon-btn danger" aria-label="Delete"><i data-lucide="x" width="14" height="14" stroke-width="1.4"></i></button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td><span class="ss-drag-handle"><i data-lucide="grip-vertical" width="14" height="14" stroke-width="1.4"></i></span></td>
+                  <td><div class="ss-file-name"><span class="ss-file-icon"><i data-lucide="file-pen" width="14" height="14" stroke-width="1.4"></i></span><a href="information-create-custom.html">Culture &amp; values summary</a></div></td>
+                  <td><span class="ss-type-badge">Custom</span></td>
+                  <td class="ss-muted">Jul 9, 2026</td>
+                  <td><div class="ss-row-actions">
+                    <button type="button" class="ss-icon-btn" aria-label="View"><i data-lucide="eye" width="14" height="14" stroke-width="1.4"></i></button>
+                    <button type="button" class="ss-icon-btn" aria-label="Edit"><i data-lucide="pencil" width="14" height="14" stroke-width="1.4"></i></button>
+                    <button type="button" class="ss-icon-btn danger" aria-label="Delete"><i data-lucide="x" width="14" height="14" stroke-width="1.4"></i></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <a class="ss-fab" href="information-upload.html" aria-label="Upload or create" title="Upload or create">
+      <i data-lucide="plus" width="22" height="22" stroke-width="1.4"></i>
+    </a>
+  </div>
+</div>
+<script>lucide.createIcons();</script>
+
+</body>
+</html>

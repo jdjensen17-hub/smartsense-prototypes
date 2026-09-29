@@ -20,6 +20,7 @@ import LabelTemplatesPage from '@/pages/operate/LabelTemplatesPage';
 import CreateListPage from '@/pages/operate/CreateListPage';
 import MCTemplatesPage from '@/pages/operate/MCTemplatesPage';
 import InformationLibraryPage from '@/pages/information/InformationLibraryPage';
+import IntegrationsPage from '@/pages/user-management/IntegrationsPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -33,6 +34,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/org':                 'Org Hierarchy',
   '/admin/licenses':            'License Assignment',
   '/admin/distribution':        'Distribution',
+  '/admin/integrations':        'Integrations',
   '/admin/org-import':          'Org Hierarchy Import',
   '/information':               'Information Library',
   '/operate/lists':             'List Completion',
@@ -230,6 +232,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               <DrawerNavItem to="/admin/org"             label="Org Hierarchy"      end  onNavigate={() => setDrawerOpen(false)} />
               <DrawerNavItem to="/admin/licenses"        label="License Assignment" end  onNavigate={() => setDrawerOpen(false)} />
               <DrawerNavItem to="/admin/distribution"   label="Distribution"       end  onNavigate={() => setDrawerOpen(false)} />
+              <DrawerNavItem to="/admin/integrations"   label="Integrations"            onNavigate={() => setDrawerOpen(false)} />
             </div>
           )}
 
@@ -331,6 +334,8 @@ export default function App() {
           <Route path="/admin/location-tags" element={<LocationTagManagementPage />} />
           <Route path="/admin/licenses"      element={<LicenseAssignmentPage />} />
           <Route path="/admin/distribution" element={<DistributionPage />} />
+          <Route path="/admin/integrations" element={<IntegrationsPage />} />
+          <Route path="/admin/integrations/:slug" element={<IntegrationsPage />} />
           <Route path="/admin/org-import"   element={<OrgHierarchyImportPage />} />
           <Route path="/information" element={<InformationLibraryPage />} />
           <Route path="/operate/lists" element={<ListCompletionPage />} />

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Information · Empty · SmartSense ONE</title>
+  <link rel="stylesheet" href="colors_and_type.css" />
+  <link rel="stylesheet" href="mock-shell.css" />
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+</head>
+<body>
+<div class="ss-app">
+  <header class="ss-topbar" role="banner">
+    <button type="button" class="ss-hamburger" aria-label="Open navigation" aria-expanded="false">
+      <i data-lucide="menu" width="18" height="18" stroke-width="1.4"></i>
+    </button>
+    <div class="ss-brand">
+      <span class="ss-brand-mark" aria-hidden="true">S</span>
+      SmartSense ONE
+    </div>
+    <span class="ss-topbar-divider" aria-hidden="true"></span>
+    <span class="ss-topbar-title">Information</span>
+    <div class="ss-topbar-spacer"></div>
+    <span class="ss-topbar-avatar" title="Jim Jensen" aria-label="Account">
+      <i data-lucide="user" width="16" height="16" stroke-width="1.4"></i>
+    </span>
+  </header>
+
+  <div class="ss-main">
+
+    <div class="ss-page">
+      <div class="ss-library">
+        <aside class="ss-tree-pane" aria-label="Categories">
+          <div class="ss-tree-header"><span class="ss-tree-header-title">Library</span></div>
+          <div class="ss-tree-body">
+            <p class="ss-quiet" style="padding:var(--ss-space-3); margin:0; font-size:12px;">No categories yet</p>
+          </div>
+          <div class="ss-tree-footer">
+            <button type="button" class="ss-btn ss-btn-ghost" style="width:100%; justify-content:flex-start;">
+              <i data-lucide="folder-plus" width="16" height="16" stroke-width="1.4"></i>
+              New category
+            </button>
+          </div>
+        </aside>
+        <section class="ss-content-pane">
+          <div class="ss-empty">
+            <div class="ss-empty-icon" aria-hidden="true"><i data-lucide="library" width="28" height="28" stroke-width="1.4"></i></div>
+            <h1 class="ss-empty-title">Build your information library</h1>
+            <p class="ss-empty-body">Create a category, then add subcategories and files. Upload PDFs, images, video, Office docs, links, or author a custom page.</p>
+            <div class="ss-empty-actions">
+              <button type="button" class="ss-btn ss-btn-secondary"><i data-lucide="folder-plus" width="14" height="14" stroke-width="1.4"></i> New category</button>
+              <a class="ss-btn ss-btn-primary" href="information-upload.html"><i data-lucide="upload" width="14" height="14" stroke-width="1.4"></i> Upload files</a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <a class="ss-fab" href="information-upload.html" aria-label="Upload or create" title="Upload or create">
+      <i data-lucide="plus" width="22" height="22" stroke-width="1.4"></i>
+    </a>
+  </div>
+</div>
+<script>lucide.createIcons();</script>
+
+</body>
+</html>
