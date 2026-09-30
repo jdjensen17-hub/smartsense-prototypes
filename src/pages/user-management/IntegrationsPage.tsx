@@ -60,6 +60,14 @@ const PLACEHOLDERS: { id: string; name: string; summary: string; status: Status 
 
 let msMemory: MsState = { connected: false, sites: [], notice: null };
 
+/** Sites an admin has Added. The editor reads this; it does not open connect. */
+export function readMicrosoftAllowlist(): { connected: boolean; sites: { id: string; name: string }[] } {
+  return {
+    connected: msMemory.connected,
+    sites: msMemory.sites.map((site) => ({ id: site.id, name: site.name })),
+  };
+}
+
 function msStatus(state: MsState): Status {
   return state.connected ? 'connected' : 'disconnected';
 }

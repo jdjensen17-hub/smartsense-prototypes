@@ -25,6 +25,22 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-09-30 — Cloud files cannot display inline
+
+- **What:** When a cloud file is attached on a list item, “Display attached file inline on the app” turns off and stays disabled. The line under it reads: “Inline display on the app not supported for cloud files.” The Info library inline column stays unchecked for that row and does not turn it back on. A library file still uses the toggle.
+- **Why:** Inline display will not be supported for cloud files.
+- **Rejected:** Leaving the toggle on and only hiding the preview. Letting the column turn inline back on after the sheet locked it.
+
+---
+
+## 2026-09-30 — Cloud file pick is site, then search
+
+- **What:** On the List Template Editor item File block, Cloud drive lists added sites only. The author picks one site, then types. No files render until there is a query. Each result shows the file name and the folder path. Results cap at 8, and a broader query says to narrow the search. The chip, site name, X, and one-source rule stay. The Information Library picker stays the short seed. This narrows the same-day “no search” line on the item picker. Tenant search, URL paste, and a folder tree of the tenant stay out.
+- **Why:** A flat list of every file does not hold up once a shared folder has dozens or hundreds of files. The allowlist is still the gate. The side sheet is 300px, so the author searches one site instead of scrolling a drive.
+- **Rejected:** A folder tree. One search box across every added site. Pasting a SharePoint URL. Listing files before the author types.
+
+---
+
 ## 2026-09-30 — Item file is library or cloud
 
 - **What:** On the List Template Editor (`/#/operate/jolt-editor`, `src/pages/operate/JoltListEditorPage.tsx`), General Options on every item has the block now labeled Info Library (`InfoLibrarySection`). That block becomes the place an author attaches one file. The file is either an Information Library file or a cloud file from a SharePoint site that was Added on Admin → Integrations. One source at a time. Choosing one clears the other. Clearing returns to both choices. The inline toggle stays and applies to whichever file is attached. Cloud files only come from sites on the product allowlist (`msMemory` added sites). Legal Hold does not appear unless it was Added. If Microsoft is Disconnected, or Connected with no added sites, Cloud drive is visible and disabled, with one line that an admin adds sites under Integrations. No Entra flow from the editor. No device file picker. No tenant search, URL paste, or folder tree. Keep `infoFile` as the display name. Add `infoSource?: 'library' | 'cloud'`. Library files are a short seed in the editor. Do not edit `/#/information`. Do not change the Integrations screens. Do not restyle the editor off the local `T` tokens. Mobile open and the preview page stay as they are.

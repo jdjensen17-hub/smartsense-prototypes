@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Barcode from 'react-barcode';
 import { ROLE_DEFS } from '../../data/roles';
+import { readMicrosoftAllowlist } from '../user-management/IntegrationsPage';
 
 // ── Design tokens ───────────────────────────────────────────────────────────
 const T = {
@@ -54,6 +55,8 @@ interface ListItem {
   bgColor?: string;
   infoFile?: string;
   infoInline?: boolean;
+  infoSource?: 'library' | 'cloud';
+  infoSite?: string;
   points?: number;
   promptHtml?: string;
   labelIds?: string[];
@@ -778,9 +781,9 @@ function HelpTip({ text }: { text: string }) {
   );
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ on, onChange, disabled = false }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <div onClick={() => onChange(!on)} style={{ display: 'inline-block', width: 32, height: 18, background: on ? T.fillAccent : T.borderStrong, borderRadius: 9999, position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s' }}>
+    <div onClick={() => { if (!disabled) onChange(!on); }} style={{ display: 'inline-block', width: 32, height: 18, background: on ? T.fillAccent : T.borderStrong, borderRadius: 9999, position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, flexShrink: 0, transition: 'background 0.15s' }}>
       <div style={{ position: 'absolute', width: 13, height: 13, background: 'white', borderRadius: '50%', top: 2.5, left: on ? 16.5 : 2.5, transition: 'left 0.15s' }} />
     </div>
   );
@@ -2403,31 +2406,243 @@ function PromptEditor({ item, onUpdate, autoFocus }: { item: ListItem; onUpdate:
   );
 }
 
+const LIBRARY_FILES: { name: string; subcategory: string }[] = [
+  { name: 'Opening Procedures.pdf', subcategory: 'Opening' },
+  { name: 'Date Label Policy.pdf', subcategory: 'Labels' },
+  { name: 'Handwashing Poster.pdf', subcategory: 'Food Safety' },
+  { name: 'Uniform Standards.pdf', subcategory: 'Brand' },
+];
+
+type CloudFile = { name: string; path: string };
+
+const CLOUD_RESULT_CAP = 8;
+
+const CLOUD_FILES: Record<string, CloudFile[]> = {
+  brand: [
+    { name: 'Logo Usage.pdf', path: 'Logos' },
+    { name: 'Logo Clear Space.pdf', path: 'Logos' },
+    { name: 'Brand Colors.pdf', path: 'Colors' },
+    { name: 'Approved Palette.pdf', path: 'Colors' },
+    { name: 'Store Photos.pdf', path: 'Photography' },
+    { name: 'Food Styling.pdf', path: 'Photography' },
+    { name: 'Menu Insert.pdf', path: 'Templates' },
+    { name: 'Window Cling Spec.pdf', path: 'Templates' },
+    { name: 'Social Post.pptx', path: 'Templates' },
+    { name: 'Tone Guide.pdf', path: 'Voice' },
+    { name: 'Campaign Names.pdf', path: 'Voice' },
+    { name: 'Drive-Thru Menu.pdf', path: 'Signage' },
+    { name: 'Interior Signs.pdf', path: 'Signage' },
+  ],
+  ops: [
+    { name: 'Opening Checklist.pdf', path: 'Opening' },
+    { name: 'Opening Procedures.pdf', path: 'Opening' },
+    { name: 'Safe Count.pdf', path: 'Opening' },
+    { name: 'Alarm Codes.pdf', path: 'Opening' },
+    { name: 'Closing Checklist.pdf', path: 'Closing' },
+    { name: 'Deposit Slip.pdf', path: 'Closing' },
+    { name: 'Walkthrough.pdf', path: 'Closing' },
+    { name: 'Shift Handoff.docx', path: 'Shift change' },
+    { name: 'Manager Notes.docx', path: 'Shift change' },
+    { name: 'Date Label Policy.pdf', path: 'Labels' },
+    { name: 'Grab and Go Labels.pdf', path: 'Labels' },
+    { name: 'Allergen Labels.pdf', path: 'Labels' },
+    { name: 'Temp Log.pdf', path: 'Food safety' },
+    { name: 'Cooling Log.pdf', path: 'Food safety' },
+    { name: 'Receiving Log.pdf', path: 'Food safety' },
+    { name: 'Uniform Standards.pdf', path: 'Brand' },
+    { name: 'Lobby Reset.pdf', path: 'Brand' },
+    { name: 'New Hire Day 1.pdf', path: 'Training' },
+  ],
+  training: [
+    { name: 'New Hire Day 1.pdf', path: 'Day 1' },
+    { name: 'Welcome Packet.pdf', path: 'Day 1' },
+    { name: 'Uniform Issue.pdf', path: 'Day 1' },
+    { name: 'Food Handler Guide.pdf', path: 'Food safety' },
+    { name: 'Allergen Quiz.pdf', path: 'Food safety' },
+    { name: 'Handwashing Poster.pdf', path: 'Food safety' },
+    { name: 'Guest Recovery.pdf', path: 'Service' },
+    { name: 'Order Accuracy.pdf', path: 'Service' },
+    { name: 'Shift Lead Guide.pdf', path: 'Leadership' },
+    { name: 'Coaching Notes.docx', path: 'Leadership' },
+    { name: 'Core Menu.pdf', path: 'Recipes' },
+    { name: 'Limited Time.pdf', path: 'Recipes' },
+  ],
+  safety: [
+    { name: 'Temp Log Guide.pdf', path: 'Temps' },
+    { name: 'Cooler Map.pdf', path: 'Temps' },
+    { name: 'Hot Holding.pdf', path: 'Temps' },
+    { name: 'Allergen Matrix.pdf', path: 'Allergens' },
+    { name: 'Cross Contact.pdf', path: 'Allergens' },
+    { name: 'Recall Steps.pdf', path: 'Recall' },
+    { name: 'Supplier Notice.docx', path: 'Recall' },
+    { name: 'Sanitizer Chart.pdf', path: 'Cleaning' },
+    { name: 'Three Compartment.pdf', path: 'Cleaning' },
+    { name: 'Exclusion Policy.pdf', path: 'Illness' },
+    { name: 'Symptom Log.pdf', path: 'Illness' },
+  ],
+  marketing: [
+    { name: 'LTO Playbook.pdf', path: 'LTO' },
+    { name: 'Promo Calendar.pdf', path: 'LTO' },
+    { name: 'Talking Points.docx', path: 'LTO' },
+    { name: 'Window Cling Spec.pdf', path: 'Signage' },
+    { name: 'A-Frame Copy.pdf', path: 'Signage' },
+    { name: 'Posting Calendar.pdf', path: 'Social' },
+    { name: 'Photo Rules.pdf', path: 'Social' },
+    { name: 'Community Events.pdf', path: 'Local' },
+    { name: 'Sponsorship Form.docx', path: 'Local' },
+  ],
+  legal: [
+    { name: 'Hold Notice.pdf', path: 'Holds' },
+    { name: 'Preservation Memo.docx', path: 'Holds' },
+    { name: 'Custodian List.xlsx', path: 'Holds' },
+    { name: 'Open Matters.pdf', path: 'Matters' },
+    { name: 'Outside Counsel.pdf', path: 'Matters' },
+  ],
+};
+
 function InfoLibrarySection({ item, onUpdate }: { item: ListItem; onUpdate: (u: Partial<ListItem>) => void }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [picker, setPicker] = useState<'library' | 'cloud' | null>(null);
+  const [cloudSiteId, setCloudSiteId] = useState<string | null>(null);
+  const [cloudQuery, setCloudQuery] = useState('');
+  const allowlist = readMicrosoftAllowlist();
+  const cloudReady = allowlist.connected && allowlist.sites.length > 0;
+  const cloudSite = allowlist.sites.find(site => site.id === cloudSiteId) ?? null;
+  const cloudQueryText = cloudQuery.trim().toLowerCase();
+  const cloudMatches = cloudSite && cloudQueryText
+    ? (CLOUD_FILES[cloudSite.id] ?? [])
+      .filter(file => file.name.toLowerCase().includes(cloudQueryText) || file.path.toLowerCase().includes(cloudQueryText))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+  const cloudShown = cloudMatches.slice(0, CLOUD_RESULT_CAP);
+  const cloudCapped = cloudMatches.length > CLOUD_RESULT_CAP;
+  const cloudAttached = item.infoSource === 'cloud' && !!item.infoFile;
+
+  const sourceBtn = (label: string, icon: string, active: boolean, disabled: boolean, onClick: () => void) => (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        fontFamily: T.font, fontSize: 13, width: '100%',
+        color: disabled ? T.textMuted : T.textAccent,
+        background: active ? T.bgAccent : T.surface0,
+        border: `0.5px solid ${disabled ? T.border : T.borderAccent}`,
+        borderRadius: 6, padding: '7px 14px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
+      }}
+    >
+      <i className={`ti ${icon}`} style={{ fontSize: 15 }} /> {label}
+    </button>
+  );
+
+  const fileBtn = (name: string, detail: string | undefined, onClick: () => void) => (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        fontFamily: T.font, width: '100%', textAlign: 'left',
+        background: T.surface2, border: `0.5px solid ${T.border}`, borderRadius: 6,
+        padding: '7px 10px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2,
+      }}
+    >
+      <span style={{ fontSize: 13, color: T.textPrimary }}>{name}</span>
+      {detail && <span style={{ fontSize: 11, color: T.textMuted }}>{detail}</span>}
+    </button>
+  );
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, color: T.textPrimary }}>Display attached file inline on the app</span>
-        <Toggle on={!!item.infoInline} onChange={v => onUpdate({ infoInline: v })} />
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, color: cloudAttached ? T.textMuted : T.textPrimary }}>Display attached file inline on the app</span>
+          <Toggle on={cloudAttached ? false : !!item.infoInline} disabled={cloudAttached} onChange={v => onUpdate({ infoInline: v })} />
+        </div>
+        {cloudAttached && (
+          <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4, marginTop: 6 }}>Inline display on the app not supported for cloud files</div>
+        )}
       </div>
-      <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={e => {
-        const file = e.target.files?.[0];
-        if (file) onUpdate({ infoFile: file.name });
-        e.target.value = '';
-      }} />
       {item.infoFile ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.surface0, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: '8px 10px' }}>
-          <i className="ti ti-file" style={{ fontSize: 15, color: T.textMuted, flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: T.textPrimary, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.infoFile}</span>
-          <button onClick={() => onUpdate({ infoFile: undefined })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', padding: 0 }}>
+          <i className={`ti ${item.infoSource === 'cloud' ? 'ti-cloud' : 'ti-file'}`} style={{ fontSize: 15, color: T.textMuted, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.infoFile}</div>
+            {item.infoSource === 'cloud' && item.infoSite && (
+              <div style={{ fontSize: 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.infoSite}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            aria-label="Clear file"
+            onClick={() => { setPicker(null); setCloudSiteId(null); setCloudQuery(''); onUpdate({ infoFile: undefined, infoSource: undefined, infoSite: undefined }); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14, display: 'flex', padding: 0 }}
+          >
             <i className="ti ti-x" />
           </button>
         </div>
       ) : (
-        <button onClick={() => fileInputRef.current?.click()} style={{ fontFamily: T.font, fontSize: 13, color: T.textAccent, background: T.surface0, border: `0.5px solid ${T.borderAccent}`, borderRadius: 6, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'center' }}>
-          <i className="ti ti-folder-open" style={{ fontSize: 15 }} /> Select File
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {sourceBtn('Information Library', 'ti-folder', picker === 'library', false, () => { setPicker('library'); setCloudSiteId(null); setCloudQuery(''); })}
+          {picker === 'library' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {LIBRARY_FILES.map(file => (
+                <div key={file.name}>
+                  {fileBtn(file.name, file.subcategory, () => onUpdate({ infoFile: file.name, infoSource: 'library', infoSite: undefined }))}
+                </div>
+              ))}
+            </div>
+          )}
+          {sourceBtn('Cloud drive', 'ti-cloud', picker === 'cloud', !cloudReady, () => { if (cloudReady) setPicker('cloud'); })}
+          {!cloudReady && (
+            <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>An admin adds sites under Integrations.</div>
+          )}
+          {picker === 'cloud' && cloudReady && !cloudSite && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {allowlist.sites.map(site => (
+                <div key={site.id}>
+                  {fileBtn(site.name, undefined, () => { setCloudSiteId(site.id); setCloudQuery(''); })}
+                </div>
+              ))}
+            </div>
+          )}
+          {picker === 'cloud' && cloudReady && cloudSite && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => { setCloudSiteId(null); setCloudQuery(''); }}
+                style={{ fontFamily: T.font, fontSize: 12, color: T.textSecondary, background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+              >
+                <i className="ti ti-chevron-left" style={{ fontSize: 14 }} /> {cloudSite.name}
+              </button>
+              <input
+                autoFocus
+                value={cloudQuery}
+                onChange={e => setCloudQuery(e.target.value)}
+                placeholder="Search files"
+                aria-label="Search files"
+                style={{ fontFamily: T.font, fontSize: 13, color: T.textPrimary, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '6px 10px', width: '100%', boxSizing: 'border-box' }}
+              />
+              {!cloudQueryText && (
+                <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Type to find a file.</div>
+              )}
+              {cloudQueryText && cloudShown.length === 0 && (
+                <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>No files match.</div>
+              )}
+              {cloudShown.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {cloudShown.map(file => (
+                    <div key={`${file.path}/${file.name}`}>
+                      {fileBtn(file.name, file.path, () => onUpdate({ infoFile: file.name, infoSource: 'cloud', infoSite: cloudSite.name, infoInline: false }))}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {cloudCapped && (
+                <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>Too many files. Narrow the search.</div>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -2712,7 +2927,7 @@ function SideSheet({ item, items, onClose, onNavigate, onUpdate, markAs, onMarkA
             </div>
           </div>
           <div style={{ borderTop: `0.5px solid ${T.border}`, paddingTop: 12, marginBottom: 10 }}>
-            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>Info Library</div>
+            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 8 }}>File</div>
             <InfoLibrarySection item={item} onUpdate={upd} />
           </div>
           {item.type !== 'subtitle' && (
@@ -3860,10 +4075,11 @@ function ItemRow({ item, items, isSelected, anySelected, isActive, isCut, dcMode
           return <ColorCell key={col.key} stripe={item.stripe} onSelect={v => onUpdate(item.id, { stripe: v })} />;
         }
         if (col.key === 'all-info-library') {
-          const on = !!item.infoInline;
+          const cloud = item.infoSource === 'cloud' && !!item.infoFile;
+          const on = cloud ? false : !!item.infoInline;
           return (
-            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: 'pointer' }}
-              onClick={e => { e.stopPropagation(); onUpdate(item.id, { infoInline: !on }); }}>
+            <td key={col.key} style={{ width: 100, padding: '0 8px', borderLeft: `0.5px solid ${T.border}`, textAlign: 'center', cursor: cloud ? 'default' : 'pointer' }}
+              onClick={e => { e.stopPropagation(); if (!cloud) onUpdate(item.id, { infoInline: !on }); }}>
               <i className={`ti ${on ? 'ti-checkbox' : 'ti-square'}`} style={{ fontSize: 15, color: on ? T.textAccent : T.textMuted }} />
             </td>
           );
