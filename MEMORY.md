@@ -6,6 +6,33 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-09-30 — Session end: Admin Integrations, then author attachment
+
+**Worked on:** Admin → Integrations (`/#/admin/integrations`). Microsoft connect, site allowlist, disconnect. Local only.
+
+**Completed:**
+- Catalog of cards. Microsoft is the only flow. Placeholders: Google Drive Connected, Dropbox and Box Disconnected.
+- Entra sign-in mock, then a list of sites already granted in SharePoint. Add / Remove is the product allowlist for list templates. No search, no URL box. Legal Hold is granted and not added.
+- Done returns to the catalog and does not save again.
+- Status is Connected or Disconnected. Incomplete setup stays in helper text on the Microsoft screen.
+- Disconnect helper: “Click Disconnect to remove the link between SmartSense and your Microsoft sites. Your admin will have to re-login to restore the connection.”
+
+**In progress:** Nothing on Integrations.
+
+**Next:** New chat. On `/#/operate/jolt-editor`, each list item can attach either an Information Library file or a cloud file. See “2026-09-30 — Item file is library or cloud.” Do not push until asked.
+
+**Not done:** The banner after Disconnect still says revoking access in Microsoft is separate and Microsoft is the source of truth.
+
+---
+
+## 2026-09-30 — Item file is library or cloud
+
+- **What:** On the List Template Editor (`/#/operate/jolt-editor`, `src/pages/operate/JoltListEditorPage.tsx`), General Options on every item has the block now labeled Info Library (`InfoLibrarySection`). That block becomes the place an author attaches one file. The file is either an Information Library file or a cloud file from a SharePoint site that was Added on Admin → Integrations. One source at a time. Choosing one clears the other. Clearing returns to both choices. The inline toggle stays and applies to whichever file is attached. Cloud files only come from sites on the product allowlist (`msMemory` added sites). Legal Hold does not appear unless it was Added. If Microsoft is Disconnected, or Connected with no added sites, Cloud drive is visible and disabled, with one line that an admin adds sites under Integrations. No Entra flow from the editor. No device file picker. No tenant search, URL paste, or folder tree. Keep `infoFile` as the display name. Add `infoSource?: 'library' | 'cloud'`. Library files are a short seed in the editor. Do not edit `/#/information`. Do not change the Integrations screens. Do not restyle the editor off the local `T` tokens. Mobile open and the preview page stay as they are.
+- **Why:** Authors attach checklist content after an admin has connected Microsoft and added sites. The library stays a separate source. The current control uploads a file from the computer, which is not either source.
+- **Rejected:** Both sources on one item. Browsing every SharePoint site. Starting connect from the item. A third catalog status for “add sites.” Rebuilding preview or the mobile open flow in this slice.
+
+---
+
 ## 2026-09-29 — Session handoff
 
 - **Worked on:** `/#/information` polish, then where Connect Microsoft belongs.
@@ -29,6 +56,62 @@ it first. Format per decision: **what / why / rejected**.
 - **What:** `/#/admin/integrations` sits in the existing Admin accordion, after Distribution. Shell title is Integrations. Cards group as Connected, then Needs setup, then Not connected. An empty group is omitted, so a catalog with nothing connected does not show an empty Connected heading. Microsoft is the only flow: Not connected, consent Accept or Deny, Connected with no sites, add and remove sites, Connected and ready, Disconnect back to Not connected. Deny keeps no connection. State lasts for the browser session. Placeholder cards — Google Drive (Connected), Dropbox (Needs setup), Box (Not connected) — use the same card and open a screen with no connect flow, so the grid and groups show before Microsoft is connected.
 - **Why:** Hiding an empty Connected group means grouping stays invisible if every card starts Not connected.
 - **Rejected:** A real OAuth redirect. Seeding Microsoft as already connected. Connect controls on the placeholders. Admin → Distribution. Copying the production SS1 nav from the 2026-09-29 screenshot.
+
+---
+
+## 2026-09-29 — Microsoft connect starts as a mocked Entra sign-in
+
+- **What:** Connect Microsoft opens a full-screen sign-in mock. Clicking the email field fills `itadmin@acme.onmicrosoft.com` and a password. Login is enabled only after that fill, then opens a permissions screen for Sites.Selected. Accept stores the connection and returns to the site list. Cancel stores nothing and returns to Not connected. Nothing is sent to Microsoft.
+- **Why:** The team needs to see the real handoff: customer admin signs in at Microsoft, then approves the permissions the app already requested, before they pick sites.
+- **Rejected:** Leaving consent as a SmartSense card with Accept and Deny. A real redirect to login.microsoftonline.com. Letting Login continue with empty fields.
+
+---
+
+## 2026-09-29 — Site list is the SharePoint grant; Add/Remove is the product allowlist
+
+- **What:** After Accept, the page lists sites already granted in SharePoint. There is no search and no URL box. Add makes a granted site available to template admins. Remove takes it off that list and does not change the SharePoint grant. Legal Hold is in the granted list so a site can show without being added.
+- **Why:** Sites.Selected cannot search the tenant. A SharePoint grant can exist for work that is not checklist content, so showing a site is not the same as offering it to authors.
+- **Rejected:** A search box. A folder tree of the whole tenant. Pasting a site URL to grant it from this screen. Treating Remove as a SharePoint revoke.
+
+---
+
+## 2026-09-30 — Disconnect helper is about restoring the link
+
+- **What:** The Disconnect card says: “Click Disconnect to remove the link between SmartSense and your Microsoft sites. Your admin will have to re-login to restore the connection.”
+- **Why:** The old copy talked about Microsoft as the source of truth. This copy tells the admin what the button does and what it takes to come back.
+- **Rejected:** Keeping the revoke-in-Microsoft sentence on that card.
+
+---
+
+## 2026-09-30 — Site list helper names list templates
+
+- **What:** The site-list helper reads: “These sites are already granted in SharePoint. Click Add to make a site available to list templates.” The sentence about Remove and the SharePoint grant is gone from the screen. Remove still only changes the author list.
+- **Why:** The second sentence explained a distinction the button row already shows. The audience is list templates, not “template admins.”
+- **Rejected:** Keeping both sentences. Leaving “template admins” in the helper.
+
+---
+
+## 2026-09-30 — Catalog status is Connected or Disconnected
+
+- **What:** Integrations has two statuses: Connected and Disconnected. There is no Add sites label and no Add sites section. Microsoft is Connected as soon as consent is accepted, including when no site is on the author list. The Microsoft screen’s helper text says when authors still cannot browse. Dropbox, which only existed to fill the middle group, is Disconnected. This replaces the 2026-09-30 “Middle status is Add sites” label.
+- **Why:** Other connectors will not all need sites. A third status named for Microsoft’s setup step does not fit the catalog.
+- **Rejected:** Keeping Add sites as a catalog section. Hiding incomplete Microsoft setup. A per-connector status vocabulary.
+
+---
+
+## 2026-09-30 — Middle status is Add sites
+
+- **What:** The middle status label is Add sites, on the catalog group and on the card badge. It still means consent is done and no site is on the author list. Disconnect stays on that screen. This replaces the “Needs setup” label from the 2026-09-29 Integrations prototype slice.
+- **Why:** Needs setup read like Not connected, so Disconnect looked out of place.
+- **Rejected:** Hiding Disconnect until a site is added. Keeping the Needs setup label.
+
+---
+
+## 2026-09-30 — Done leaves the Microsoft site screen
+
+- **What:** After the connection exists, a primary Done button sits at the bottom of the site list and returns to the Integrations catalog. It does not save. Add and Remove already saved. Done shows with zero sites added. Disconnect stays in its own card.
+- **Why:** The only exit was the back chevron. A Save or Confirm would make the toggles feel provisional.
+- **Rejected:** A confirmation that re-saves the allowlist. Hiding Done until at least one site is added.
 
 ---
 
