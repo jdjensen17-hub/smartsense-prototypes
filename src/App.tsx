@@ -21,6 +21,8 @@ import CreateListPage from '@/pages/operate/CreateListPage';
 import MCTemplatesPage from '@/pages/operate/MCTemplatesPage';
 import InformationLibraryPage from '@/pages/information/InformationLibraryPage';
 import IntegrationsPage from '@/pages/user-management/IntegrationsPage';
+import StatusesListPage from '@/pages/user-management/StatusesListPage';
+import StatusSetEditorPage from '@/pages/user-management/StatusSetEditorPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -35,6 +37,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/licenses':            'License Assignment',
   '/admin/distribution':        'Distribution',
   '/admin/integrations':        'Integrations',
+  '/admin/statuses':            'Statuses',
   '/admin/org-import':          'Org Hierarchy Import',
   '/information':               'Information Library',
   '/operate/lists':             'List Completion',
@@ -233,6 +236,8 @@ function Shell({ children }: { children: React.ReactNode }) {
               <DrawerNavItem to="/admin/licenses"        label="License Assignment" end  onNavigate={() => setDrawerOpen(false)} />
               <DrawerNavItem to="/admin/distribution"   label="Distribution"       end  onNavigate={() => setDrawerOpen(false)} />
               <DrawerNavItem to="/admin/integrations"   label="Integrations"            onNavigate={() => setDrawerOpen(false)} />
+              {/* No org-admin gate in this prototype. Other Admin items are visible the same way. */}
+              <DrawerNavItem to="/admin/statuses"       label="Statuses"                onNavigate={() => setDrawerOpen(false)} />
             </div>
           )}
 
@@ -336,6 +341,8 @@ export default function App() {
           <Route path="/admin/distribution" element={<DistributionPage />} />
           <Route path="/admin/integrations" element={<IntegrationsPage />} />
           <Route path="/admin/integrations/:slug" element={<IntegrationsPage />} />
+          <Route path="/admin/statuses" element={<StatusesListPage />} />
+          <Route path="/admin/statuses/:setId" element={<StatusSetEditorPage />} />
           <Route path="/admin/org-import"   element={<OrgHierarchyImportPage />} />
           <Route path="/information" element={<InformationLibraryPage />} />
           <Route path="/operate/lists" element={<ListCompletionPage />} />

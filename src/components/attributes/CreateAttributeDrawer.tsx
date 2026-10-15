@@ -210,7 +210,7 @@ export default function CreateAttributeDrawer({ open, editingAttr, onClose, onSa
               value={tagType}
               onChange={e => setTagType(e.target.value as AttributeType)}
               className="rounded py-2 px-3 text-sm focus:outline-none"
-              style={{ border: '1px solid #CCCDD0', color: '#35353B', borderRadius: '12px', background: '#fff' }}
+              style={{ border: '1px solid #CCCDD0', color: '#35353B', borderRadius: '12px', backgroundColor: '#fff' }}
             >
               <option value="Location Attribute">Location Attribute</option>
               <option value="Item Group">Item Group</option>
@@ -228,7 +228,7 @@ export default function CreateAttributeDrawer({ open, editingAttr, onClose, onSa
                   value={valueType}
                   onChange={e => { setValueType(e.target.value as ValueType); setEnumValues([]); }}
                   className="rounded py-2 px-3 text-sm focus:outline-none"
-                  style={{ border: '1px solid #CCCDD0', color: '#35353B', borderRadius: '12px', background: '#fff' }}
+                  style={{ border: '1px solid #CCCDD0', color: '#35353B', borderRadius: '12px', backgroundColor: '#fff' }}
                 >
                   <option value="Boolean">Boolean (Yes / No)</option>
                   <option value="Numeric">Numeric (whole number)</option>

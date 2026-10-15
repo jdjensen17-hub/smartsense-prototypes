@@ -55,3 +55,16 @@ body {
   background-color: #F7F7FA;
   color: #35353B;
 }
+
+/* The native menu arrow sits on the right edge. Draw one 8px in from the
+   border instead. Selects that already draw their own arrow, and borderless
+   time fields, keep theirs. */
+select:not([style*="appearance"]):not([style*="background:"]):not([style*="border: none"]):not([style*="border:none"]) {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23757677' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px 6px;
+  padding-right: 26px;
+}

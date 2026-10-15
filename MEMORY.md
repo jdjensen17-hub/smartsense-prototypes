@@ -6,6 +6,38 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-10-15 — A status changes is phase 3
+
+- **What:** Settings › Notifications gets “A status changes” as the last event, on both list and audit templates. No NEW pill and no email preview. The status hint is “Click a status to set up a notification.” It notifies roles when an instance moves to the chosen statuses. Attach PDF shows only while Email is on and starts checked. Audits attach the Leave Behind Report. Lists attach the list completion PDF. No set disables the row: “Select a status set first.” A set switch clears the chosen statuses and the row says “No statuses selected. Edit to choose.” None removes those rules. The card summary is “N events configured · M notifications”, or “No events configured” when nothing is saved. Rules live on `templateStatus` with the set choice. The sample audit starts with Compliance Manager · Email (PDF attached) · to Needs Compliance Approval. The sample list starts with Pharmacy Manager · Push · 24 hours before due.
+- **Why:** Authors already configure events on this card. The status event is one more row, not a second panel. Jim pulled the NEW pill and the email preview on 2026-10-15.
+- **Rejected:** A separate notifications panel. Individual people or free-text emails. The spec’s NEW pill, Preview email link, and “Email copy is fixed” note. Turning Attach PDF on by default for the older “List is displayed” and “List is completed” events.
+
+## 2026-10-15 — Template status set is phase 2
+
+- **What:** A template picks one status set, or None. On a list, the Status card is the collapsible Settings card above Notifications. On an audit, it is the card on the Audits tab, between Audit Outcomes and Leave Behind Report. The Status card starts collapsed on both. Audit Outcomes and Leave Behind Report stay open. Collapsed with no set, the list says “List status not configured” and the audit says “Audit status not configured”. That line is gone once a set is selected, and it is hidden while the card is open. No NEW pill. Notifications says “No events configured” only while no event is saved. The info tip is “Optionally select a status set for this list…” (audit says “this audit”). There is no helper under the selector and no “used by N templates” line. The preview is one row per status in set order, with Default and Can submit from on that same row. Manage statuses stays. The Audits tab is only on an audit template, to the right of Settings. Opening Checklist stays the default list and starts at None. The samples are `#/operate/jolt-editor?template=monthly-self-assessment` (Pharmacy Self-Assessment, 212 in-flight lists) and `#/operate/jolt-editor?template=supervisor-facility-audit` (Costco Compliance Review, 18 in-flight audits). The header menu can open either sample. Switching with in-flight instances confirms a mapping, then Publish moves `usedBy`. `templateStatus` in `src/data/templateStatus.ts` is what Phase 3 reads.
+- **Why:** There is one Jolt editor. The spec’s audit and list screens are two templates on that route, not a second editor.
+- **Rejected:** Renaming Opening Checklist. Putting the Status card on Settings for audits. A new audit-editor route. Leaving the audit Status card always open. The NEW pill, the title summary, the selector helper, and the “used by N templates” line.
+
+## 2026-10-15 — Close test Chrome windows
+
+- **What:** If a check opens a Chrome window on Jim's Mac, close that window when the check is done. Leave his own Chrome alone.
+- **Why:** Jim asked for this. A leftover test window stays on his machine.
+- **Rejected:** Closing only the tab and leaving the test window open.
+
+## 2026-10-14 — Admin Statuses is phase 1
+
+- **What:** `#/admin/statuses` and `#/admin/statuses/:setId` are the status-set admin. The shared store is `statusSets` in `src/data/statusSets.ts`, with `<StatusChip>` in `src/components/statuses/StatusChip.tsx`. Phases 2 and 3 import those. The nav item sits after Integrations. No NEW pill. New saves are stamped Ben Caldwell (the logged-in prototype user). Seed rows keep Jim Jensen and Dana Whitfield. There is no org-admin gate; every Admin item is visible the same way.
+- **Why:** Phase 1 owns the store. `@joltup/colors` is not installed, and Roles and People already use the admin hex palette, so Statuses matches those pages. Jim removed the NEW pill on 2026-10-15.
+- **Rejected:** A separate permission check for this prototype. Emotion styling that would not match the other admin lists. Keeping the mock’s NEW pill.
+
+## 2026-10-14 — Audit templates live in the Jolt editor
+
+- **What:** For the Statuses prototype, `/#/operate/jolt-editor` also supports audit templates. An **Audits** tab sits to the right of Settings. Phase 2 puts the Status card on that tab. Phase 1 is Admin › Statuses only and does not add the tab.
+- **Why:** There is no separate audit template editor in this repo. The mock’s audit screens map onto the existing Jolt editor.
+- **Rejected:** A new audit-editor route for this prototype.
+
+---
+
 ## 2026-09-30 — Session end: Admin Integrations, then author attachment
 
 **Worked on:** Admin → Integrations (`/#/admin/integrations`). Microsoft connect, site allowlist, disconnect. Local only.

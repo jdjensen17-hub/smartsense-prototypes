@@ -1,6 +1,11 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from '@emotion/styled';
+import { AuditsTab, submitStatusPhrase, TemplateStatusCard } from '@/components/statuses/TemplateStatusCard';
+import { AUDIT_SAMPLE_ID, LIST_SAMPLE_ID, notificationSummary, pdfAttachmentInfo, templateStatus, useTemplateStatus, type NotificationRule } from '@/data/templateStatus';
+import { StatusChip } from '@/components/statuses/StatusChip';
+import { useStatusSets } from '@/data/statusSets';
 import { X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Barcode from 'react-barcode';
@@ -3181,42 +3186,70 @@ function DCConditionPanel({ childItem, parentItem, onSave, onUpdate, onRemoveLin
 }
 
 // ── Notification section helpers ──────────────────────────────────────────
-interface NotifRule { id: string; event: string; roles: string[]; methods: string[]; offsetMin?: number; frequency?: 'Daily' | 'Weekly'; attachPdf?: boolean; }
+const STATUS_NOTIFY_ROLES = ['Pharmacy Manager', 'Regional Supervisor', 'Compliance Manager', 'Divisional VP', 'Auditor'];
 
-function NotificationSection() {
-  const EVENTS = [
+function offsetLabel(min?: number) {
+  if (!min) return '';
+  if (min % 60 === 0 && min >= 60) {
+    const hours = min / 60;
+    return ` · ${hours} hour${hours === 1 ? '' : 's'} before due`;
+  }
+  return ` · ${min}min before`;
+}
+
+function methodLabel(rule: NotificationRule) {
+  return rule.methods.map((method) => (
+    method === 'Email' && rule.attachPdf && rule.event === 'status_changed' ? 'Email (PDF attached)' : method
+  )).join(', ');
+}
+
+function NotificationSection({ templateId, onDirty }: { templateId: string; onDirty: () => void }) {
+  const EVENTS: { id: string; label: string; note?: string }[] = [
     { id: 'displayed', label: 'List is displayed' },
     { id: 'out-of-range', label: 'Item is out of range', note: 'Measurement items only' },
     { id: 'before-due', label: 'Before list is due' },
     { id: 'overdue', label: 'Item is overdue' },
     { id: 'completed', label: 'List is completed' },
     { id: 'image-exception', label: 'An image exception occurs' },
+    { id: 'status_changed', label: 'A status changes' },
   ];
   const PDF_EVENTS = new Set(['displayed', 'completed']);
-  const [rules, setRules] = useState<NotifRule[]>([]);
+  const template = useTemplateStatus(templateId);
+  useStatusSets();
+  const rules = template.notificationRules;
+  const selectedSet = templateStatus.getSelectedSet(templateId);
+  const statusEnabled = templateStatus.isEventEnabled(templateId);
+  const pdfInfo = pdfAttachmentInfo(template.type);
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [formRoles, setFormRoles] = useState<string[]>([]);
   const [formMethods, setFormMethods] = useState<string[]>([]);
+  const [formStatuses, setFormStatuses] = useState<string[]>([]);
   const [formOffset, setFormOffset] = useState(30);
   const [formFrequency, setFormFrequency] = useState<'Daily' | 'Weekly'>('Daily');
   const [formAttachPdf, setFormAttachPdf] = useState(false);
+  useEffect(() => {
+    setAddingFor(null);
+    setEditingRuleId(null);
+  }, [templateId]);
 
   const openAdd = (evId: string) => {
     setEditingRuleId(null);
     setFormRoles([]);
     setFormMethods(evId === 'image-exception' ? ['Email'] : []);
+    setFormStatuses([]);
     setFormOffset(30);
     setFormFrequency('Daily');
     setFormAttachPdf(false);
     setAddingFor(evId);
   };
 
-  const openEdit = (rule: NotifRule) => {
+  const openEdit = (rule: NotificationRule) => {
     setAddingFor(rule.event);
     setEditingRuleId(rule.id);
     setFormRoles(rule.roles);
     setFormMethods(rule.methods);
+    setFormStatuses(rule.statusIds ?? []);
     setFormOffset(rule.offsetMin ?? 30);
     setFormFrequency(rule.frequency ?? 'Daily');
     setFormAttachPdf(!!rule.attachPdf);
@@ -3224,55 +3257,104 @@ function NotificationSection() {
 
   const saveRule = (event: string) => {
     if (!formRoles.length || !formMethods.length) return;
-    const extra = event === 'before-due'
-      ? { offsetMin: formOffset, frequency: undefined, attachPdf: undefined }
-      : event === 'image-exception'
-        ? { offsetMin: undefined, frequency: formFrequency, attachPdf: undefined }
-        : {
-            offsetMin: undefined,
-            frequency: undefined,
-            attachPdf: PDF_EVENTS.has(event) && formMethods.includes('Email') ? formAttachPdf : undefined,
-          };
-    if (editingRuleId) {
-      setRules(prev => prev.map(r => r.id === editingRuleId ? { ...r, roles: formRoles, methods: formMethods, ...extra } : r));
-    } else {
-      setRules(prev => [...prev, { id: mkid(), event, roles: formRoles, methods: formMethods, ...extra }]);
-    }
+    if (event === 'status_changed' && !formStatuses.length) return;
+    const orderedStatuses = selectedSet?.statuses.map((status) => status.id).filter((id) => formStatuses.includes(id)) ?? [];
+    const extra = event === 'status_changed'
+      ? { offsetMin: undefined, frequency: undefined, statusIds: orderedStatuses, attachPdf: formMethods.includes('Email') ? formAttachPdf : false }
+      : event === 'before-due'
+        ? { offsetMin: formOffset, frequency: undefined, attachPdf: undefined, statusIds: undefined }
+        : event === 'image-exception'
+          ? { offsetMin: undefined, frequency: formFrequency, attachPdf: undefined, statusIds: undefined }
+          : {
+              offsetMin: undefined,
+              frequency: undefined,
+              statusIds: undefined,
+              attachPdf: PDF_EVENTS.has(event) && formMethods.includes('Email') ? formAttachPdf : undefined,
+            };
+    templateStatus.upsertRule(templateId, { id: editingRuleId ?? mkid(), event, roles: formRoles, methods: formMethods, ...extra });
+    onDirty();
     setAddingFor(null);
     setEditingRuleId(null);
     setFormRoles([]);
     setFormMethods([]);
+    setFormStatuses([]);
     setFormAttachPdf(false);
   };
+
+  const ruleReady = (event: string) => formRoles.length > 0 && formMethods.length > 0 && (event !== 'status_changed' || formStatuses.length > 0);
+
+  const linkBtn: React.CSSProperties = { fontFamily: T.font, fontSize: 12, fontWeight: 500, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0 };
+  const addingThis = (evId: string) => addingFor === evId && !editingRuleId;
 
   return (
     <div>
       <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Events</div>
-      {EVENTS.map(ev => (
+      {EVENTS.map(ev => {
+        if (ev.id === 'status_changed' && !statusEnabled) {
+          return (
+            <div key={ev.id} style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, color: T.textMuted }}>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{ev.label}</span>
+              <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <i className="ti ti-lock" style={{ fontSize: 14 }} /> Select a status set first
+              </span>
+            </div>
+          );
+        }
+        return (
         <div key={ev.id} style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 13, fontWeight: 500, color: T.textPrimary }}>{ev.label}</span>
-              {ev.note && <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 6 }}>({ev.note})</span>}
+              {ev.note && <span style={{ fontSize: 11, color: T.textMuted }}>({ev.note})</span>}
             </div>
-            <button onClick={() => openAdd(ev.id)} style={{ fontFamily: T.font, fontSize: 12, color: T.textAccent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-              <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button type="button" disabled={addingThis(ev.id)} onClick={() => openAdd(ev.id)} style={{ ...linkBtn, opacity: addingThis(ev.id) ? 0.4 : 1, cursor: addingThis(ev.id) ? 'default' : 'pointer' }}>
+                <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add
+              </button>
+            </div>
           </div>
           {rules.filter(r => r.event === ev.id).map(r => (
             editingRuleId === r.id ? null :
-            <div key={r.id} onClick={() => openEdit(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.surface0, border: `0.5px solid ${T.border}`, borderRadius: 5, padding: '7px 10px', marginBottom: 4, cursor: 'pointer' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = T.borderStrong)}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = T.border)}>
-              <div style={{ fontSize: 12, color: T.textPrimary }}>{r.roles.join(', ')} · {r.methods.join(', ')}{r.offsetMin ? ` · ${r.offsetMin}min before` : ''}{r.frequency ? ` · ${r.frequency}` : ''}{r.attachPdf ? ' · PDF' : ''}</div>
-              <button onClick={e => { e.stopPropagation(); setRules(rules.filter(x => x.id !== r.id)); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 13 }}><i className="ti ti-trash" /></button>
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: r.event === 'status_changed' && !r.statusIds?.length ? T.bgWarning : T.surface0, border: `0.5px solid ${r.event === 'status_changed' && !r.statusIds?.length ? 'transparent' : T.border}`, borderRadius: 5, padding: '7px 10px', marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: r.event === 'status_changed' && !r.statusIds?.length ? T.textWarning : T.textPrimary, minWidth: 0 }}>
+                <i className="ti ti-bell" style={{ fontSize: 14, color: T.textMuted }} />
+                {r.event === 'status_changed' && !r.statusIds?.length
+                  ? 'No statuses selected. Edit to choose.'
+                  : <>
+                      <span>{r.roles.join(', ')} · {methodLabel(r)}{offsetLabel(r.offsetMin)}{r.frequency ? ` · ${r.frequency}` : ''}{r.event !== 'status_changed' && r.attachPdf ? ' · PDF' : ''}{r.event === 'status_changed' ? ' · to' : ''}</span>
+                      {r.event === 'status_changed' && r.statusIds?.map((id) => {
+                        const status = selectedSet?.statuses.find((item) => item.id === id);
+                        return status ? <StatusChip key={id} status={status} size="sm" /> : null;
+                      })}
+                    </>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <button type="button" aria-label="Edit notification" onClick={() => openEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 14 }}><i className="ti ti-pencil" /></button>
+                <button type="button" aria-label="Delete notification" onClick={() => { templateStatus.deleteRule(templateId, r.id); onDirty(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textDanger, fontSize: 14 }}><i className="ti ti-trash" /></button>
+              </div>
             </div>
           ))}
           {addingFor === ev.id && (
             <div style={{ background: T.surface0, border: `0.5px solid ${T.borderStrong}`, borderRadius: 6, padding: 12, marginTop: 4 }}>
+              {ev.id === 'status_changed' && selectedSet && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Statuses</div>
+                  <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 8 }}>Click a status to set up a notification.</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {selectedSet.statuses.map((status) => {
+                      const on = formStatuses.includes(status.id);
+                      return (
+                        <button key={status.id} type="button" onClick={() => setFormStatuses((prev) => prev.includes(status.id) ? prev.filter((id) => id !== status.id) : [...prev, status.id])} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}>
+                          <StatusChip status={status} size="sm" checked={on} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Role</div>
               <div style={{ marginBottom: 10 }}>
-                <TagPicker options={ROLE_DEFS.map(r => r.name)} selected={formRoles} onChange={setFormRoles} placeholder="Select roles…" portalDropdown />
+                <TagPicker options={ev.id === 'status_changed' ? STATUS_NOTIFY_ROLES : ROLE_DEFS.map(r => r.name)} selected={formRoles} onChange={setFormRoles} placeholder="Select roles…" portalDropdown />
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
                 <div>
@@ -3283,6 +3365,7 @@ function NotificationSection() {
                         if (ev.id === 'image-exception') return;
                         setFormMethods(prev => {
                           const next = prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m];
+                          if (ev.id === 'status_changed' && m === 'Email' && next.includes('Email') && !prev.includes('Email')) setFormAttachPdf(true);
                           if (!next.includes('Email')) setFormAttachPdf(false);
                           return next;
                         });
@@ -3298,7 +3381,7 @@ function NotificationSection() {
                     <div style={{ fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Minutes before due</div>
                     <select value={formOffset} onChange={e => setFormOffset(Number(e.target.value))}
                       style={{ fontFamily: T.font, fontSize: 13, border: `0.5px solid ${T.borderStrong}`, borderRadius: 5, padding: '4px 8px', background: T.surface2, color: T.textPrimary, cursor: 'pointer' }}>
-                      {[{label:'15 min',val:15},{label:'30 min',val:30},{label:'1 hour',val:60},{label:'90 min',val:90},{label:'2 hours',val:120},{label:'4 hours',val:240},{label:'6 hours',val:360}].map(o => (
+                      {[{label:'15 min',val:15},{label:'30 min',val:30},{label:'1 hour',val:60},{label:'90 min',val:90},{label:'2 hours',val:120},{label:'4 hours',val:240},{label:'6 hours',val:360},{label:'24 hours',val:1440}].map(o => (
                         <option key={o.val} value={o.val}>{o.label}</option>
                       ))}
                     </select>
@@ -3319,8 +3402,8 @@ function NotificationSection() {
                   style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 5, cursor: 'pointer', border: `0.5px solid ${T.borderStrong}`, background: T.surface2, color: T.textSecondary, alignSelf: 'flex-end' }}>
                   Cancel
                 </button>
-                <button disabled={!formRoles.length || !formMethods.length} onClick={() => saveRule(ev.id)}
-                  style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 5, cursor: formRoles.length && formMethods.length ? 'pointer' : 'default', border: 'none', background: formRoles.length && formMethods.length ? T.fillAccent : T.borderStrong, color: formRoles.length && formMethods.length ? T.onAccent : T.textMuted, alignSelf: 'flex-end' }}>
+                <button disabled={!ruleReady(ev.id)} onClick={() => saveRule(ev.id)}
+                  style={{ fontFamily: T.font, fontSize: 12, fontWeight: 500, padding: '5px 12px', borderRadius: 5, cursor: ruleReady(ev.id) ? 'pointer' : 'default', border: 'none', background: ruleReady(ev.id) ? T.fillAccent : T.borderStrong, color: ruleReady(ev.id) ? T.onAccent : T.textMuted, alignSelf: 'flex-end' }}>
                   Done
                 </button>
               </div>
@@ -3330,16 +3413,26 @@ function NotificationSection() {
                   <Toggle on={formAttachPdf} onChange={setFormAttachPdf} />
                 </div>
               )}
+              {ev.id === 'status_changed' && formMethods.includes('Email') && (
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px dashed ${T.border}`, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={formAttachPdf} onChange={(e) => setFormAttachPdf(e.target.checked)} style={{ marginTop: 2, accentColor: T.fillAccent }} />
+                  <span>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.textPrimary }}>Attach PDF</span>
+                    <span style={{ display: 'block', fontSize: 12, color: T.textMuted, marginTop: 2 }}>{pdfInfo.hint}</span>
+                  </span>
+                </label>
+              )}
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 // ── Settings tab ──────────────────────────────────────────────────────────
-function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displayTimes, setDisplayTimes }: { scoringOn: boolean; setScoringOn: (v: boolean) => void; submission: string; setSubmission: (v: string) => void; displayTimes: DisplayTime[]; setDisplayTimes: React.Dispatch<React.SetStateAction<DisplayTime[]>> }) {
+function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displayTimes, setDisplayTimes, templateId, onStatusDirty }: { scoringOn: boolean; setScoringOn: (v: boolean) => void; submission: string; setSubmission: (v: string) => void; displayTimes: DisplayTime[]; setDisplayTimes: React.Dispatch<React.SetStateAction<DisplayTime[]>>; templateId: string; onStatusDirty: () => void }) {
   const [submissionAccess, setSubmissionAccess] = useState('anyone-anytime');
   const [listScoreVisible, setListScoreVisible] = useState(true);
   const [itemScoreVisible, setItemScoreVisible] = useState(true);
@@ -3352,11 +3445,17 @@ function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displ
   const [listLocationTags, setListLocationTags] = useState<string[]>([]);
   const [allowGeo, setAllowGeo] = useState(true);
   const [allowMultiCopy, setAllowMultiCopy] = useState(false);
+  const templateForNotes = useTemplateStatus(templateId);
+  useStatusSets();
+  const statusPhrase = submitStatusPhrase(templateId);
+  const selectedSet = templateStatus.getSelectedSet(templateId);
+  const submitFrom = selectedSet?.statuses.filter((status) => status.canSubmitFrom) ?? [];
+  const submissionSummary = `${submission === 'items-anytime' ? 'Items can be submitted when complete' : 'List must be fully complete to submit'}${statusPhrase}`;
 
   return (
     <div style={{ padding: '16px 16px', maxWidth: 720, width: '100%', flexShrink: 0 }}>
       {/* List submission */}
-      <SectionHeader label="List submission" helpTip="Decide whether this list should be completed like a form (everything at once) or allow items to be submitted as completed." summary={submission === 'items-anytime' ? 'Items can be submitted when complete' : 'List must be fully complete to submit'}>
+      <SectionHeader label="List submission" helpTip="Decide whether this list should be completed like a form (everything at once) or allow items to be submitted as completed." summary={submissionSummary}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             { value: 'items-anytime', label: 'List items can be submitted when complete', tip: '' },
@@ -3368,6 +3467,17 @@ function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displ
               <HelpTip text={opt.tip} />
             </label>
           ))}
+          {selectedSet && (
+            <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.45 }}>
+              {submitFrom.length > 0 ? (
+                <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                  The status set also limits submit to: {submitFrom.map((status) => <StatusChip key={status.id} status={status} size="sm" />)}
+                </span>
+              ) : (
+                <span><strong style={{ fontWeight: 600 }}>{selectedSet.name}</strong> allows submit from any status.</span>
+              )}
+            </div>
+          )}
         </div>
       </SectionHeader>
 
@@ -3462,9 +3572,13 @@ function SettingsTab({ scoringOn, setScoringOn, submission, setSubmission, displ
         <CreateSettingsSubsection allowCreate={allowCreate} setAllowCreate={setAllowCreate} allowGeo={allowGeo} setAllowGeo={setAllowGeo} allowMultiCopy={allowMultiCopy} setAllowMultiCopy={setAllowMultiCopy} />
       </SectionHeader>
 
+      {templateStatus.get(templateId)?.type === 'list' && (
+        <TemplateStatusCard templateId={templateId} collapsible onDirty={onStatusDirty} />
+      )}
+
       {/* Notifications */}
-      <SectionHeader label="Notifications" helpTip="Configure email, text, or push notifications that are triggered by different events." summary="No events configured" defaultOpen={false}>
-        <NotificationSection />
+      <SectionHeader label="Notifications" helpTip="Configure email, text, or push notifications that are triggered by different events." summary={notificationSummary(templateForNotes.notificationRules)} defaultOpen={false}>
+        <NotificationSection templateId={templateId} onDirty={onStatusDirty} />
       </SectionHeader>
 
       {/* Location Tags */}
@@ -5180,7 +5294,14 @@ function RestoreInstancesModal({ onClose, onRestore, onReactivateOnly }: { onClo
 
 // ── Main editor ────────────────────────────────────────────────────────────
 export default function JoltListEditorPage() {
-  const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const requested = params.get('template');
+  const templateId = templateStatus.has(requested) ? requested! : 'opening-checklist';
+  const templateDraft = useTemplateStatus(templateId);
+  const [activeTab, setActiveTab] = useState<'items' | 'settings' | 'audits'>(
+    templateDraft.type === 'audit' ? 'audits' : templateId === 'opening-checklist' ? 'items' : 'settings',
+  );
   const [scoringOn, setScoringOn] = useState(false);
   const [submission, setSubmission] = useState('items-anytime');
   const [flags, setFlags] = useState<Flag[]>(INITIAL_FLAGS);
@@ -5267,6 +5388,7 @@ export default function JoltListEditorPage() {
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [schedulePanelOpen, setSchedulePanelOpen] = useState(false);
   const autosaveSig = useRef<string | null>(null);
+  const [publishNote, setPublishNote] = useState<string | null>(null);
   const statusChipRef = useRef<HTMLButtonElement>(null);
   const publishSplitRef = useRef<HTMLDivElement>(null);
   const [kebabOpenId, setKebabOpenId] = useState<string | null>(null);
@@ -5336,9 +5458,14 @@ export default function JoltListEditorPage() {
   }, [schedulePanelOpen]);
 
   const handlePublishNow = () => {
+    const note = templateStatus.onPublish(templateId);
     setScheduledAt(null);
     setSchedulePanelOpen(false);
     setSaveStatus('published');
+    if (note) {
+      setPublishNote(note);
+      window.setTimeout(() => setPublishNote(null), 4000);
+    }
   };
 
   const handleSchedule = (d: Date) => {
@@ -5352,7 +5479,12 @@ export default function JoltListEditorPage() {
     setSaveStatus('unpublished');
   };
 
-  const canPublish = saveStatus === 'unpublished' || saveStatus === 'saving' || scheduledAt !== null;
+  const canPublish = saveStatus === 'unpublished' || saveStatus === 'saving' || scheduledAt !== null || templateDraft.dirty;
+
+  useEffect(() => {
+    if (templateDraft.type === 'audit') setActiveTab('audits');
+    else setActiveTab((tab) => (tab === 'audits' ? 'settings' : tab));
+  }, [templateId, templateDraft.type]);
 
   // Assign a stable color per DC parent
   const dcColors = React.useMemo(() => {
@@ -5536,7 +5668,7 @@ export default function JoltListEditorPage() {
     ? formatPublishChip(scheduledAt)
     : saveStatus === 'saving' ? 'Saving…'
     : saveStatus === 'published' ? 'Published'
-    : saveStatus === 'unpublished' ? 'Unpublished changes'
+    : (saveStatus === 'unpublished' || templateDraft.dirty) ? 'Unpublished changes'
     : 'Saved';
 
   return (
@@ -5551,8 +5683,8 @@ export default function JoltListEditorPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: T.surface1, borderBottom: `0.5px solid ${T.border}`, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <a href="#/operate/lists" style={{ color: T.textSecondary, fontSize: 18, textDecoration: 'none', display: 'flex', alignItems: 'center' }}>←</a>
-          <span style={{ fontSize: 16, fontWeight: 600, color: T.textPrimary }}>Opening Checklist</span>
-          <span style={{ background: T.bgAccent, color: T.textAccent, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4 }}>11 locations</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: T.textPrimary }}>{templateDraft.name}</span>
+          <span style={{ background: T.bgAccent, color: T.textAccent, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4 }}>{templateDraft.locations} locations</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {!templateDeactivated && (
@@ -5569,7 +5701,7 @@ export default function JoltListEditorPage() {
                 } : {
                   fontSize: 11, fontFamily: T.font, border: 'none', background: 'none', padding: 0,
                   color: saveStatus === 'published' ? T.textAccent : T.textMuted,
-                  fontStyle: saveStatus === 'unpublished' ? 'italic' : 'normal',
+                  fontStyle: (saveStatus === 'unpublished' || templateDraft.dirty) ? 'italic' : 'normal',
                   cursor: 'default', textAlign: 'right', maxWidth: 220,
                 }}
               >
@@ -5628,7 +5760,7 @@ export default function JoltListEditorPage() {
               <i className="ti ti-dots-vertical" />
             </button>
             {headerMenuOpen && (
-              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, padding: '6px 0', width: 240, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}>
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: T.surface2, border: `0.5px solid ${T.borderStrong}`, borderRadius: 8, padding: '6px 0', width: 280, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}>
                 {templateDeactivated ? (
                   <div
                     onClick={() => { setHeaderMenuOpen(false); setRestoreModalOpen(true); }}
@@ -5640,6 +5772,41 @@ export default function JoltListEditorPage() {
                   </div>
                 ) : (
                   <>
+                    {[
+                      { action: 'sample-audit', icon: 'ti-clipboard-check', label: 'Sample: Supervisor Facility Audit' },
+                      { action: 'sample-list', icon: 'ti-list-check', label: 'Sample: Monthly Self-Assessment' },
+                      { action: 'sample-opening', icon: 'ti-list', label: 'Opening Checklist' },
+                    ].filter((item) => (
+                      item.action === 'sample-audit' ? templateId !== AUDIT_SAMPLE_ID
+                      : item.action === 'sample-list' ? templateId !== LIST_SAMPLE_ID
+                      : templateId !== 'opening-checklist'
+                    )).map(kmi => (
+                      <div
+                        key={kmi.action}
+                        onClick={() => {
+                          setHeaderMenuOpen(false);
+                          const next = kmi.action === 'sample-audit' ? AUDIT_SAMPLE_ID : kmi.action === 'sample-list' ? LIST_SAMPLE_ID : 'opening-checklist';
+                          setActiveTab(next === AUDIT_SAMPLE_ID ? 'audits' : 'settings');
+                          navigate(next === 'opening-checklist' ? '/operate/jolt-editor' : `/operate/jolt-editor?template=${next}`);
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textPrimary, cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <i className={`ti ${kmi.icon}`} style={{ fontSize: 15, color: T.textMuted, width: 18 }} />{kmi.label}
+                      </div>
+                    ))}
+                    <div style={{ height: 0.5, background: T.border, margin: '4px 0' }} />
+                    {templateDraft.dirty && (
+                      <div
+                        onClick={() => { templateStatus.discard(templateId); setSaveStatus('saved'); setHeaderMenuOpen(false); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', fontSize: 13, color: T.textDanger, cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = T.surface1)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <i className="ti ti-arrow-back-up" style={{ fontSize: 15, color: T.textDanger, width: 18 }} />Discard unpublished changes
+                      </div>
+                    )}
                     {[
                       { action: 'import-csv', icon: 'ti-file-import', label: 'Import Translation CSV' },
                       { action: 'export-csv', icon: 'ti-file-export', label: 'Export Translation CSV' },
@@ -5690,16 +5857,24 @@ export default function JoltListEditorPage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', padding: '0 16px', background: T.surface2, borderBottom: `0.5px solid ${T.border}`, flexShrink: 0, alignItems: 'center' }}>
-        {(['items', 'settings'] as const).map(tab => (
-          <div key={tab} onClick={() => setActiveTab(tab)} style={{ fontSize: 13, fontWeight: 500, padding: '11px 16px', cursor: 'pointer', color: activeTab === tab ? T.textAccent : T.textSecondary, borderBottom: activeTab === tab ? `2px solid ${T.fillAccent}` : '2px solid transparent', marginBottom: -0.5, textTransform: 'capitalize' }}>
-            {tab === 'items' ? 'Items' : 'Settings'}
+        {(['items', 'settings'] as const).concat(templateDraft.type === 'audit' ? ['audits'] : []).map(tab => (
+          <div key={tab} onClick={() => setActiveTab(tab)} style={{ fontSize: 13, fontWeight: 500, padding: '11px 16px', cursor: 'pointer', color: activeTab === tab ? T.textAccent : T.textSecondary, borderBottom: activeTab === tab ? `2px solid ${T.fillAccent}` : '2px solid transparent', marginBottom: -0.5 }}>
+            {tab === 'items' ? 'Items' : tab === 'settings' ? 'Settings' : 'Audits'}
           </div>
         ))}
       </div>
 
-      {activeTab === 'settings' ? (
+      {publishNote && (
+        <div style={{ padding: '8px 16px', background: T.bgAccent, color: T.textAccent, fontSize: 13, flexShrink: 0 }}>{publishNote}</div>
+      )}
+
+      {activeTab === 'audits' ? (
         <div style={{ flex: 1, overflowY: 'auto', background: T.surface2, display: 'flex', justifyContent: 'center' }}>
-          <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} submission={submission} setSubmission={setSubmission} displayTimes={displayTimes} setDisplayTimes={setDisplayTimes} />
+          <AuditsTab templateId={templateId} onDirty={() => setSaveStatus('unpublished')} />
+        </div>
+      ) : activeTab === 'settings' ? (
+        <div style={{ flex: 1, overflowY: 'auto', background: T.surface2, display: 'flex', justifyContent: 'center' }}>
+          <SettingsTab scoringOn={scoringOn} setScoringOn={handleSetScoringOn} submission={submission} setSubmission={setSubmission} displayTimes={displayTimes} setDisplayTimes={setDisplayTimes} templateId={templateId} onStatusDirty={() => setSaveStatus('unpublished')} />
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
