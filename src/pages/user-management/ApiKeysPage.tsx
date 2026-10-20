@@ -28,7 +28,7 @@ import { ORG, allRejected, apiKeys, rejectedFor, useApiKeys, type ApiKey } from 
 
 type Dialog =
   | { type: 'locations' }
-  | { type: 'add'; name: string; notes: string; error: string | null }
+  | { type: 'add'; name: string; notes: string; error: string | null; replacesKeyId?: string }
   | { type: 'token'; keyId: string; keyName: string; token: string; rotated: boolean; oldLast4?: string }
   | { type: 'rotate'; keyId: string }
   | { type: 'revoke'; keyId: string };
@@ -177,6 +177,7 @@ function ApiKeysScreen() {
                     onOpen={() => navigate(`/admin/api-keys/${apiKey.id}`)}
                     onRotate={() => setDialog({ type: 'rotate', keyId: apiKey.id })}
                     onRevoke={() => setDialog({ type: 'revoke', keyId: apiKey.id })}
+                    onReplace={() => setDialog({ type: 'add', name: apiKey.name, notes: apiKey.notes, error: null, replacesKeyId: apiKey.id })}
                     onRejected={() => navigate(`/admin/api-keys/rejected?key=${apiKey.id}`)}
                   />
                 ))}
@@ -204,6 +205,7 @@ function ApiKeysScreen() {
           initialName={dialog.name}
           initialNotes={dialog.notes}
           initialError={dialog.error}
+          replaces={dialog.replacesKeyId ? apiKeys.get(dialog.replacesKeyId) : null}
           onClose={() => setDialog(null)}
           onCreated={({ key, token }) => setDialog({ type: 'token', keyId: key.id, keyName: key.name, token, rotated: false })}
         />
@@ -252,6 +254,7 @@ function KeyRow({
   onOpen,
   onRotate,
   onRevoke,
+  onReplace,
   onRejected,
 }: {
   apiKey: ApiKey;
@@ -260,6 +263,7 @@ function KeyRow({
   onOpen: () => void;
   onRotate: () => void;
   onRevoke: () => void;
+  onReplace: () => void;
   onRejected: () => void;
 }) {
   const revoked = apiKey.status === 'revoked';
@@ -307,7 +311,10 @@ function KeyRow({
       {canManage && (
         <td className="px-3.5 py-2.5 text-right" style={{ whiteSpace: 'nowrap' }}>
           {revoked ? (
-            <span style={{ color: C.text3 }}>Revoked {apiKey.revokedOn}</span>
+            <span className="flex items-center justify-end gap-3.5">
+              <span style={{ color: C.text3 }}>Revoked {apiKey.revokedOn}</span>
+              <LinkButton icon={<Plus size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); onReplace(); }}>Replace</LinkButton>
+            </span>
           ) : (
             <span className="flex justify-end gap-3.5">
               <LinkButton icon={<RotateCw size={13} strokeWidth={1.8} />} onClick={(e) => { e.stopPropagation(); onRotate(); }}>Rotate</LinkButton>

@@ -24,6 +24,10 @@ export type ApiKey = {
   oldKeyCalls?: { last: string | null; count: number; last4: string };
   revokedOn?: string;
   revokedBy?: string;
+  /** The revoked key this one was created to replace. */
+  replacesKeyId?: string;
+  /** The key created to replace this revoked one. */
+  replacedByKeyId?: string;
 };
 
 export type KeyEvent = {
@@ -376,11 +380,12 @@ export const apiKeys = {
     if (state.viewAs === viewAs) return;
     replace({ ...state, viewAs });
   },
+  /** Only active keys hold a name. A revoked key's name is free to reuse for its replacement. */
   nameTaken(name: string) {
     const normalized = name.trim().toLowerCase();
-    return state.keys.some((key) => key.name.trim().toLowerCase() === normalized);
+    return state.keys.some((key) => key.status === 'active' && key.name.trim().toLowerCase() === normalized);
   },
-  create({ name, notes }: { name: string; notes: string }) {
+  create({ name, notes, replacesKeyId }: { name: string; notes: string; replacesKeyId?: string }) {
     const token = makeToken(name);
     const trimmed = name.trim();
     let id = slug(trimmed) || `key-${state.keys.length}`;
@@ -395,8 +400,13 @@ export const apiKeys = {
       events: 0,
       last4: token.slice(-4),
       notes: notes.trim(),
+      ...(replacesKeyId ? { replacesKeyId } : {}),
     };
-    replace({ ...state, keys: [key, ...state.keys], events: { ...state.events, [id]: [] } });
+    replace({
+      ...state,
+      keys: [key, ...state.keys].map((item) => (item.id === replacesKeyId ? { ...item, replacedByKeyId: id } : item)),
+      events: { ...state.events, [id]: [] },
+    });
     return { key, token };
   },
   /** For the ?modal=token deep link: creating the sample key twice must hand back the same token. */

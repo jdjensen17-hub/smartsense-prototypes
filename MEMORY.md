@@ -6,6 +6,12 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-10-20 — A revoked partner reconnects with a replacement key
+
+- **What:** Key names are unique among **active** keys only, still case-insensitive and still 40 characters max. Once a key is revoked its name is free, so the replacement carries the same partner name. A revoked key detail gets a primary **Create replacement key** action, and the revoked row on the list gets a **Replace** link next to the revoked date. Both are hidden in support read-only view. The action opens the Add key dialog pre-filled with the revoked key's name and notes, titled "Create replacement key", with a line naming the key it replaces. From there it is the normal copy-once dialog and then the new key's Test page. The pair is labelled both ways: the new key shows a "Replaces a revoked key" badge plus a line linking to the revoked key, and the revoked key's banner says "Replaced by {name}, created {date}". `replacesKeyId` and `replacedByKeyId` on the key carry this.
+- **Why:** Revoking is how an admin cuts off a partner that leaked or rotated out a key, and the partner usually comes back. Blocking the name forever forced a fake name like "FixFlow 2", which then shows on every Task. Two keys can now share a name, so each one has to say which is which; Created date, the last 4, and the status pill already separate them on the list.
+- **Rejected:** Letting a revoked key be un-revoked or restored. Moving the revoked key's history onto the replacement. Auto-naming the replacement something like "{name} (2)". Dropping the duplicate check for active keys.
+
 ## 2026-10-20 — Partner Portal API keys live at Admin › API Keys
 
 - **What:** The Partner Portal admin setup flow is `#/admin/api-keys`, with `role-check`, `rejected`, `:keyId`, and `:keyId/test` nested under it. Pages are `ApiKeysPage`, `ApiKeyRoleCheckPage`, `ApiKeyRejectedEventsPage`, `ApiKeyDetailPage`, and `ApiKeyTestPage` in `src/pages/user-management/`, with shared parts in `src/components/api-keys/` and the in-memory store in `src/data/apiKeys.ts`. The nav entry is one flat `DrawerNavItem` after Statuses. Sample data stays fictional: Summit Fuel & Market, PumpLink, StockWise, FixFlow, InsightBoard, made-up stores and people. The mock's dev-only Screens picker is not ported; every state has a query param instead (`?state=`, `?modal=`, `?demo=`, `?phase=resolving`, `?edit=notes`, `?as=csm`, `?reset=1`), and support view also has a "Switch to org admin" link in its banner.

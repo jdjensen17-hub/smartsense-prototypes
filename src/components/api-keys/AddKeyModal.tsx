@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Key } from 'lucide-react';
+import { Info, Key } from 'lucide-react';
 import { NAME_MAX, apiKeys, partnerTag, type ApiKey } from '@/data/apiKeys';
 import { IconBadge, Modal } from './Modal';
 import { Button, Code, FieldError, FieldLabel, Help, KindChip, SourcePill } from './ui';
@@ -10,12 +10,15 @@ export function AddKeyModal({
   initialName = '',
   initialNotes = '',
   initialError = null,
+  replaces = null,
   onClose,
   onCreated,
 }: {
   initialName?: string;
   initialNotes?: string;
   initialError?: string | null;
+  /** Set when this key reconnects a partner whose key was revoked. */
+  replaces?: ApiKey | null;
   onClose: () => void;
   onCreated: (result: { key: ApiKey; token: string }) => void;
 }) {
@@ -37,14 +40,18 @@ export function AddKeyModal({
       setError('A key with this name already exists.');
       return;
     }
-    onCreated(apiKeys.create({ name: trimmed, notes }));
+    onCreated(apiKeys.create({ name: trimmed, notes, replacesKeyId: replaces?.id }));
   }
 
   return (
     <Modal
       icon={<IconBadge tone="info"><Key size={18} strokeWidth={1.8} /></IconBadge>}
-      title="Add API key"
-      subtitle="Name it after the partner or system that will use it."
+      title={replaces ? 'Create replacement key' : 'Add API key'}
+      subtitle={
+        replaces
+          ? `Reconnect ${replaces.name} with a new key. The revoked key keeps its own history.`
+          : 'Name it after the partner or system that will use it.'
+      }
       onClose={onClose}
       footer={
         <>
@@ -53,6 +60,14 @@ export function AddKeyModal({
         </>
       }
     >
+      {replaces && (
+        <p className="mb-3.5 flex items-start gap-1.5 rounded px-2.5 py-2 text-xs" style={{ backgroundColor: '#F2F7FE', border: '1px solid #B9D4F5' }}>
+          <Info size={13} strokeWidth={1.8} className="mt-0.5 flex-shrink-0" color={C.primary} />
+          <span>
+            Replaces <b>{replaces.name}</b>, revoked {replaces.revokedOn}. Send the new key to the partner so they can reconnect.
+          </span>
+        </p>
+      )}
       <div className="mb-3.5">
         <FieldLabel htmlFor="api-key-name" counter={`${name.length}/${NAME_MAX}`}>
           Key name <span style={{ color: C.danger }}>*</span>

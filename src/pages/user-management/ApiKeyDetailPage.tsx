@@ -2,7 +2,8 @@
 
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Ban, Download, Lock, Pencil, RotateCw, Send, TriangleAlert } from 'lucide-react';
+import { Ban, Download, Lock, Pencil, Plus, RotateCw, Send, TriangleAlert } from 'lucide-react';
+import { AddKeyModal } from '@/components/api-keys/AddKeyModal';
 import { CopyKeyModal } from '@/components/api-keys/CopyKeyModal';
 import { LocationsModal } from '@/components/api-keys/LocationsModal';
 import { ConfirmDialog } from '@/components/api-keys/Modal';
@@ -31,7 +32,8 @@ type Dialog =
   | { type: 'locations' }
   | { type: 'rotate' }
   | { type: 'revoke' }
-  | { type: 'token'; token: string; oldLast4: string };
+  | { type: 'replace' }
+  | { type: 'token'; keyId: string; keyName: string; token: string; rotated: boolean; oldLast4?: string };
 
 /** A query change is a new entry point, so the screen starts over from the URL. */
 export default function ApiKeyDetailPage() {
@@ -40,7 +42,7 @@ export default function ApiKeyDetailPage() {
   return <ApiKeyDetailScreen key={`${keyId}?${params.toString()}`} />;
 }
 
-/** Deep links from the reference mock: ?modal=rotate | revoke | token&rotated=1 */
+/** Deep links from the reference mock: ?modal=rotate | revoke | replace | token&rotated=1 */
 function dialogFromParams(params: URLSearchParams, keyId: string): Dialog | null {
   switch (params.get('modal')) {
     case 'locations':
@@ -49,9 +51,12 @@ function dialogFromParams(params: URLSearchParams, keyId: string): Dialog | null
       return { type: 'rotate' };
     case 'revoke':
       return { type: 'revoke' };
+    case 'replace':
+      return { type: 'replace' };
     case 'token': {
+      const key = apiKeys.get(keyId);
       const rotated = apiKeys.rotateOnce(keyId);
-      return { type: 'token', token: rotated.token, oldLast4: rotated.oldLast4 };
+      return { type: 'token', keyId, keyName: key?.name ?? '', token: rotated.token, rotated: true, oldLast4: rotated.oldLast4 };
     }
     default:
       return null;
@@ -88,10 +93,22 @@ function ApiKeyDetailScreen() {
   const events = state.events[apiKey.id] ?? [];
   const rejected = rejectedFor(state, apiKey.id).length;
   const oldCalls = apiKey.oldKeyCalls;
+  // Two keys can share a name once the first is revoked, so each one says which is which.
+  const replaced = state.keys.find((key) => key.id === apiKey.replacesKeyId) ?? null;
+  const replacement = state.keys.find((key) => key.id === apiKey.replacedByKeyId) ?? null;
 
   function rotate() {
     const result = apiKeys.rotate(keyId);
-    setDialog({ type: 'token', token: result.token, oldLast4: result.oldLast4 });
+    setDialog({ type: 'token', keyId, keyName: apiKey?.name ?? '', token: result.token, rotated: true, oldLast4: result.oldLast4 });
+  }
+
+  function finishToken(current: Extract<Dialog, { type: 'token' }>) {
+    setDialog(null);
+    if (current.rotated) {
+      showToast('New key issued. The old key no longer works.');
+      return;
+    }
+    navigate(`/admin/api-keys/${current.keyId}/test`);
   }
 
   function revoke() {
@@ -111,15 +128,26 @@ function ApiKeyDetailScreen() {
       <Crumbs items={[{ label: 'Settings' }, { label: 'API Keys', to: '/admin/api-keys' }, { label: apiKey.name }]} />
       <PageHead
         title={apiKey.name}
-        badge={active ? <Pill tone="active">Active</Pill> : <Pill tone="revoked">Revoked</Pill>}
+        badge={
+          <>
+            {active ? <Pill tone="active">Active</Pill> : <Pill tone="revoked">Revoked</Pill>}
+            {replaced && <Pill tone="info">Replaces a revoked key</Pill>}
+          </>
+        }
         subtitle={`${active ? 'Active' : 'Revoked'} · Created ${apiKey.created} by ${apiKey.createdBy}`}
         actions={
-          active && canManage ? (
-            <>
-              <Button icon={<Send size={14} strokeWidth={1.8} />} onClick={() => navigate(`/admin/api-keys/${apiKey.id}/test`)}>Send test event</Button>
-              <Button icon={<RotateCw size={14} strokeWidth={1.8} />} onClick={() => setDialog({ type: 'rotate' })}>Rotate key</Button>
-              <Button variant="danger-outline" icon={<Ban size={14} strokeWidth={1.8} />} onClick={() => setDialog({ type: 'revoke' })}>Revoke key</Button>
-            </>
+          canManage ? (
+            active ? (
+              <>
+                <Button icon={<Send size={14} strokeWidth={1.8} />} onClick={() => navigate(`/admin/api-keys/${apiKey.id}/test`)}>Send test event</Button>
+                <Button icon={<RotateCw size={14} strokeWidth={1.8} />} onClick={() => setDialog({ type: 'rotate' })}>Rotate key</Button>
+                <Button variant="danger-outline" icon={<Ban size={14} strokeWidth={1.8} />} onClick={() => setDialog({ type: 'revoke' })}>Revoke key</Button>
+              </>
+            ) : (
+              <Button variant="primary" icon={<Plus size={14} strokeWidth={2} />} onClick={() => setDialog({ type: 'replace' })}>
+                Create replacement key
+              </Button>
+            )
           ) : undefined
         }
       />
@@ -129,7 +157,19 @@ function ApiKeyDetailScreen() {
         {!active && (
           <Banner tone="gray" icon={<Lock size={17} strokeWidth={1.8} color={C.text2} />}>
             <b>Revoked {apiKey.revokedOn} by {apiKey.revokedBy}.</b> History is read-only. Tasks this key already created stay on To-Dos until completed.
+            {replacement && (
+              <>
+                {' '}Replaced by{' '}
+                <Link to={`/admin/api-keys/${replacement.id}`} style={{ color: C.primary }}>{replacement.name}</Link>, created {replacement.created}.
+              </>
+            )}
           </Banner>
+        )}
+        {replaced && (
+          <p className="text-sm" style={{ color: C.text2 }}>
+            Replaces{' '}
+            <Link to={`/admin/api-keys/${replaced.id}`} style={{ color: C.primary }}>{replaced.name}</Link>, revoked {replaced.revokedOn}. That key keeps its own history.
+          </p>
         )}
 
         <Panel>
@@ -267,13 +307,22 @@ function ApiKeyDetailScreen() {
           onCancel={() => setDialog(null)}
         />
       )}
+      {dialog?.type === 'replace' && (
+        <AddKeyModal
+          initialName={apiKey.name}
+          initialNotes={apiKey.notes}
+          replaces={apiKey}
+          onClose={() => setDialog(null)}
+          onCreated={({ key, token }) => setDialog({ type: 'token', keyId: key.id, keyName: key.name, token, rotated: false })}
+        />
+      )}
       {dialog?.type === 'token' && (
         <CopyKeyModal
-          keyName={apiKey.name}
+          keyName={dialog.keyName}
           token={dialog.token}
-          rotated
+          rotated={dialog.rotated}
           oldLast4={dialog.oldLast4}
-          onDone={() => { setDialog(null); showToast('New key issued. The old key no longer works.'); }}
+          onDone={() => finishToken(dialog)}
         />
       )}
       <ToastHost />
