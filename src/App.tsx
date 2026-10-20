@@ -23,6 +23,11 @@ import InformationLibraryPage from '@/pages/information/InformationLibraryPage';
 import IntegrationsPage from '@/pages/user-management/IntegrationsPage';
 import StatusesListPage from '@/pages/user-management/StatusesListPage';
 import StatusSetEditorPage from '@/pages/user-management/StatusSetEditorPage';
+import ApiKeysPage from '@/pages/user-management/ApiKeysPage';
+import ApiKeyDetailPage from '@/pages/user-management/ApiKeyDetailPage';
+import ApiKeyTestPage from '@/pages/user-management/ApiKeyTestPage';
+import ApiKeyRejectedEventsPage from '@/pages/user-management/ApiKeyRejectedEventsPage';
+import ApiKeyRoleCheckPage from '@/pages/user-management/ApiKeyRoleCheckPage';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -38,6 +43,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/distribution':        'Distribution',
   '/admin/integrations':        'Integrations',
   '/admin/statuses':            'Statuses',
+  '/admin/api-keys':            'API Keys',
   '/admin/org-import':          'Org Hierarchy Import',
   '/information':               'Information Library',
   '/operate/lists':             'List Completion',
@@ -238,6 +244,8 @@ function Shell({ children }: { children: React.ReactNode }) {
               <DrawerNavItem to="/admin/integrations"   label="Integrations"            onNavigate={() => setDrawerOpen(false)} />
               {/* No org-admin gate in this prototype. Other Admin items are visible the same way. */}
               <DrawerNavItem to="/admin/statuses"       label="Statuses"                onNavigate={() => setDrawerOpen(false)} />
+              {/* Placement is provisional: the mock keeps API Keys under Admin › Settings. Move this one line when design confirms. */}
+              <DrawerNavItem to="/admin/api-keys"       label="API Keys"                onNavigate={() => setDrawerOpen(false)} />
             </div>
           )}
 
@@ -343,6 +351,11 @@ export default function App() {
           <Route path="/admin/integrations/:slug" element={<IntegrationsPage />} />
           <Route path="/admin/statuses" element={<StatusesListPage />} />
           <Route path="/admin/statuses/:setId" element={<StatusSetEditorPage />} />
+          <Route path="/admin/api-keys" element={<ApiKeysPage />} />
+          <Route path="/admin/api-keys/role-check" element={<ApiKeyRoleCheckPage />} />
+          <Route path="/admin/api-keys/rejected" element={<ApiKeyRejectedEventsPage />} />
+          <Route path="/admin/api-keys/:keyId" element={<ApiKeyDetailPage />} />
+          <Route path="/admin/api-keys/:keyId/test" element={<ApiKeyTestPage />} />
           <Route path="/admin/org-import"   element={<OrgHierarchyImportPage />} />
           <Route path="/information" element={<InformationLibraryPage />} />
           <Route path="/operate/lists" element={<ListCompletionPage />} />

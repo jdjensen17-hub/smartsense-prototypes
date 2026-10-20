@@ -6,6 +6,12 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-10-20 — Partner Portal API keys live at Admin › API Keys
+
+- **What:** The Partner Portal admin setup flow is `#/admin/api-keys`, with `role-check`, `rejected`, `:keyId`, and `:keyId/test` nested under it. Pages are `ApiKeysPage`, `ApiKeyRoleCheckPage`, `ApiKeyRejectedEventsPage`, `ApiKeyDetailPage`, and `ApiKeyTestPage` in `src/pages/user-management/`, with shared parts in `src/components/api-keys/` and the in-memory store in `src/data/apiKeys.ts`. The nav entry is one flat `DrawerNavItem` after Statuses. Sample data stays fictional: Summit Fuel & Market, PumpLink, StockWise, FixFlow, InsightBoard, made-up stores and people. The mock's dev-only Screens picker is not ported; every state has a query param instead (`?state=`, `?modal=`, `?demo=`, `?phase=resolving`, `?edit=notes`, `?as=csm`, `?reset=1`), and support view also has a "Switch to org admin" link in its banner.
+- **Why:** The repo's Admin nav is a flat accordion with no Settings subgroup, and placement is still open after design review, so a single nav line is the cheapest thing to move. The admin hex palette matches the pages this screen sits next to. The site is public, so no real partner or customer names.
+- **Rejected:** A Settings subgroup in the drawer only to mirror the mock. The mock's NEW pill, following the Statuses decision from 2026-10-14. Porting the Screens picker into the product UI. Rebuilding the shell header to carry the mock's "Support access" pill and org name.
+
 ## 2026-10-15 — A status changes is phase 3
 
 - **What:** Settings › Notifications gets “A status changes” as the last event, on both list and audit templates. No NEW pill and no email preview. The status hint is “Click a status to set up a notification.” It notifies roles when an instance moves to the chosen statuses. Attach PDF shows only while Email is on and starts checked. Audits attach the Leave Behind Report. Lists attach the list completion PDF. No set disables the row: “Select a status set first.” A set switch clears the chosen statuses and the row says “No statuses selected. Edit to choose.” None removes those rules. The card summary is “N events configured · M notifications”, or “No events configured” when nothing is saved. Rules live on `templateStatus` with the set choice. The sample audit starts with Compliance Manager · Email (PDF attached) · to Needs Compliance Approval. The sample list starts with Pharmacy Manager · Push · 24 hours before due.
