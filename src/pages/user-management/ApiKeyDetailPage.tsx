@@ -310,7 +310,6 @@ function ApiKeyDetailScreen() {
       {dialog?.type === 'replace' && (
         <AddKeyModal
           initialName={apiKey.name}
-          initialNotes={apiKey.notes}
           replaces={apiKey}
           onClose={() => setDialog(null)}
           onCreated={({ key, token }) => setDialog({ type: 'token', keyId: key.id, keyName: key.name, token, rotated: false })}

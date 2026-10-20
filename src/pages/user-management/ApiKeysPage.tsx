@@ -177,7 +177,7 @@ function ApiKeysScreen() {
                     onOpen={() => navigate(`/admin/api-keys/${apiKey.id}`)}
                     onRotate={() => setDialog({ type: 'rotate', keyId: apiKey.id })}
                     onRevoke={() => setDialog({ type: 'revoke', keyId: apiKey.id })}
-                    onReplace={() => setDialog({ type: 'add', name: apiKey.name, notes: apiKey.notes, error: null, replacesKeyId: apiKey.id })}
+                    onReplace={() => setDialog({ type: 'add', name: apiKey.name, notes: '', error: null, replacesKeyId: apiKey.id })}
                     onRejected={() => navigate(`/admin/api-keys/rejected?key=${apiKey.id}`)}
                   />
                 ))}
