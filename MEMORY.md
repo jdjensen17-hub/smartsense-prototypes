@@ -6,6 +6,14 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-10-27 — The Status app mock ships as a static public asset
+
+- **What:** The List Instance Status mobile mock lives at `public/status-item-app-mock/`: `index.html` (the mock), `screens/` (the S1–S11 and `ref_*` PNG captures), `build_mock.py` (the generator, now writing `index.html` in place), and a short `README.md`. Public URL is `https://smartsense-prototypes.vercel.app/status-item-app-mock/`, and each capture has its own URL under `screens/`. Epics LW-18142 and LW-18165 cite that instead of a `/workspace` path. The HTML stays the settled source of truth — it is not rewritten into React. It is not in the nav drawer.
+- **Why:** `public/` is served verbatim, so the mock's phone and tablet frames render full-bleed with no shell header and no HashRouter around them. `public/roadmap/index.html` already proves Vercel resolves a static folder at `/folder/`. The mock has no external fonts, images, or scripts, so one folder is the whole dependency.
+- **Rejected:** Porting the mock into a React page under `src/pages/mobile/operate/`. A route inside the app shell, which would wrap the device frames. A drawer entry, since `prototype-workflow.mdc` says a page does not go in the drawer just to be shareable, and the roadmap page sets the same precedent. Keeping the generator outside `public/`, which would leave the served file and its source in different folders.
+
+---
+
 ## 2026-10-20 — A revoked partner reconnects with a replacement key
 
 - **What:** Key names are unique among **active** keys only, still case-insensitive and still 40 characters max. Once a key is revoked its name is free, so the replacement carries the same partner name. A revoked key detail gets a primary **Create replacement key** action, and the revoked row on the list gets a **Replace** link next to the revoked date. Both are hidden in support read-only view. The action opens the Add key dialog pre-filled with the revoked key's name and notes, titled "Create replacement key", with a line naming the key it replaces. From there it is the normal copy-once dialog and then the new key's Test page. The pair is labelled both ways: the new key shows a "Replaces a revoked key" badge plus a line linking to the revoked key, and the revoked key's banner says "Replaced by {name}, created {date}". `replacesKeyId` and `replacedByKeyId` on the key carry this.
