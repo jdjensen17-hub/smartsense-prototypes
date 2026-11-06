@@ -54,13 +54,11 @@ export const AUDITOR_LOCATIONS: Record<string, string> = {
   john: 'John Auditor',
 };
 
-/** auditorLocIds: Audits-CG locations where the person holds the auditor role.
- *  assignedAt: subset where they also hold Assigned on this template. */
+/** auditorLocIds: Audits-CG locations where the person holds the auditor role. */
 export type DemoPerson = {
   id: string;
   name: string;
   auditorLocIds: string[];
-  assignedAt: string[];
 };
 
 /** OPEN-B: only roles linked to person items on the Inspection Site asset template. */
@@ -68,18 +66,18 @@ export const OPEN_B_ROLES = ['Compliance Manager', 'Regional Supervisor', 'Distr
 
 export const PEOPLE_BY_ROLE: Record<string, DemoPerson[]> = {
   'Regional Supervisor': [
-    { id: 'rs1', name: 'R.S. One', auditorLocIds: ['jane'], assignedAt: ['jane'] },
-    { id: 'rs2', name: 'R.S. Two', auditorLocIds: ['jane'], assignedAt: ['jane'] },
-    { id: 'rs3', name: 'R.S. Three', auditorLocIds: ['jane', 'john'], assignedAt: ['jane', 'john'] },
-    { id: 'rs4', name: 'R.S. Four', auditorLocIds: [], assignedAt: [] },
-    { id: 'rs5', name: 'R.S. Five', auditorLocIds: ['john'], assignedAt: [] },
+    { id: 'rs1', name: 'R.S. One', auditorLocIds: ['jane'] },
+    { id: 'rs2', name: 'R.S. Two', auditorLocIds: ['jane'] },
+    { id: 'rs3', name: 'R.S. Three', auditorLocIds: ['jane', 'john'] },
+    { id: 'rs4', name: 'R.S. Four', auditorLocIds: [] },
+    { id: 'rs5', name: 'R.S. Five', auditorLocIds: ['john'] },
   ],
   'District Manager': [
-    { id: 'dm1', name: 'D.M. North', auditorLocIds: ['jane'], assignedAt: ['jane'] },
-    { id: 'dm2', name: 'D.M. South', auditorLocIds: ['john'], assignedAt: ['john'] },
+    { id: 'dm1', name: 'D.M. North', auditorLocIds: ['jane'] },
+    { id: 'dm2', name: 'D.M. South', auditorLocIds: ['john'] },
   ],
   'Compliance Manager': [
-    { id: 'cm1', name: 'C.M. West', auditorLocIds: ['jane', 'john'], assignedAt: ['jane'] },
+    { id: 'cm1', name: 'C.M. West', auditorLocIds: ['jane', 'john'] },
   ],
 };
 
@@ -92,26 +90,6 @@ export function peopleLabels(audience: AudienceRow) {
   return peopleForRole(audience.role)
     .filter((person) => audience.peopleIds.includes(person.id))
     .map((person) => person.name);
-}
-
-/** OR-union of people across audience rows, deduped by person id. */
-export function unionPeople(audiences: AudienceRow[]) {
-  const byId = new Map<string, DemoPerson>();
-  audiences.forEach((audience) => {
-    const all = peopleForRole(audience.role);
-    const picked = audience.peopleMode === 'all'
-      ? all
-      : all.filter((person) => audience.peopleIds.includes(person.id));
-    picked.forEach((person) => byId.set(person.id, person));
-  });
-  return [...byId.values()];
-}
-
-/** Placement alone does not grant completion — surface people without Assigned. */
-export function completionRisks(audiences: AudienceRow[]) {
-  return unionPeople(audiences).flatMap((person) => person.auditorLocIds
-    .filter((locId) => !person.assignedAt.includes(locId))
-    .map((locId) => `${person.name} @ ${AUDITOR_LOCATIONS[locId]}`));
 }
 
 // ── Schedule preview copy ─────────────────────────────────────────────────

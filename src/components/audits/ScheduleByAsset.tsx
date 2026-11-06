@@ -6,7 +6,6 @@ import { createPortal } from 'react-dom';
 import {
   auditSetup,
   AUDITOR_LOCATIONS,
-  completionRisks,
   defaultEndDateISO,
   DUE_UNITS,
   endListLabel,
@@ -31,13 +30,11 @@ const T = {
   textSecondary: '#5C5C6E',
   textMuted: '#9898A8',
   textAccent: '#185FA5',
-  textWarning: '#854F0B',
   border: 'rgba(26,26,31,0.12)',
   borderStrong: 'rgba(26,26,31,0.22)',
   borderAccent: '#378ADD',
   fillAccent: '#378ADD',
   bgAccent: '#E6F1FB',
-  bgWarning: '#FAEEDA',
   onAccent: '#FFFFFF',
   font: "'Inter', -apple-system, sans-serif",
 };
@@ -369,7 +366,6 @@ export function AudiencesSection({ templateId, onDirty }: { templateId: string; 
     onDirty();
   };
 
-  const risks = completionRisks(audiences);
   const multi = audiences.length > 1;
 
   return (
@@ -409,12 +405,6 @@ export function AudiencesSection({ templateId, onDirty }: { templateId: string; 
             <LinkBtn onClick={openAdd}><i className="ti ti-plus" /> Add audience</LinkBtn>
           </div>
         </>
-      )}
-      {risks.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 12, background: T.bgWarning, border: '0.5px solid #FFD54F', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: T.textWarning, lineHeight: 1.45 }}>
-          <i className="ti ti-alert-triangle" style={{ fontSize: 14, marginTop: 1 }} />
-          <span><strong>Completion risk:</strong> {risks.join('; ')}. Assigned/Managed still gate completion.</span>
-        </div>
       )}
       {draft && (
         <AudienceModal
