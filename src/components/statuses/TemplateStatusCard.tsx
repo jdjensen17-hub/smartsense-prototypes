@@ -1,6 +1,13 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  AUDIENCE_TIP,
+  AudiencesSection,
+  AuditScheduleSection,
+  SCHEDULE_TIP,
+} from '@/components/audits/ScheduleByAsset';
 import { StatusChip } from '@/components/statuses/StatusChip';
+import { audienceSummary, scheduleSummary, useAuditSetup } from '@/data/auditSetup';
 import { statusSets, useStatusSets } from '@/data/statusSets';
 import {
   defaultStatusOf,
@@ -275,8 +282,16 @@ const OUTCOME_SEED = [
 export function AuditsTab({ templateId, onDirty }: { templateId: string; onDirty: () => void }) {
   const [outcomes, setOutcomes] = useState(OUTCOME_SEED);
   const [report, setReport] = useState('default');
+  const setup = useAuditSetup(templateId);
   return (
     <div style={{ padding: 16, maxWidth: 720, width: '100%' }}>
+      {/* Schedule-by-asset authoring (LW-17820) shares this tab with the status config below. */}
+      <CardShell title="Audit schedule" summary={scheduleSummary(setup.schedules)} help={SCHEDULE_TIP}>
+        <AuditScheduleSection templateId={templateId} onDirty={onDirty} />
+      </CardShell>
+      <CardShell title="Audiences" summary={audienceSummary(setup.audiences)} help={AUDIENCE_TIP}>
+        <AudiencesSection templateId={templateId} onDirty={onDirty} />
+      </CardShell>
       <CardShell title="Audit Outcomes" summary="Set an outcome for each score range" help="Set an outcome for each score range">
         <div style={{ display: 'grid', gridTemplateColumns: '105px 1fr 165px 28px', gap: 8, alignItems: 'center', marginBottom: 8, fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: T.textMuted }}>
           <span>Score above</span><span>Outcome</span><span>Outcome override flag</span><span />

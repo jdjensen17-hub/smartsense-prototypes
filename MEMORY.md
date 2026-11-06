@@ -6,6 +6,14 @@ it first. Format per decision: **what / why / rejected**.
 
 ---
 
+## 2026-11-06 — Schedule-by-asset setup is a section pair on the Audits tab
+
+- **What:** LW-17820 setup UX ports onto the existing Audits tab of `#/operate/jolt-editor?template=supervisor-facility-audit`: an **Audit schedule** card and an **Audiences** card above Audit Outcomes / Status / Leave Behind Report, in the same `CardShell` chrome. Frequency presets are Once (no recurrence) / Monthly / Quarterly / Twice yearly / Annually — no Custom. Each row is start month + day, Due amount + days/weeks/months after displays (default 30 days), and End No end (default) or On date (`<input type="date">`, ISO `endDate`, stub Dec 31 of next year, hidden for Once). Multiple rows carry the Costco stagger. Schedule preview copy is frequency-specific. Audiences are N rows of OPEN-B role + All/specific people, OR-union, with a Completion risk warning when a selected person lacks Assigned at their auditor location. State lives in `auditSetup` (`src/data/auditSetup.ts`), UI in `src/components/audits/ScheduleByAsset.tsx`. Publish with zero schedule rows soft-warns in the publish note; it does not block.
+- **Why:** The epic puts both features on the Audits tab, and this repo already had an Audits tab for status config. Two cards on that tab read as when → who above the existing scoring/status content, and `templateStatus`'s store pattern already proves an in-memory store the editor header can read.
+- **Rejected:** A fourth top-level tab, which would split one setup flow across two tabs. The HTML mock's Settings-vs-Audits chrome split (superseded by the epic). The mock's framework-only chrome: Items Inspection-Site toggle and its danger banner, demo helpers tray, Placement and Location tags cards (placement copy is the Audiences info tip instead). A Generation Preview panel, which the locked mock removed. Hard-blocking SAVE with zero schedules.
+
+---
+
 ## 2026-10-27 — The Status app mock ships as a static public asset
 
 - **What:** The List Instance Status mobile mock lives at `public/status-item-app-mock/`: `index.html` (the mock), `screens/` (the S1–S11 and `ref_*` PNG captures), `build_mock.py` (the generator, now writing `index.html` in place), and a short `README.md`. Public URL is `https://smartsense-prototypes.vercel.app/status-item-app-mock/`, and each capture has its own URL under `screens/`. Epics LW-18142 and LW-18165 cite that instead of a `/workspace` path. The HTML stays the settled source of truth — it is not rewritten into React. It is not in the nav drawer.

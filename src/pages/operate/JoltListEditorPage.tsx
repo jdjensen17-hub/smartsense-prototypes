@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from '@emotion/styled';
 import { AuditsTab, submitStatusPhrase, TemplateStatusCard } from '@/components/statuses/TemplateStatusCard';
 import { AUDIT_SAMPLE_ID, LIST_SAMPLE_ID, notificationSummary, pdfAttachmentInfo, templateStatus, useTemplateStatus, type NotificationRule } from '@/data/templateStatus';
+import { useAuditSetup } from '@/data/auditSetup';
 import { StatusChip } from '@/components/statuses/StatusChip';
 import { useStatusSets } from '@/data/statusSets';
 import { X } from 'lucide-react';
@@ -5299,6 +5300,7 @@ export default function JoltListEditorPage() {
   const requested = params.get('template');
   const templateId = templateStatus.has(requested) ? requested! : 'opening-checklist';
   const templateDraft = useTemplateStatus(templateId);
+  const auditSetupRecord = useAuditSetup(templateId);
   const [activeTab, setActiveTab] = useState<'items' | 'settings' | 'audits'>(
     templateDraft.type === 'audit' ? 'audits' : templateId === 'opening-checklist' ? 'items' : 'settings',
   );
@@ -5459,11 +5461,16 @@ export default function JoltListEditorPage() {
 
   const handlePublishNow = () => {
     const note = templateStatus.onPublish(templateId);
+    // Soft-warn only: publishing an audit template without a schedule row is allowed.
+    const scheduleWarning = templateDraft.type === 'audit' && auditSetupRecord.schedules.length === 0
+      ? 'Published. No audit schedule yet — audits generate once you add a schedule on the Audits tab.'
+      : null;
     setScheduledAt(null);
     setSchedulePanelOpen(false);
     setSaveStatus('published');
-    if (note) {
-      setPublishNote(note);
+    const shown = [note, scheduleWarning].filter(Boolean).join(' ');
+    if (shown) {
+      setPublishNote(shown);
       window.setTimeout(() => setPublishNote(null), 4000);
     }
   };
