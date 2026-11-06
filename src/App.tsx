@@ -28,6 +28,7 @@ import ApiKeyDetailPage from '@/pages/user-management/ApiKeyDetailPage';
 import ApiKeyTestPage from '@/pages/user-management/ApiKeyTestPage';
 import ApiKeyRejectedEventsPage from '@/pages/user-management/ApiKeyRejectedEventsPage';
 import ApiKeyRoleCheckPage from '@/pages/user-management/ApiKeyRoleCheckPage';
+import { AUDIT_SAMPLE_ID } from '@/data/templateStatus';
 
 // ── Logged-in user (prototype stub) ─────────────────────────────────────────────
 const CURRENT_USER_ID = 'p16';
@@ -81,15 +82,20 @@ function ChevronIcon({ open }: { open: boolean }) {
 }
 
 // ── Nav drawer item ───────────────────────────────────────────────────────────
-function DrawerNavItem({ to, label, end, onNavigate }: { to: string; label: string; end?: boolean; onNavigate: () => void }) {
+// matchSearch: for two items on one path, the query string decides which is active.
+function DrawerNavItem({ to, label, end, matchSearch, onNavigate }: { to: string; label: string; end?: boolean; matchSearch?: string; onNavigate: () => void }) {
+  const { search } = useLocation();
   return (
     <NavLink to={to} end={end} onClick={onNavigate}
       className="block rounded px-3 py-2 text-sm transition-colors"
-      style={({ isActive }) => ({
-        backgroundColor: isActive ? '#5CA6D9' : 'transparent',
-        color: isActive ? '#ffffff' : '#757677',
-        fontWeight: isActive ? 600 : 400,
-      })}
+      style={({ isActive }) => {
+        const active = isActive && (matchSearch === undefined || search === matchSearch);
+        return {
+          backgroundColor: active ? '#5CA6D9' : 'transparent',
+          color: active ? '#ffffff' : '#757677',
+          fontWeight: active ? 600 : 400,
+        };
+      }}
       onMouseEnter={e => { if (e.currentTarget.style.color !== 'rgb(255, 255, 255)') e.currentTarget.style.backgroundColor = '#F7F7FA'; }}
       onMouseLeave={e => { if (e.currentTarget.style.color !== 'rgb(255, 255, 255)') e.currentTarget.style.backgroundColor = 'transparent'; }}
     >
@@ -272,7 +278,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           {operateOpen && (
             <div className="mt-1 ml-3 flex flex-col gap-0.5" style={{ borderLeft: '1px solid #CCCDD0', paddingLeft: '10px' }}>
               <DrawerNavItem to="/operate/lists" label="List Completion" end onNavigate={() => setDrawerOpen(false)} />
-              <DrawerNavItem to="/operate/jolt-editor" label="List Template Editor" end onNavigate={() => setDrawerOpen(false)} />
+              <DrawerNavItem to="/operate/jolt-editor" label="List Template Editor" end matchSearch="" onNavigate={() => setDrawerOpen(false)} />
+              <DrawerNavItem to={`/operate/jolt-editor?template=${AUDIT_SAMPLE_ID}`} label="Audit Template Editor" end matchSearch={`?template=${AUDIT_SAMPLE_ID}`} onNavigate={() => setDrawerOpen(false)} />
               <DrawerNavItem to="/operate/jolt-preview" label="List Preview" end onNavigate={() => setDrawerOpen(false)} />
               <DrawerNavItem to="/mobile/operate/pdf-search" label="PDF Search" end onNavigate={() => setDrawerOpen(false)} />
             </div>
